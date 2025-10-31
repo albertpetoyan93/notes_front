@@ -1,0 +1,68 @@
+.table-wrapper {
+  position: relative;
+  max-height: calc(100vh - 150px);
+  // .ant-table-body": {
+  //     height: ``,
+  //   }
+
+  .ant-table-body {
+    // height: calc(100vh - 328px);
+    // max-height: calc(100vh - 269px) !important;
+  }
+  .scroll-btn {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 10;
+    opacity: 0;
+    transition: opacity 0.2s;
+    pointer-events: none;
+    width: 18px;
+    height: 100px;
+  }
+  .scroll-btn.left {
+    left: 0;
+  }
+
+  .scroll-btn.right {
+    right: 0;
+  }
+  &:hover {
+    .scroll-btn {
+      opacity: 0.6;
+      pointer-events: auto;
+    }
+  }
+  .ant-pagination {
+    margin: 10px 0 !important;
+    text-align: center;
+  }
+}
+
+.duble_row_title {
+  .ant-table-body {
+    height: calc(100vh - 346px);
+  }
+}
+.single_row_title {
+  .ant-table-body {
+    height: calc(100vh - 305px);
+  }
+}
+
+.ant-table-body::-webkit-scrollbar {
+  width: 6px; /* Make the vertical scrollbar thinner */
+  background: transparent;
+  width: 6px;
+  height: 6px;
+}
+
+.ant-table-body::-webkit-scrollbar-thumb {
+  background: #bdbdbd; /* Scrollbar color */
+  border-radius: 4px;
+}
+
+.ant-table-body::-webkit-scrollbar-track {
+  background: transparent;
+  width: 6px;
+}

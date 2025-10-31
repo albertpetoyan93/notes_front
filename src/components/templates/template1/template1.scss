@@ -1,0 +1,25 @@
+.template1 {
+  .banner {
+    // background-repeat: no-repeat;
+    background-position: center;
+    padding: 20px;
+    text-align: center;
+    height: 480px;
+    display: flex;
+    h1 {
+      display: flex;
+      align-items: center; /* Vertical centering */
+      justify-content: center; /* Optional: horizontal centering */
+      height: 100%; /* Takes full height of parent */
+      text-align: center;
+      color: #fff;
+    }
+  }
+  .content_block {
+    margin-top: 24px;
+    h1 {
+      text-align: center;
+      margin: 20px 0;
+    }
+  }
+}

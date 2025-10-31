@@ -1,0 +1,106 @@
+@use "./components/header/header.scss" as header;
+
+:root {
+  font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+
+  // color-scheme: light dark;
+  color: #032649;
+  // background-color: #242424;
+
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+*::-webkit-scrollbar {
+  width: 6px; /* Make the vertical scrollbar thinner */
+  background: transparent;
+  width: 6px;
+  height: 6px;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: #bdbdbd; /* Scrollbar color */
+  border-radius: 4px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+  width: 6px;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  min-width: 320px;
+  min-height: 100vh;
+}
+.site-layout {
+}
+.clickable {
+  cursor: pointer;
+}
+.cell-center {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.action_block {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 1rem;
+
+  * {
+    // This targets all children of .action_block
+    cursor: pointer;
+  }
+}
+.ant-form-item-explain-error {
+  color: #ff4d4f;
+}
+
+.icon_custom {
+  font-size: 16px;
+}
+.edit_icon {
+  color: var(--secondary_2);
+}
+.see_more_icon {
+  color: var(--primary);
+}
+.delete_icon {
+  color: var(--secondary_1);
+}
+button {
+  box-shadow: none !important;
+}
+.ant-upload {
+  width: 100%;
+  display: block;
+  button {
+    width: 100%;
+  }
+}
+.ant-upload-list-item {
+  display: none !important;
+}
+
+.text_overflow {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.highlight-row {
+  transition: background-color 0.3s ease;
+  td {
+    background-color: #efefef !important;
+  }
+}

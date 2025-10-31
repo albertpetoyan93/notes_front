@@ -1,0 +1,28 @@
+.sidebar_header {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 0 20px;
+  height: 65px;
+  border-bottom: 1px solid #e0e0e0;
+}
+.sidebar_menu {
+  max-height: calc(100% - 100px);
+  height: 100%;
+  overflow-y: auto;
+  background: none;
+  .ant-menu-item {
+    color: var(--colorTextMenu);
+  }
+  .ant-menu-submenu-title {
+    color: var(--colorTextMenu) !important;
+  }
+  .ant-menu-item-selected {
+    background: var(--colorBgMenuItem);
+    color: var(--colorText);
+  }
+  .ant-menu-item-active {
+    background: var(--colorBgMenuItem) !important;
+    color: var(--colorText);
+  }
+}

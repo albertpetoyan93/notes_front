@@ -1,0 +1,26 @@
+export enum PageTypes {
+  SINGLE = "SINGLE",
+  MULTIPLE = "MULTIPLE",
+  CHARITY = "CHARITY",
+  NEWS = "NEWS",
+  EVENT = "EVENT",
+  BOARD_OF_TRUSTEES = "BOARD_OF_TRUSTEES",
+  EXECUTIVE_BOARD = "EXECUTIVE_BOARD",
+  MEDIA = "MEDIA",
+}
+
+export enum MenuCntentTypes {
+  SPECIAL = "SPECIAL",
+  MULTIPLE = "MULTIPLE",
+  SINGLE = "SINGLE",
+}
+
+export enum DocumentImageTypes {
+  IDENTITY = "IDENTITY",
+  NATIONALITY = "NATIONALITY",
+}
+
+export enum RolesType {
+  GENERAL_ADMIN = "GENERAL",
+  CHAPTER_ADMIN = "CHAPTER",
+}
