@@ -14,7 +14,7 @@
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.0",
     "@geo-maps/countries-land-50m": "^0.6.0",
-    "antd": "^5.26.6",
+    "antd": "^5.27.6",
     "axios": "^1.7.9",
     "country-state-city": "^3.2.1",
     "dayjs": "^1.11.13",

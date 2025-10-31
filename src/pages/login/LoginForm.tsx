@@ -48,8 +48,8 @@ const LoginForm = () => {
             alignItems: "center",
           }}
         >
-          <Form.Item name="username" label="Username" style={{ width: "100%" }}>
-            <Input placeholder="Username" />
+          <Form.Item name="email" label="Email" style={{ width: "100%" }}>
+            <Input placeholder="Email" />
           </Form.Item>
         </div>
         <div
