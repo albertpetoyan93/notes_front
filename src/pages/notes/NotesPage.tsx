@@ -615,7 +615,7 @@ const NotesPage = () => {
 
   return (
     <div className="notes-page">
-      <Row className="notes-header" gutter={[16, 16]}>
+      <Row className="notes-header" gutter={[16, 8]}>
         <Col
           xs={{ span: 12, order: 1 }}
           sm={{ span: 12, order: 1 }}
