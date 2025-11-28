@@ -3,17 +3,15 @@
   min-height: calc(100vh - 64px);
 
   .notes-header {
-    display: flex;
-    justify-content: space-between;
     align-items: center;
     margin-bottom: 6px;
-    gap: 12px;
 
     .switcher {
-      background: var(--surfaceMuted);
-      border-radius: 999px;
+      border-radius: 14px;
       padding: 4px;
       border: 1px solid var(--borderSubtle);
+      order: 1;
+      max-width: 200px;
 
       .ant-segmented-item {
         color: var(--textMuted);
@@ -35,14 +33,6 @@
       font-weight: 700;
       font-size: 32px;
     }
-  }
-
-  .notes-filters {
-    padding: 12px;
-    background: var(--surfaceCard);
-    border-radius: 16px;
-    border: 1px solid var(--borderSubtle);
-    box-shadow: var(--boxShadow);
   }
 
   .notes-loading {

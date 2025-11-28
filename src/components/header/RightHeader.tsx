@@ -4,7 +4,7 @@ import { FaPowerOff } from "react-icons/fa6";
 import { useTheme } from "../../contexts/ThemeContext";
 import useAuth from "../../hooks/useAuth";
 import { useAuthStore } from "../../store/authStore";
-import ThemeSelector from "../themeSelector/ThemeSelector";
+// import ThemeSelector from "../themeSelector/ThemeSelector";
 
 const RightHeader = () => {
   const { mode, handleThemeChange } = useTheme();
@@ -24,7 +24,7 @@ const RightHeader = () => {
       <span style={{ marginRight: "10px" }}>
         {me?.name} {me?.surname}
       </span>
-      <ThemeSelector />
+      {/* <ThemeSelector /> */}
       <Dropdown
         trigger={["click"]}
         menu={{

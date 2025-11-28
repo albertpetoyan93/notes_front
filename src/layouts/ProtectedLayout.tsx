@@ -55,13 +55,12 @@ const ProtectedLayout: React.FC = () => {
           }}
         >
           <Row style={{ alignItems: "center" }}>
-            <Col span={8}>
+            <Col span={12}>
               <LeftHeader
               // collapsed={collapsed} setCollapsed={setCollapsed}
               />
             </Col>
-            <Col span={8}></Col>
-            <Col span={8}>
+            <Col span={12}>
               <RightHeader />
             </Col>
           </Row>

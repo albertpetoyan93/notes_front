@@ -615,86 +615,116 @@ const NotesPage = () => {
 
   return (
     <div className="notes-page">
-      <div className="notes-header">
-        <Segmented
-          className="switcher"
-          value={viewMode}
-          onChange={(value) => handleViewModeChange(value as "card" | "table")}
-          style={{ padding: "6px" }}
-          options={[
-            {
-              label: "Cards",
-              value: "card",
-              icon: <AppstoreOutlined />,
-            },
-            {
-              label: "Table",
-              value: "table",
-              icon: <UnorderedListOutlined />,
-            },
-          ]}
-        />
-        <div className="notes-filters">
-          <Space
-            size="middle"
-            wrap
-            style={{ width: "100%", justifyContent: "space-between" }}
-          >
-            <Space size="middle" wrap>
-              <Select
-                value={selectedCategory}
-                onChange={handleCategoryChange}
-                style={{ width: 150 }}
-                popupClassName="notes-select-dropdown"
-                options={categories}
-              />
-              <Select
-                value={selectedProject}
-                onChange={handleProjectChange}
-                style={{ width: 180 }}
-                placeholder="Filter by project"
-                popupClassName="notes-select-dropdown"
-              >
-                <Select.Option value="all">All Projects</Select.Option>
-                {projects.map((project) => (
-                  <Select.Option key={project} value={project}>
-                    {project}
-                  </Select.Option>
-                ))}
-              </Select>
-              <Select
-                value={selectedTag}
-                onChange={handleTagChange}
-                style={{ width: 150 }}
-                placeholder="Filter by tag"
-                popupClassName="notes-select-dropdown"
-              >
-                <Select.Option value="all">All Tags</Select.Option>
-                {availableTags.map((tag) => (
-                  <Select.Option key={tag} value={tag}>
-                    {tag}
-                  </Select.Option>
-                ))}
-              </Select>
-              <Search
-                placeholder="Search notes..."
-                allowClear
-                onSearch={handleSearch}
-                style={{ width: 300 }}
-                prefix={<SearchOutlined />}
-              />
-            </Space>
-          </Space>
-        </div>
-        <Button
-          type="primary"
-          icon={<PlusOutlined />}
-          onClick={() => setModalVisible(true)}
-          size="large"
+      <Row className="notes-header" gutter={[16, 16]}>
+        <Col
+          xs={{ span: 12, order: 1 }}
+          sm={{ span: 12, order: 1 }}
+          md={{ span: 12, order: 1 }}
+          lg={{ span: 4, order: 1 }}
         >
-          New Note
-        </Button>
-      </div>
+          <Segmented
+            className="switcher"
+            value={viewMode}
+            onChange={(value) =>
+              handleViewModeChange(value as "card" | "table")
+            }
+            style={{ padding: "6px" }}
+            options={[
+              {
+                label: "Cards",
+                value: "card",
+                icon: <AppstoreOutlined />,
+              },
+              {
+                label: "Table",
+                value: "table",
+                icon: <UnorderedListOutlined />,
+              },
+            ]}
+          />
+        </Col>
+        <Col
+          xs={{ order: 3 }}
+          sm={{ order: 3 }}
+          md={{ span: 24, order: 3 }}
+          lg={{ span: 16, order: 2 }}
+        >
+          {" "}
+          <div className="notes-filters">
+            <Row align="middle" gutter={[8, 8]}>
+              <Col xs={24} sm={5}>
+                {" "}
+                <Select
+                  value={selectedCategory}
+                  onChange={handleCategoryChange}
+                  style={{ width: "100%" }}
+                  popupClassName="notes-select-dropdown"
+                  options={categories}
+                />
+              </Col>
+              <Col xs={24} sm={5}>
+                <Select
+                  value={selectedProject}
+                  onChange={handleProjectChange}
+                  style={{ width: "100%" }}
+                  placeholder="Filter by project"
+                  popupClassName="notes-select-dropdown"
+                >
+                  <Select.Option value="all">All Projects</Select.Option>
+                  {projects.map((project) => (
+                    <Select.Option key={project} value={project}>
+                      {project}
+                    </Select.Option>
+                  ))}
+                </Select>
+              </Col>
+              <Col xs={24} sm={4}>
+                <Select
+                  value={selectedTag}
+                  onChange={handleTagChange}
+                  style={{ width: "100%" }}
+                  placeholder="Filter by tag"
+                  popupClassName="notes-select-dropdown"
+                >
+                  <Select.Option value="all">All Tags</Select.Option>
+                  {availableTags.map((tag) => (
+                    <Select.Option key={tag} value={tag}>
+                      {tag}
+                    </Select.Option>
+                  ))}
+                </Select>
+              </Col>
+              <Col xs={24} sm={10}>
+                <Search
+                  placeholder="Search notes..."
+                  allowClear
+                  onSearch={handleSearch}
+                  style={{ width: "100%" }}
+                  prefix={<SearchOutlined />}
+                />
+              </Col>
+            </Row>
+          </div>
+        </Col>
+        <Col
+          xs={{ span: 12, order: 2 }}
+          sm={{ span: 12, order: 2 }}
+          md={{ span: 12, order: 2 }}
+          lg={{ span: 4, order: 3 }}
+          style={{ textAlign: "right" }}
+        >
+          {" "}
+          <Button
+            className="new_note_button"
+            type="primary"
+            icon={<PlusOutlined />}
+            onClick={() => setModalVisible(true)}
+            size="large"
+          >
+            New Note
+          </Button>
+        </Col>
+      </Row>
 
       {loading ? (
         <div className="notes-loading">
