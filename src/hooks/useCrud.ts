@@ -7,7 +7,7 @@ import {
 } from "../configs/axios";
 import { filterSerachParams } from "../utils/filterSerachParams";
 import { useSearchParams } from "react-router-dom";
-import { toast } from "react-toastify";
+import { message } from "antd";
 
 type Endpoints = {
   list: string;
@@ -59,9 +59,9 @@ const useCrud = (endpoints: Endpoints) => {
     } catch (err: any) {
       err.errors
         ? err.errors.map((error: any) => {
-            toast.error(error.message);
+            message.error(error.message);
           })
-        : toast.error(err.message);
+        : message.error(err.message);
       setError(err);
       throw err;
     } finally {
@@ -82,9 +82,9 @@ const useCrud = (endpoints: Endpoints) => {
     } catch (err: any) {
       err.errors
         ? err.errors.map((error: any) => {
-            toast.error(error.message);
+            message.error(error.message);
           })
-        : toast.error(err.message);
+        : message.error(err.message);
       setError(err);
     } finally {
       setLoading(false);
@@ -100,7 +100,7 @@ const useCrud = (endpoints: Endpoints) => {
       );
       await fetchData(params);
     } catch (err: any) {
-      toast.error(err.message);
+      message.error(err.message);
       setError(err);
     } finally {
       setLoading(false);
