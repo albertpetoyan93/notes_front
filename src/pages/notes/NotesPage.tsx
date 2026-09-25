@@ -9,6 +9,7 @@ import {
   LinkOutlined,
   PlusOutlined,
   SearchOutlined,
+  ShareAltOutlined,
   StarFilled,
   StarOutlined,
   UnorderedListOutlined,
@@ -30,9 +31,11 @@ import {
   Typography,
   message,
 } from "antd";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useNoteStore } from "../../store/noteStore";
 import NoteModal from "./NoteModal";
+import ShareModal from "./ShareModal";
 import "./NotesPage.scss";
 import NoteViewModal from "./NoteViewModal";
 import dayjsExtra from "../../utils/dayjs";
@@ -61,16 +64,21 @@ const NotesPage = () => {
     getProjects,
   } = useNoteStore();
 
+  const [searchParams, setSearchParams] = useSearchParams();
+  const selectedCategory = searchParams.get("category") || "all";
+  const selectedProject = searchParams.get("project") || "all";
+  const selectedTag = searchParams.get("tag") || "all";
+  const searchQuery = searchParams.get("search") || "";
+  const sharedFilter = searchParams.get("shared") === "true" ? "shared" : "all";
+
   const [modalVisible, setModalVisible] = useState(false);
   const [editingNote, setEditingNote] = useState<any>(null);
   const [viewModalVisible, setViewModalVisible] = useState(false);
   const [viewingNote, setViewingNote] = useState<any>(null);
-  const [selectedCategory, setSelectedCategory] = useState<string>("all");
-  const [selectedProject, setSelectedProject] = useState<string>("all");
-  const [selectedTag, setSelectedTag] = useState<string>("all");
+  const [shareModalVisible, setShareModalVisible] = useState(false);
+  const [sharingNote, setSharingNote] = useState<any>(null);
   const [projects, setProjects] = useState<string[]>([]);
   const [availableTags, setAvailableTags] = useState<string[]>([]);
-  const [searchQuery, setSearchQuery] = useState<string>("");
   const [viewMode, setViewMode] = useState<"card" | "table">(() => {
     const saved = localStorage.getItem("notesViewMode");
     return (saved as "card" | "table") || "card";
@@ -79,6 +87,57 @@ const NotesPage = () => {
   const [visiblePasswords, setVisiblePasswords] = useState<Set<string>>(
     new Set()
   );
+
+  const isNoteOwner = (note: any) =>
+    note?.isOwner === true || note?.permission === "owner";
+
+  const canEditNote = (note: any) =>
+    isNoteOwner(note) || note?.permission === "edit";
+
+  const handleShare = (note: any) => {
+    setSharingNote(note);
+    setShareModalVisible(true);
+  };
+
+  const handleShareModalClose = () => {
+    setShareModalVisible(false);
+    setSharingNote(null);
+  };
+
+  const updateSearchParams = useCallback(
+    (updates: Record<string, string | null | undefined>) => {
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev);
+          Object.entries(updates).forEach(([key, value]) => {
+            if (!value || value === "all") {
+              next.delete(key);
+            } else {
+              next.set(key, value);
+            }
+          });
+          return next;
+        },
+        { replace: true }
+      );
+    },
+    [setSearchParams]
+  );
+
+  const fetchWithCurrentFilters = useCallback(() => {
+    fetchNotes({
+      category: selectedCategory !== "all" ? selectedCategory : undefined,
+      project: selectedProject !== "all" ? selectedProject : undefined,
+      search: searchQuery || undefined,
+      sharedOnly: sharedFilter === "shared",
+    });
+  }, [
+    fetchNotes,
+    selectedCategory,
+    selectedProject,
+    searchQuery,
+    sharedFilter,
+  ]);
 
   const handleViewModeChange = (mode: "card" | "table") => {
     setViewMode(mode);
@@ -117,9 +176,13 @@ const NotesPage = () => {
   };
 
   useEffect(() => {
-    fetchNotes();
+    fetchWithCurrentFilters();
+  }, [fetchWithCurrentFilters]);
+
+  useEffect(() => {
     loadProjects();
-  }, [fetchNotes]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     // Extract unique tags from all notes whenever notes change
@@ -167,33 +230,23 @@ const NotesPage = () => {
   };
 
   const handleSearch = (value: string) => {
-    setSearchQuery(value);
-    fetchNotes({
-      category: selectedCategory !== "all" ? selectedCategory : undefined,
-      search: value,
-    });
+    updateSearchParams({ search: value.trim() || null });
   };
 
   const handleCategoryChange = (category: string) => {
-    setSelectedCategory(category);
-    fetchNotes({
-      category: category !== "all" ? category : undefined,
-      project: selectedProject !== "all" ? selectedProject : undefined,
-      search: searchQuery,
-    });
+    updateSearchParams({ category });
   };
 
   const handleProjectChange = (project: string) => {
-    setSelectedProject(project);
-    fetchNotes({
-      category: selectedCategory !== "all" ? selectedCategory : undefined,
-      project: project !== "all" ? project : undefined,
-      search: searchQuery,
-    });
+    updateSearchParams({ project });
   };
 
   const handleTagChange = (tag: string) => {
-    setSelectedTag(tag);
+    updateSearchParams({ tag });
+  };
+
+  const handleSharedFilterChange = (value: string) => {
+    updateSearchParams({ shared: value === "shared" ? "true" : null });
   };
 
   const getCategoryColor = (category: string) => {
@@ -259,13 +312,19 @@ const NotesPage = () => {
         fixed: "left" as const,
         ellipsis: true,
         sorter: (a: any, b: any) => a.title.localeCompare(b.title),
-        render: (text: string) => (
-          <Text strong style={{ cursor: "pointer" }}>
-            {text}
-          </Text>
+        render: (text: string, record: any) => (
+          <Space size={4}>
+            <Text strong style={{ cursor: "pointer" }}>
+              {text}
+            </Text>
+            {record.isShared && (
+              <Tag color="purple" style={{ margin: 0 }}>
+                Shared
+              </Tag>
+            )}
+          </Space>
         ),
-      },
-      {
+      },      {
         title: "Category",
         dataIndex: "category",
         key: "category",
@@ -552,27 +611,29 @@ const NotesPage = () => {
       {
         title: "Actions",
         key: "actions",
-        width: 120,
+        width: 160,
         fixed: "right" as const,
         render: (_: any, record: any) => (
           <Space size="small">
-            <Tooltip title="Toggle Favorite">
-              <Button
-                type="text"
-                size="small"
-                icon={
-                  record.isFavorite ? (
-                    <StarFilled style={{ color: "#faad14" }} />
-                  ) : (
-                    <StarOutlined />
-                  )
-                }
-                onClick={(e) => {
-                  e.stopPropagation();
-                  toggleFavorite(record.id);
-                }}
-              />
-            </Tooltip>
+            {isNoteOwner(record) && (
+              <Tooltip title="Toggle Favorite">
+                <Button
+                  type="text"
+                  size="small"
+                  icon={
+                    record.isFavorite ? (
+                      <StarFilled style={{ color: "#faad14" }} />
+                    ) : (
+                      <StarOutlined />
+                    )
+                  }
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    toggleFavorite(record.id);
+                  }}
+                />
+              </Tooltip>
+            )}
             <Tooltip title="View">
               <Button
                 type="text"
@@ -584,29 +645,46 @@ const NotesPage = () => {
                 }}
               />
             </Tooltip>
-            <Tooltip title="Edit">
-              <Button
-                type="text"
-                size="small"
-                icon={<EditOutlined />}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleEdit(record);
-                }}
-              />
-            </Tooltip>
-            <Tooltip title="Delete">
-              <Button
-                type="text"
-                size="small"
-                danger
-                icon={<DeleteOutlined />}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleDelete(record.id);
-                }}
-              />
-            </Tooltip>
+            {isNoteOwner(record) && (
+              <Tooltip title="Share">
+                <Button
+                  type="text"
+                  size="small"
+                  icon={<ShareAltOutlined />}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleShare(record);
+                  }}
+                />
+              </Tooltip>
+            )}
+            {canEditNote(record) && (
+              <Tooltip title="Edit">
+                <Button
+                  type="text"
+                  size="small"
+                  icon={<EditOutlined />}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleEdit(record);
+                  }}
+                />
+              </Tooltip>
+            )}
+            {isNoteOwner(record) && (
+              <Tooltip title="Delete">
+                <Button
+                  type="text"
+                  size="small"
+                  danger
+                  icon={<DeleteOutlined />}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleDelete(record.id);
+                  }}
+                />
+              </Tooltip>
+            )}
           </Space>
         ),
       },
@@ -652,8 +730,7 @@ const NotesPage = () => {
           {" "}
           <div className="notes-filters">
             <Row align="middle" gutter={[8, 8]}>
-              <Col xs={24} sm={5}>
-                {" "}
+              <Col xs={24} sm={4}>
                 <Select
                   value={selectedCategory}
                   onChange={handleCategoryChange}
@@ -662,7 +739,7 @@ const NotesPage = () => {
                   options={categories}
                 />
               </Col>
-              <Col xs={24} sm={5}>
+              <Col xs={24} sm={4}>
                 <Select
                   value={selectedProject}
                   onChange={handleProjectChange}
@@ -694,11 +771,26 @@ const NotesPage = () => {
                   ))}
                 </Select>
               </Col>
-              <Col xs={24} sm={10}>
+              <Col xs={24} sm={4}>
+                <Select
+                  value={sharedFilter}
+                  onChange={handleSharedFilterChange}
+                  style={{ width: "100%" }}
+                  popupClassName="notes-select-dropdown"
+                  options={[
+                    { value: "all", label: "Mine & shared" },
+                    { value: "shared", label: "Shared with me" },
+                  ]}
+                />
+              </Col>
+              <Col xs={24} sm={8}>
                 <Search
+                  key={searchQuery}
                   placeholder="Search notes..."
                   allowClear
+                  defaultValue={searchQuery}
                   onSearch={handleSearch}
+                  onClear={() => updateSearchParams({ search: null })}
                   style={{ width: "100%" }}
                   prefix={<SearchOutlined />}
                 />
@@ -726,16 +818,18 @@ const NotesPage = () => {
         </Col>
       </Row>
 
-      {loading ? (
+      {loading && notes.length === 0 ? (
         <div className="notes-loading">
           <Spin size="large" />
         </div>
-      ) : filteredNotes.length === 0 ? (
-        <Empty
-          description="No notes found. Try adjusting your filters or create a new note!"
-          image={Empty.PRESENTED_IMAGE_SIMPLE}
-        />
-      ) : viewMode === "card" ? (
+      ) : (
+        <Spin spinning={loading} size="large">
+          {filteredNotes.length === 0 ? (
+            <Empty
+              description="No notes found. Try adjusting your filters or create a new note!"
+              image={Empty.PRESENTED_IMAGE_SIMPLE}
+            />
+          ) : viewMode === "card" ? (
         <Row gutter={[16, 16]}>
           {filteredNotes.map((note) => (
             <Col xs={24} sm={12} lg={6} xl={4} key={note.id}>
@@ -745,21 +839,27 @@ const NotesPage = () => {
                 onClick={() => handleView(note)}
                 style={{ cursor: "pointer" }}
                 actions={[
+                  ...(isNoteOwner(note)
+                    ? [
+                        <Button
+                          key="favorite"
+                          type="text"
+                          icon={
+                            note.isFavorite ? (
+                              <StarFilled style={{ color: "#faad14" }} />
+                            ) : (
+                              <StarOutlined />
+                            )
+                          }
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleFavorite(note.id);
+                          }}
+                        />,
+                      ]
+                    : []),
                   <Button
-                    type="text"
-                    icon={
-                      note.isFavorite ? (
-                        <StarFilled style={{ color: "#faad14" }} />
-                      ) : (
-                        <StarOutlined />
-                      )
-                    }
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      toggleFavorite(note.id);
-                    }}
-                  />,
-                  <Button
+                    key="view"
                     type="text"
                     icon={<EyeOutlined />}
                     onClick={(e) => {
@@ -767,30 +867,54 @@ const NotesPage = () => {
                       handleView(note);
                     }}
                   />,
-                  <Button
-                    type="text"
-                    icon={<EditOutlined />}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleEdit(note);
-                    }}
-                  />,
-                  <Button
-                    type="text"
-                    danger
-                    icon={<DeleteOutlined />}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleDelete(note.id);
-                    }}
-                  />,
+                  ...(isNoteOwner(note)
+                    ? [
+                        <Button
+                          key="share"
+                          type="text"
+                          icon={<ShareAltOutlined />}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleShare(note);
+                          }}
+                        />,
+                      ]
+                    : []),
+                  ...(canEditNote(note)
+                    ? [
+                        <Button
+                          key="edit"
+                          type="text"
+                          icon={<EditOutlined />}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleEdit(note);
+                          }}
+                        />,
+                      ]
+                    : []),
+                  ...(isNoteOwner(note)
+                    ? [
+                        <Button
+                          key="delete"
+                          type="text"
+                          danger
+                          icon={<DeleteOutlined />}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDelete(note.id);
+                          }}
+                        />,
+                      ]
+                    : []),
                 ]}
               >
                 <div className="note-card-header">
                   <Tag color={getCategoryColor(note.category)}>
                     {note.category.toUpperCase()}
                   </Tag>
-                  {note.isFavorite && (
+                  {note.isShared && <Tag color="purple">Shared</Tag>}
+                  {note.isFavorite && isNoteOwner(note) && (
                     <StarFilled style={{ color: "#faad14", fontSize: 16 }} />
                   )}
                 </div>
@@ -979,18 +1103,35 @@ const NotesPage = () => {
           })}
           size="middle"
         />
+          )}
+        </Spin>
       )}
 
       <NoteModal
         visible={modalVisible}
         note={editingNote}
         onClose={handleModalClose}
+        onSaved={fetchWithCurrentFilters}
+      />
+
+      <ShareModal
+        visible={shareModalVisible}
+        note={sharingNote}
+        onClose={handleShareModalClose}
       />
 
       <NoteViewModal
         visible={viewModalVisible}
         note={viewingNote}
         onClose={handleViewModalClose}
+        onShare={
+          viewingNote && isNoteOwner(viewingNote)
+            ? () => {
+                handleViewModalClose();
+                handleShare(viewingNote);
+              }
+            : undefined
+        }
       />
     </div>
   );

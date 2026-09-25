@@ -1,4 +1,5 @@
-import { Drawer, Descriptions, Tag, Typography } from "antd";
+import { ShareAltOutlined } from "@ant-design/icons";
+import { Button, Drawer, Descriptions, Space, Tag, Typography } from "antd";
 
 const { Paragraph, Title } = Typography;
 
@@ -6,20 +7,24 @@ interface NoteViewModalProps {
   visible: boolean;
   note: any;
   onClose: () => void;
+  onShare?: () => void;
 }
 
-const NoteViewModal = ({ visible, note, onClose }: NoteViewModalProps) => {
+const NoteViewModal = ({
+  visible,
+  note,
+  onClose,
+  onShare,
+}: NoteViewModalProps) => {
   if (!note) return null;
 
   const parseContent = (content: any) => {
-    // If content is already an object, return it
     if (typeof content === "object" && content !== null) {
       return {
         mainContent: content.mainContent || "",
         customFields: content.customFields || [],
       };
     }
-    // If it's a string, try to parse it
     try {
       return JSON.parse(content);
     } catch {
@@ -32,9 +37,20 @@ const NoteViewModal = ({ visible, note, onClose }: NoteViewModalProps) => {
   return (
     <Drawer
       title={
-        <Title level={4} style={{ margin: 0 }}>
-          {note.title}
-        </Title>
+        <Space style={{ width: "100%", justifyContent: "space-between" }}>
+          <Title level={4} style={{ margin: 0 }}>
+            {note.title}
+          </Title>
+          {onShare && (
+            <Button
+              type="text"
+              icon={<ShareAltOutlined />}
+              onClick={onShare}
+            >
+              Share
+            </Button>
+          )}
+        </Space>
       }
       open={visible}
       onClose={onClose}
@@ -43,19 +59,22 @@ const NoteViewModal = ({ visible, note, onClose }: NoteViewModalProps) => {
     >
       <Descriptions column={1} bordered size="small">
         <Descriptions.Item label="Category">
-          <Tag
-            color={
-              note.category === "password"
-                ? "red"
-                : note.category === "login"
-                ? "green"
-                : note.category === "command"
-                ? "purple"
-                : "blue"
-            }
-          >
-            {note.category.toUpperCase()}
-          </Tag>
+          <Space>
+            <Tag
+              color={
+                note.category === "password"
+                  ? "red"
+                  : note.category === "login"
+                  ? "green"
+                  : note.category === "command"
+                  ? "purple"
+                  : "blue"
+              }
+            >
+              {note.category.toUpperCase()}
+            </Tag>
+            {note.isShared && <Tag color="purple">Shared with you</Tag>}
+          </Space>
         </Descriptions.Item>
 
         {note.project && (

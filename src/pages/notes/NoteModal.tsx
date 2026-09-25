@@ -9,6 +9,7 @@ interface NoteModalProps {
   visible: boolean;
   note?: any;
   onClose: () => void;
+  onSaved?: () => void;
 }
 
 interface CustomField {
@@ -16,9 +17,9 @@ interface CustomField {
   value: string;
 }
 
-const NoteModal = ({ visible, note, onClose }: NoteModalProps) => {
+const NoteModal = ({ visible, note, onClose, onSaved }: NoteModalProps) => {
   const [form] = Form.useForm();
-  const { createNote, updateNote, loading, fetchNotes } = useNoteStore();
+  const { createNote, updateNote, loading } = useNoteStore();
   const [selectedCategory, setSelectedCategory] = useState<string>("note");
   const [customFields, setCustomFields] = useState<CustomField[]>([]);
 
@@ -148,11 +149,9 @@ const NoteModal = ({ visible, note, onClose }: NoteModalProps) => {
         await createNote(values);
       }
 
-      // Refresh notes list
-      await fetchNotes();
-
       form.resetFields();
       setCustomFields([]);
+      onSaved?.();
       onClose();
     } catch (error) {
       // Error handling is done in the hook

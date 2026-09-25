@@ -104,3 +104,21 @@ button {
     background-color: #efefef !important;
   }
 }
+
+.share-message-left {
+  .ant-message-notice-content {
+    text-align: left;
+  }
+
+  .ant-message-custom-content {
+    align-items: flex-start;
+  }
+
+  .share-error-list {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    text-align: left;
+    gap: 4px;
+  }
+}

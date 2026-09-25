@@ -12,7 +12,7 @@ export interface NoteContent {
 export interface Note {
   id: number;
   title: string;
-  content: NoteContent | Record<string, any>; // JSONB object
+  content: NoteContent | Record<string, any>;
   comment?: string;
   category: "note" | "password" | "login" | "command" | "ssh" | "db" | "other";
   project?: string;
@@ -22,6 +22,24 @@ export interface Note {
   userId: number;
   createdAt: string;
   updatedAt: string;
+  isOwner?: boolean;
+  isShared?: boolean;
+  permission?: "owner" | "view" | "edit";
+}
+
+export interface NoteShare {
+  id: number;
+  noteId: number;
+  sharedByUserId: number;
+  sharedWithUserId: number;
+  permission: "view" | "edit";
+  createdAt: string;
+  sharedWith?: {
+    id: number;
+    username: string;
+    email: string;
+    fullName?: string;
+  };
 }
 
 interface NoteStore {
@@ -32,12 +50,12 @@ interface NoteStore {
   searchQuery: string;
   projects: string[];
 
-  // Actions
   fetchNotes: (filters?: {
     category?: string;
     project?: string;
     search?: string;
     isFavorite?: boolean;
+    sharedOnly?: boolean;
   }) => Promise<void>;
   getNote: (id: number) => Promise<Note>;
   createNote: (note: Partial<Note>) => Promise<Note>;
@@ -46,6 +64,13 @@ interface NoteStore {
   toggleFavorite: (id: number) => Promise<void>;
   getNoteStats: () => Promise<any>;
   getProjects: () => Promise<string[]>;
+  shareNote: (
+    noteId: number,
+    identifier: string | string[],
+    permission?: "view" | "edit"
+  ) => Promise<{ shared: NoteShare[]; failed: { identifier: string; message: string }[] }>;
+  getNoteShares: (noteId: number) => Promise<NoteShare[]>;
+  revokeShare: (noteId: number, userId: number) => Promise<void>;
   setSelectedCategory: (category: string) => void;
   setSearchQuery: (query: string) => void;
 }
@@ -73,6 +98,9 @@ export const useNoteStore = create<NoteStore>((set, get) => ({
       }
       if (filters?.isFavorite) {
         params.append("isFavorite", "true");
+      }
+      if (filters?.sharedOnly) {
+        params.append("sharedOnly", "true");
       }
 
       const response = await axios.get(`/api/notes?${params.toString()}`);
@@ -102,7 +130,6 @@ export const useNoteStore = create<NoteStore>((set, get) => ({
         notes: [response.data, ...state.notes],
         loading: false,
       }));
-      await get().fetchNotes();
       return response.data;
     } catch (error: any) {
       set({ error: error.message, loading: false });
@@ -118,7 +145,6 @@ export const useNoteStore = create<NoteStore>((set, get) => ({
         notes: state.notes.map((n) => (n.id === id ? response.data : n)),
         loading: false,
       }));
-      await get().fetchNotes();
       return response.data;
     } catch (error: any) {
       set({ error: error.message, loading: false });
@@ -142,7 +168,7 @@ export const useNoteStore = create<NoteStore>((set, get) => ({
 
   toggleFavorite: async (id) => {
     const note = get().notes.find((n) => n.id === id);
-    if (!note) return;
+    if (!note || note.isOwner === false) return;
 
     set({ loading: true, error: null });
     try {
@@ -180,6 +206,24 @@ export const useNoteStore = create<NoteStore>((set, get) => ({
       set({ error: error.message });
       throw error;
     }
+  },
+
+  shareNote: async (noteId, identifier, permission = "view") => {
+    const identifiers = Array.isArray(identifier) ? identifier : [identifier];
+    const response = await axios.post(`/api/notes/${noteId}/share`, {
+      identifiers,
+      permission,
+    });
+    return response.data;
+  },
+
+  getNoteShares: async (noteId) => {
+    const response = await axios.get(`/api/notes/${noteId}/shares`);
+    return response.data;
+  },
+
+  revokeShare: async (noteId, userId) => {
+    await axios.delete(`/api/notes/${noteId}/share/${userId}`);
   },
 
   setSelectedCategory: (category) => {
