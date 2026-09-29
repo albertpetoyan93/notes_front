@@ -7,6 +7,7 @@ export interface NoteContent {
     label: string;
     value: string;
   }>;
+  decryptionFailed?: boolean;
 }
 
 export interface Note {
