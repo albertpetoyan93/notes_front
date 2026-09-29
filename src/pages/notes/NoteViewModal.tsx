@@ -77,9 +77,9 @@ const NoteViewModal = ({
           </Space>
         </Descriptions.Item>
 
-        {note.project && (
-          <Descriptions.Item label="Project">
-            <Tag color="processing">{note.project}</Tag>
+        {note.collection?.name && (
+          <Descriptions.Item label="Collection">
+            <Tag color="processing">{note.collection.name}</Tag>
           </Descriptions.Item>
         )}
 

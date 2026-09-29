@@ -25,6 +25,16 @@ export interface Note {
   isOwner?: boolean;
   isShared?: boolean;
   permission?: "owner" | "view" | "edit";
+  collectionId?: number | null;
+  collection?: { id: number; name: string } | null;
+}
+
+export interface CollectionItem {
+  id: number;
+  name: string;
+  isOwner: boolean;
+  permission: "owner" | "view" | "edit";
+  noteCount: number;
 }
 
 export interface NoteShare {
@@ -33,6 +43,7 @@ export interface NoteShare {
   sharedByUserId: number;
   sharedWithUserId: number;
   permission: "view" | "edit";
+  expiresAt?: string | null;
   createdAt: string;
   sharedWith?: {
     id: number;
@@ -53,24 +64,63 @@ interface NoteStore {
   fetchNotes: (filters?: {
     category?: string;
     project?: string;
+    tag?: string;
     search?: string;
     isFavorite?: boolean;
     sharedOnly?: boolean;
+    trash?: boolean;
+    collectionId?: number;
   }) => Promise<void>;
   getNote: (id: number) => Promise<Note>;
   createNote: (note: Partial<Note>) => Promise<Note>;
   updateNote: (id: number, note: Partial<Note>) => Promise<Note>;
   deleteNote: (id: number) => Promise<void>;
+  restoreNote: (id: number) => Promise<void>;
+  searchUsers: (
+    query: string
+  ) => Promise<
+    { id: number; username: string; email: string; fullName?: string }[]
+  >;
   toggleFavorite: (id: number) => Promise<void>;
   getNoteStats: () => Promise<any>;
   getProjects: () => Promise<string[]>;
   shareNote: (
     noteId: number,
     identifier: string | string[],
-    permission?: "view" | "edit"
+    permission?: "view" | "edit",
+    expiresIn?: string
   ) => Promise<{ shared: NoteShare[]; failed: { identifier: string; message: string }[] }>;
   getNoteShares: (noteId: number) => Promise<NoteShare[]>;
   revokeShare: (noteId: number, userId: number) => Promise<void>;
+  exportNotes: () => Promise<{
+    version: number;
+    exportedAt: string;
+    skipped: number;
+    notes: Partial<Note>[];
+  }>;
+  importNotes: (
+    notes: Partial<Note>[]
+  ) => Promise<{ imported: number; failed: { title: string; message: string }[] }>;
+  fetchCollections: () => Promise<CollectionItem[]>;
+  createCollection: (name: string) => Promise<CollectionItem>;
+  renameCollection: (id: number, name: string) => Promise<CollectionItem>;
+  deleteCollection: (id: number) => Promise<void>;
+  addNotesToCollection: (
+    id: number,
+    noteIds: number[]
+  ) => Promise<{ added: number; skipped: number }>;
+  removeNoteFromCollection: (id: number, noteId: number) => Promise<void>;
+  availableCollectionNotes: (
+    id: number
+  ) => Promise<{ id: number; title: string }[]>;
+  shareCollection: (
+    id: number,
+    identifiers: string[],
+    permission?: "view" | "edit",
+    expiresIn?: string
+  ) => Promise<{ shared: any[]; failed: { identifier: string; message: string }[] }>;
+  getCollectionShares: (id: number) => Promise<any[]>;
+  revokeCollectionShare: (id: number, userId: number) => Promise<void>;
   setSelectedCategory: (category: string) => void;
   setSearchQuery: (query: string) => void;
 }
@@ -93,6 +143,9 @@ export const useNoteStore = create<NoteStore>((set, get) => ({
       if (filters?.project && filters.project !== "all") {
         params.append("project", filters.project);
       }
+      if (filters?.tag && filters.tag !== "all") {
+        params.append("tag", filters.tag);
+      }
       if (filters?.search) {
         params.append("search", filters.search);
       }
@@ -101,6 +154,12 @@ export const useNoteStore = create<NoteStore>((set, get) => ({
       }
       if (filters?.sharedOnly) {
         params.append("sharedOnly", "true");
+      }
+      if (filters?.trash) {
+        params.append("trash", "true");
+      }
+      if (filters?.collectionId) {
+        params.append("collection", String(filters.collectionId));
       }
 
       const response = await axios.get(`/api/notes?${params.toString()}`);
@@ -166,21 +225,50 @@ export const useNoteStore = create<NoteStore>((set, get) => ({
     }
   },
 
-  toggleFavorite: async (id) => {
-    const note = get().notes.find((n) => n.id === id);
-    if (!note || note.isOwner === false) return;
-
+  restoreNote: async (id) => {
     set({ loading: true, error: null });
     try {
-      const response = await axios.put(`/api/notes/${id}`, {
-        isFavorite: !note.isFavorite,
-      });
+      await axios.post(`/api/notes/${id}/restore`);
       set((state) => ({
-        notes: state.notes.map((n) => (n.id === id ? response.data : n)),
+        notes: state.notes.filter((n) => n.id !== id),
         loading: false,
       }));
     } catch (error: any) {
       set({ error: error.message, loading: false });
+      throw error;
+    }
+  },
+
+  searchUsers: async (query) => {
+    const response = await axios.get("/api/auth/users", {
+      params: { q: query },
+    });
+    return response.data;
+  },
+
+  toggleFavorite: async (id) => {
+    const note = get().notes.find((n) => n.id === id);
+    if (!note) return;
+
+    const nextFavorite = !note.isFavorite;
+    set((state) => ({
+      notes: state.notes.map((n) =>
+        n.id === id ? { ...n, isFavorite: nextFavorite } : n
+      ),
+    }));
+
+    try {
+      const response = await axios.post(`/api/notes/${id}/favorite`);
+      set((state) => ({
+        notes: state.notes.map((n) => (n.id === id ? response.data : n)),
+      }));
+    } catch (error: any) {
+      set((state) => ({
+        notes: state.notes.map((n) =>
+          n.id === id ? { ...n, isFavorite: !nextFavorite } : n
+        ),
+        error: error.message,
+      }));
       throw error;
     }
   },
@@ -208,11 +296,12 @@ export const useNoteStore = create<NoteStore>((set, get) => ({
     }
   },
 
-  shareNote: async (noteId, identifier, permission = "view") => {
+  shareNote: async (noteId, identifier, permission = "view", expiresIn = "never") => {
     const identifiers = Array.isArray(identifier) ? identifier : [identifier];
     const response = await axios.post(`/api/notes/${noteId}/share`, {
       identifiers,
       permission,
+      expiresIn,
     });
     return response.data;
   },
@@ -224,6 +313,72 @@ export const useNoteStore = create<NoteStore>((set, get) => ({
 
   revokeShare: async (noteId, userId) => {
     await axios.delete(`/api/notes/${noteId}/share/${userId}`);
+  },
+
+  exportNotes: async () => {
+    const response = await axios.get("/api/notes/export");
+    return response.data;
+  },
+
+  importNotes: async (notes) => {
+    const response = await axios.post("/api/notes/import", { notes });
+    return response.data;
+  },
+
+  fetchCollections: async () => {
+    const response = await axios.get("/api/collections");
+    return response.data;
+  },
+
+  createCollection: async (name: string) => {
+    const response = await axios.post("/api/collections", { name });
+    return response.data;
+  },
+
+  renameCollection: async (id: number, name: string) => {
+    const response = await axios.put(`/api/collections/${id}`, { name });
+    return response.data;
+  },
+
+  deleteCollection: async (id: number) => {
+    await axios.delete(`/api/collections/${id}`);
+  },
+
+  addNotesToCollection: async (id: number, noteIds: number[]) => {
+    const response = await axios.post(`/api/collections/${id}/notes`, { noteIds });
+    return response.data;
+  },
+
+  removeNoteFromCollection: async (id: number, noteId: number) => {
+    await axios.delete(`/api/collections/${id}/notes/${noteId}`);
+  },
+
+  availableCollectionNotes: async (id: number) => {
+    const response = await axios.get(`/api/collections/${id}/available-notes`);
+    return response.data;
+  },
+
+  shareCollection: async (
+    id: number,
+    identifiers: string[],
+    permission: "view" | "edit" = "view",
+    expiresIn = "never"
+  ) => {
+    const response = await axios.post(`/api/collections/${id}/share`, {
+      identifiers,
+      permission,
+      expiresIn,
+    });
+    return response.data;
+  },
+
+  getCollectionShares: async (id: number) => {
+    const response = await axios.get(`/api/collections/${id}/shares`);
+    return response.data;
+  },
+
+  revokeCollectionShare: async (id: number, userId: number) => {
+    await axios.delete(`/api/collections/${id}/share/${userId}`);
   },
 
   setSelectedCategory: (category) => {

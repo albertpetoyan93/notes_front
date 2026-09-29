@@ -11,10 +11,22 @@ import {
   Typography,
   message,
 } from "antd";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { NoteShare, useNoteStore } from "../../store/noteStore";
 
 const { Text } = Typography;
+
+function expiryLabel(expiresAt?: string | null) {
+  if (!expiresAt) return "No expiry";
+  const date = new Date(expiresAt);
+  if (date.getTime() <= Date.now()) return "Expired";
+  return `Expires ${date.toLocaleDateString()}`;
+}
+
+function expiryColor(expiresAt?: string | null) {
+  if (!expiresAt) return "default";
+  return new Date(expiresAt).getTime() <= Date.now() ? "red" : "gold";
+}
 
 interface ShareModalProps {
   visible: boolean;
@@ -23,11 +35,40 @@ interface ShareModalProps {
 }
 
 const ShareModal = ({ visible, note, onClose }: ShareModalProps) => {
-  const { shareNote, getNoteShares, revokeShare } = useNoteStore();
+  const { shareNote, getNoteShares, revokeShare, searchUsers } = useNoteStore();
   const [form] = Form.useForm();
   const [shares, setShares] = useState<NoteShare[]>([]);
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [userOptions, setUserOptions] = useState<
+    { value: string; label: string; name: string; email: string }[]
+  >([]);
+  const searchTimer = useRef<number>();
+
+  const handleUserSearch = (value: string) => {
+    window.clearTimeout(searchTimer.current);
+    const query = value.trim();
+    if (query.length < 2) {
+      setUserOptions([]);
+      return;
+    }
+
+    searchTimer.current = window.setTimeout(async () => {
+      try {
+        const users = await searchUsers(query);
+        setUserOptions(
+          users.map((user) => ({
+            value: user.email,
+            label: user.email,
+            name: user.fullName || user.username,
+            email: user.email,
+          }))
+        );
+      } catch {
+        setUserOptions([]);
+      }
+    }, 300);
+  };
 
   const loadShares = async () => {
     if (!note?.id) return;
@@ -56,7 +97,8 @@ const ShareModal = ({ visible, note, onClose }: ShareModalProps) => {
       const result = await shareNote(
         note.id,
         values.identifiers,
-        values.permission
+        values.permission,
+        values.expiresIn
       );
 
       if (result.shared?.length) {
@@ -78,6 +120,11 @@ const ShareModal = ({ visible, note, onClose }: ShareModalProps) => {
             </div>
           ),
         });
+      }
+
+      if (result.shared?.length) {
+        onClose();
+        return;
       }
 
       form.resetFields(["identifiers"]);
@@ -131,7 +178,7 @@ const ShareModal = ({ visible, note, onClose }: ShareModalProps) => {
       <Form
         form={form}
         layout="vertical"
-        initialValues={{ permission: "view", identifiers: [] }}
+        initialValues={{ permission: "view", identifiers: [], expiresIn: "never" }}
         onFinish={handleShare}
       >
         <Form.Item
@@ -145,14 +192,27 @@ const ShareModal = ({ visible, note, onClose }: ShareModalProps) => {
               message: "Add at least one email or username",
             },
           ]}
-          extra="Type an email or username and press Enter to add more"
+          extra="Type at least 2 characters, then pick a user"
         >
           <Select
-            mode="tags"
-            tokenSeparators={[",", " ", ";"]}
-            placeholder="Add emails or usernames..."
+            mode="multiple"
+            showSearch
+            filterOption={false}
+            onSearch={handleUserSearch}
+            options={userOptions}
+            optionRender={(option) => (
+              <div style={{ display: "flex", flexDirection: "column" }}>
+                <span>{option.data.name}</span>
+                <span style={{ fontSize: 12, opacity: 0.7 }}>
+                  {option.data.email}
+                </span>
+              </div>
+            )}
+            popupMatchSelectWidth={false}
+            dropdownStyle={{ minWidth: 320 }}
+            placeholder="Search by email or username"
             suffixIcon={<UserAddOutlined />}
-            open={false}
+            notFoundContent={null}
           />
         </Form.Item>
         <Form.Item name="permission" label="Permission">
@@ -160,6 +220,16 @@ const ShareModal = ({ visible, note, onClose }: ShareModalProps) => {
             options={[
               { value: "view", label: "View only" },
               { value: "edit", label: "Can edit" },
+            ]}
+          />
+        </Form.Item>
+        <Form.Item name="expiresIn" label="Access expires">
+          <Select
+            options={[
+              { value: "never", label: "Never" },
+              { value: "1", label: "In 1 day" },
+              { value: "7", label: "In 7 days" },
+              { value: "30", label: "In 30 days" },
             ]}
           />
         </Form.Item>
@@ -205,10 +275,13 @@ const ShareModal = ({ visible, note, onClose }: ShareModalProps) => {
                 `User #${share.sharedWithUserId}`
               }
               description={
-                <Space>
+                <Space wrap>
                   <Text type="secondary">{share.sharedWith?.email}</Text>
                   <Tag color={share.permission === "edit" ? "blue" : "default"}>
                     {share.permission}
+                  </Tag>
+                  <Tag color={expiryColor(share.expiresAt)}>
+                    {expiryLabel(share.expiresAt)}
                   </Tag>
                 </Space>
               }

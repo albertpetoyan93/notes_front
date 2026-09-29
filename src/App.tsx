@@ -18,10 +18,11 @@ function AppContent() {
 
   useEffect(() => {
     const root = document.documentElement;
+    root.setAttribute("data-theme", mode);
     Object.keys(theme.token).forEach((key) => {
       root.style.setProperty(`--${key}`, (theme.token as any)[key]);
     });
-  }, [theme]);
+  }, [theme, mode]);
 
   return (
     <ConfigProvider theme={theme}>

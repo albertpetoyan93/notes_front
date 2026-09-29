@@ -1,13 +1,22 @@
 import { DeleteOutlined, PlusOutlined } from "@ant-design/icons";
 import { Button, Col, Form, Input, Modal, Row, Select, Switch } from "antd";
 import { useEffect, useState } from "react";
-import { useNoteStore } from "../../store/noteStore";
+import { useNoteStore, CollectionItem } from "../../store/noteStore";
 
 const { TextArea } = Input;
+
+const generatePassword = (length = 16) => {
+  const chars =
+    "abcdefghijkmnopqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789!@#$%^&*";
+  const values = new Uint32Array(length);
+  crypto.getRandomValues(values);
+  return Array.from(values, (n) => chars[n % chars.length]).join("");
+};
 
 interface NoteModalProps {
   visible: boolean;
   note?: any;
+  defaultCollectionId?: number;
   onClose: () => void;
   onSaved?: () => void;
 }
@@ -17,11 +26,18 @@ interface CustomField {
   value: string;
 }
 
-const NoteModal = ({ visible, note, onClose, onSaved }: NoteModalProps) => {
+const NoteModal = ({
+  visible,
+  note,
+  defaultCollectionId,
+  onClose,
+  onSaved,
+}: NoteModalProps) => {
   const [form] = Form.useForm();
-  const { createNote, updateNote, loading } = useNoteStore();
+  const { createNote, updateNote, loading, fetchCollections } = useNoteStore();
   const [selectedCategory, setSelectedCategory] = useState<string>("note");
   const [customFields, setCustomFields] = useState<CustomField[]>([]);
+  const [collections, setCollections] = useState<CollectionItem[]>([]);
 
   useEffect(() => {
     if (visible && note) {
@@ -52,8 +68,18 @@ const NoteModal = ({ visible, note, onClose, onSaved }: NoteModalProps) => {
       form.resetFields();
       setSelectedCategory("note");
       setCustomFields([]);
+      if (defaultCollectionId) {
+        form.setFieldValue("collectionId", defaultCollectionId);
+      }
     }
-  }, [visible, note, form]);
+  }, [visible, note, form, defaultCollectionId]);
+
+  useEffect(() => {
+    if (!visible) return;
+    fetchCollections()
+      .then(setCollections)
+      .catch(() => setCollections([]));
+  }, [visible, fetchCollections]);
 
   const handleCategoryChange = (value: string) => {
     setSelectedCategory(value);
@@ -143,6 +169,13 @@ const NoteModal = ({ visible, note, onClose, onSaved }: NoteModalProps) => {
         };
       }
 
+      const canChooseCollection = !note || note.isOwner;
+      if (canChooseCollection) {
+        values.collectionId = values.collectionId || null;
+      } else {
+        delete values.collectionId;
+      }
+
       if (note) {
         await updateNote(note.id, values);
       } else {
@@ -211,8 +244,23 @@ const NoteModal = ({ visible, note, onClose, onSaved }: NoteModalProps) => {
           </Select>
         </Form.Item>
 
-        <Form.Item name="project" label="Project (optional)">
-          <Input placeholder="e.g., Website Redesign, API Backend, etc." />
+        <Form.Item name="collectionId" label="Collection">
+          <Select
+            allowClear
+            placeholder="No collection"
+            disabled={!!note && !note.isOwner}
+            options={collections
+              .filter(
+                (collection) =>
+                  collection.permission === "owner" ||
+                  collection.permission === "edit" ||
+                  collection.id === note?.collectionId
+              )
+              .map((collection) => ({
+                value: collection.id,
+                label: collection.name,
+              }))}
+          />
         </Form.Item>
 
         {/* Custom Fields Section */}
@@ -262,6 +310,19 @@ const NoteModal = ({ visible, note, onClose, onSaved }: NoteModalProps) => {
                     }
                   />
                 </Col>
+                {field.label.toLowerCase().includes("pass") && (
+                  <Col>
+                    <Button
+                      type="link"
+                      size="small"
+                      onClick={() =>
+                        updateCustomField(index, "value", generatePassword())
+                      }
+                    >
+                      Generate
+                    </Button>
+                  </Col>
+                )}
                 <Col>
                   <Button
                     type="text"

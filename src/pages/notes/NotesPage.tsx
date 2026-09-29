@@ -3,23 +3,28 @@ import {
   CheckOutlined,
   CopyOutlined,
   DeleteOutlined,
+  DownloadOutlined,
   EditOutlined,
   EyeInvisibleOutlined,
   EyeOutlined,
   LinkOutlined,
+  MinusCircleOutlined,
   PlusOutlined,
   SearchOutlined,
   ShareAltOutlined,
   StarFilled,
   StarOutlined,
+  UndoOutlined,
   UnorderedListOutlined,
 } from "@ant-design/icons";
 import {
   Button,
   Card,
   Col,
+  Dropdown,
   Empty,
   Input,
+  Modal,
   Row,
   Segmented,
   Select,
@@ -31,14 +36,17 @@ import {
   Typography,
   message,
 } from "antd";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useNoteStore } from "../../store/noteStore";
 import NoteModal from "./NoteModal";
 import ShareModal from "./ShareModal";
 import "./NotesPage.scss";
 import NoteViewModal from "./NoteViewModal";
+import CollectionDialogs from "./CollectionDialogs";
+import CollectionsDrawer from "./CollectionsDrawer";
 import dayjsExtra from "../../utils/dayjs";
+import { CollectionItem } from "../../store/noteStore";
 
 const { Title, Text, Paragraph } = Typography;
 const { Search } = Input;
@@ -60,16 +68,31 @@ const NotesPage = () => {
     loading,
     fetchNotes,
     deleteNote,
+    restoreNote,
     toggleFavorite,
-    getProjects,
+    exportNotes,
+    importNotes,
+    fetchCollections,
+    deleteCollection,
+    removeNoteFromCollection,
   } = useNoteStore();
 
   const [searchParams, setSearchParams] = useSearchParams();
   const selectedCategory = searchParams.get("category") || "all";
-  const selectedProject = searchParams.get("project") || "all";
+  const selectedCollection = searchParams.get("collection") || "all";
   const selectedTag = searchParams.get("tag") || "all";
   const searchQuery = searchParams.get("search") || "";
-  const sharedFilter = searchParams.get("shared") === "true" ? "shared" : "all";
+  const [searchInput, setSearchInput] = useState(searchQuery);
+  const searchTimer = useRef<number>();
+  const importInputRef = useRef<HTMLInputElement>(null);
+  const viewFilter =
+    searchParams.get("trash") === "true"
+      ? "trash"
+      : searchParams.get("shared") === "true"
+        ? "shared"
+        : searchParams.get("favorites") === "true"
+          ? "favorites"
+          : "all";
 
   const [modalVisible, setModalVisible] = useState(false);
   const [editingNote, setEditingNote] = useState<any>(null);
@@ -77,7 +100,14 @@ const NotesPage = () => {
   const [viewingNote, setViewingNote] = useState<any>(null);
   const [shareModalVisible, setShareModalVisible] = useState(false);
   const [sharingNote, setSharingNote] = useState<any>(null);
-  const [projects, setProjects] = useState<string[]>([]);
+  const [collections, setCollections] = useState<CollectionItem[]>([]);
+  const [collectionMode, setCollectionMode] = useState<
+    "create" | "rename" | "add" | "share" | null
+  >(null);
+  const [collectionsOpen, setCollectionsOpen] = useState(false);
+  const [dialogCollection, setDialogCollection] = useState<CollectionItem | null>(
+    null
+  );
   const [availableTags, setAvailableTags] = useState<string[]>([]);
   const [viewMode, setViewMode] = useState<"card" | "table">(() => {
     const saved = localStorage.getItem("notesViewMode");
@@ -127,16 +157,21 @@ const NotesPage = () => {
   const fetchWithCurrentFilters = useCallback(() => {
     fetchNotes({
       category: selectedCategory !== "all" ? selectedCategory : undefined,
-      project: selectedProject !== "all" ? selectedProject : undefined,
+      tag: selectedTag !== "all" ? selectedTag : undefined,
       search: searchQuery || undefined,
-      sharedOnly: sharedFilter === "shared",
+      sharedOnly: viewFilter === "shared",
+      trash: viewFilter === "trash",
+      isFavorite: viewFilter === "favorites",
+      collectionId:
+        selectedCollection !== "all" ? Number(selectedCollection) : undefined,
     });
   }, [
     fetchNotes,
     selectedCategory,
-    selectedProject,
+    selectedTag,
     searchQuery,
-    sharedFilter,
+    viewFilter,
+    selectedCollection,
   ]);
 
   const handleViewModeChange = (mode: "card" | "table") => {
@@ -180,32 +215,94 @@ const NotesPage = () => {
   }, [fetchWithCurrentFilters]);
 
   useEffect(() => {
-    loadProjects();
+    loadCollections();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
-    // Extract unique tags from all notes whenever notes change
+    if (collectionsOpen) loadCollections();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [collectionsOpen]);
+
+  useEffect(() => {
+    if (selectedTag !== "all") return;
     const allTags = notes.flatMap((note) => note.tags || []);
     const uniqueTags = Array.from(new Set(allTags)).sort();
     setAvailableTags(uniqueTags);
-  }, [notes]);
+  }, [notes, selectedTag]);
 
-  const loadProjects = async () => {
+  const loadCollections = async () => {
     try {
-      const projectList = await getProjects();
-      setProjects(projectList);
+      const list = await fetchCollections();
+      setCollections(list);
     } catch (error) {
-      console.error("Failed to load projects");
+      console.error("Failed to load collections");
     }
   };
 
-  const handleDelete = async (id: number) => {
+  const activeCollection =
+    collections.find((item) => String(item.id) === selectedCollection) || null;
+
+  const openCollectionDialog = (
+    mode: "create" | "rename" | "add" | "share",
+    collection?: CollectionItem
+  ) => {
+    setDialogCollection(collection || null);
+    setCollectionMode(mode);
+  };
+
+  const handleDeleteCollection = (collection: CollectionItem) => {
+    Modal.confirm({
+      title: `Delete "${collection.name}"?`,
+      content: "Notes in this collection stay in your list, without a collection.",
+      okText: "Delete",
+      okButtonProps: { danger: true },
+      onOk: async () => {
+        await deleteCollection(collection.id);
+        if (String(collection.id) === selectedCollection) {
+          updateSearchParams({ collection: null });
+        }
+        await loadCollections();
+        message.success("Collection deleted");
+      },
+    });
+  };
+
+  const handleRemoveFromCollection = async (noteId: number) => {
+    if (!activeCollection) return;
     try {
-      await deleteNote(id);
-      message.success("Note deleted successfully");
-    } catch (error) {
-      message.error("Failed to delete note");
+      await removeNoteFromCollection(activeCollection.id, noteId);
+      message.success("Removed from collection");
+      fetchWithCurrentFilters();
+      loadCollections();
+    } catch (error: any) {
+      message.error(error?.message || "Could not remove note");
+    }
+  };
+
+  const handleDelete = (id: number) => {
+    Modal.confirm({
+      title: "Move this note to trash?",
+      content: "You can restore it later from the Trash filter.",
+      okText: "Move to trash",
+      okButtonProps: { danger: true },
+      onOk: async () => {
+        try {
+          await deleteNote(id);
+          message.success("Note moved to trash");
+        } catch {
+          message.error("Failed to delete note");
+        }
+      },
+    });
+  };
+
+  const handleRestore = async (id: number) => {
+    try {
+      await restoreNote(id);
+      message.success("Note restored");
+    } catch {
+      message.error("Failed to restore note");
     }
   };
 
@@ -230,34 +327,94 @@ const NotesPage = () => {
   };
 
   const handleSearch = (value: string) => {
+    window.clearTimeout(searchTimer.current);
+    setSearchInput(value);
     updateSearchParams({ search: value.trim() || null });
+  };
+
+  const handleSearchInput = (value: string) => {
+    setSearchInput(value);
+    window.clearTimeout(searchTimer.current);
+    searchTimer.current = window.setTimeout(() => {
+      updateSearchParams({ search: value.trim() || null });
+    }, 300);
   };
 
   const handleCategoryChange = (category: string) => {
     updateSearchParams({ category });
   };
 
-  const handleProjectChange = (project: string) => {
-    updateSearchParams({ project });
+  const handleCollectionChange = (collection: string) => {
+    updateSearchParams({ collection });
   };
 
   const handleTagChange = (tag: string) => {
     updateSearchParams({ tag });
   };
 
-  const handleSharedFilterChange = (value: string) => {
-    updateSearchParams({ shared: value === "shared" ? "true" : null });
+  const handleViewFilterChange = (value: string) => {
+    updateSearchParams({
+      shared: value === "shared" ? "true" : null,
+      trash: value === "trash" ? "true" : null,
+      favorites: value === "favorites" ? "true" : null,
+    });
+  };
+
+  const handleExport = async () => {
+    try {
+      const backup = await exportNotes();
+      const blob = new Blob([JSON.stringify(backup, null, 2)], {
+        type: "application/json",
+      });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `notes-backup-${new Date().toISOString().slice(0, 10)}.json`;
+      link.click();
+      URL.revokeObjectURL(url);
+      if (backup.skipped) {
+        message.warning(
+          `Exported ${backup.notes.length} notes. Skipped ${backup.skipped} that could not be decrypted.`
+        );
+      } else {
+        message.success(`Exported ${backup.notes.length} notes`);
+      }
+    } catch (error: any) {
+      message.error(error?.message || "Failed to export notes");
+    }
+  };
+
+  const handleImportFile = async (file: File) => {
+    try {
+      const text = await file.text();
+      const parsed = JSON.parse(text);
+      const notes = Array.isArray(parsed) ? parsed : parsed?.notes;
+      if (!Array.isArray(notes) || notes.length === 0) {
+        message.error("That file has no notes to import");
+        return;
+      }
+      const result = await importNotes(notes);
+      fetchWithCurrentFilters();
+      if (result.failed?.length) {
+        message.warning(
+          `Imported ${result.imported}. ${result.failed.length} could not be imported.`
+        );
+      } else {
+        message.success(`Imported ${result.imported} notes`);
+      }
+    } catch (error: any) {
+      message.error(error?.message || "Failed to import notes");
+    }
   };
 
   const getCategoryColor = (category: string) => {
     return categories.find((c) => c.value === category)?.color || "default";
   };
 
-  // Filter notes by selected tag on the frontend
   const filteredNotes =
-    selectedTag === "all"
-      ? notes
-      : notes.filter((note) => note.tags && note.tags.includes(selectedTag));
+    viewFilter === "favorites"
+      ? notes.filter((note) => note.isFavorite)
+      : notes;
 
   const copyToClipboard = (text: string, fieldKey: string, label?: string) => {
     navigator.clipboard.writeText(text).then(
@@ -339,15 +496,14 @@ const NotesPage = () => {
         ),
       },
       {
-        title: "Project",
-        dataIndex: "project",
-        key: "project",
-        width: 120,
+        title: "Collection",
+        key: "collection",
+        width: 140,
         ellipsis: true,
-        render: (project: string) =>
-          project ? (
+        render: (_: string, record: any) =>
+          record.collection?.name ? (
             <Tag color="processing" style={{ margin: 0 }}>
-              {project}
+              {record.collection.name}
             </Tag>
           ) : (
             <Text type="secondary">-</Text>
@@ -615,7 +771,7 @@ const NotesPage = () => {
         fixed: "right" as const,
         render: (_: any, record: any) => (
           <Space size="small">
-            {isNoteOwner(record) && (
+            {viewFilter !== "trash" && (
               <Tooltip title="Toggle Favorite">
                 <Button
                   type="text"
@@ -671,20 +827,33 @@ const NotesPage = () => {
                 />
               </Tooltip>
             )}
-            {isNoteOwner(record) && (
-              <Tooltip title="Delete">
-                <Button
-                  type="text"
-                  size="small"
-                  danger
-                  icon={<DeleteOutlined />}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleDelete(record.id);
-                  }}
-                />
-              </Tooltip>
-            )}
+            {isNoteOwner(record) &&
+              (viewFilter === "trash" ? (
+                <Tooltip title="Restore">
+                  <Button
+                    type="text"
+                    size="small"
+                    icon={<UndoOutlined />}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleRestore(record.id);
+                    }}
+                  />
+                </Tooltip>
+              ) : (
+                <Tooltip title="Delete">
+                  <Button
+                    type="text"
+                    size="small"
+                    danger
+                    icon={<DeleteOutlined />}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDelete(record.id);
+                    }}
+                  />
+                </Tooltip>
+              ))}
           </Space>
         ),
       },
@@ -725,7 +894,7 @@ const NotesPage = () => {
           xs={{ order: 3 }}
           sm={{ order: 3 }}
           md={{ span: 24, order: 3 }}
-          lg={{ span: 16, order: 2 }}
+          lg={{ span: 12, order: 2 }}
         >
           {" "}
           <div className="notes-filters">
@@ -741,16 +910,17 @@ const NotesPage = () => {
               </Col>
               <Col xs={24} sm={4}>
                 <Select
-                  value={selectedProject}
-                  onChange={handleProjectChange}
+                  value={selectedCollection}
+                  onChange={handleCollectionChange}
                   style={{ width: "100%" }}
-                  placeholder="Filter by project"
+                  placeholder="Collection"
                   popupClassName="notes-select-dropdown"
                 >
-                  <Select.Option value="all">All Projects</Select.Option>
-                  {projects.map((project) => (
-                    <Select.Option key={project} value={project}>
-                      {project}
+                  <Select.Option value="all">All collections</Select.Option>
+                  {collections.map((collection) => (
+                    <Select.Option key={collection.id} value={String(collection.id)}>
+                      {collection.name}
+                      {!collection.isOwner ? " (shared)" : ""}
                     </Select.Option>
                   ))}
                 </Select>
@@ -773,24 +943,25 @@ const NotesPage = () => {
               </Col>
               <Col xs={24} sm={4}>
                 <Select
-                  value={sharedFilter}
-                  onChange={handleSharedFilterChange}
+                  value={viewFilter}
+                  onChange={handleViewFilterChange}
                   style={{ width: "100%" }}
                   popupClassName="notes-select-dropdown"
                   options={[
                     { value: "all", label: "Mine & shared" },
                     { value: "shared", label: "Shared with me" },
+                    { value: "favorites", label: "Favorites" },
+                    { value: "trash", label: "Trash" },
                   ]}
                 />
               </Col>
               <Col xs={24} sm={8}>
                 <Search
-                  key={searchQuery}
                   placeholder="Search notes..."
                   allowClear
-                  defaultValue={searchQuery}
+                  value={searchInput}
+                  onChange={(event) => handleSearchInput(event.target.value)}
                   onSearch={handleSearch}
-                  onClear={() => updateSearchParams({ search: null })}
                   style={{ width: "100%" }}
                   prefix={<SearchOutlined />}
                 />
@@ -802,21 +973,59 @@ const NotesPage = () => {
           xs={{ span: 12, order: 2 }}
           sm={{ span: 12, order: 2 }}
           md={{ span: 12, order: 2 }}
-          lg={{ span: 4, order: 3 }}
+          lg={{ span: 8, order: 3 }}
           style={{ textAlign: "right" }}
         >
-          {" "}
-          <Button
-            className="new_note_button"
-            type="primary"
-            icon={<PlusOutlined />}
-            onClick={() => setModalVisible(true)}
-            size="large"
-          >
-            New Note
-          </Button>
+          <Space>
+            <input
+              ref={importInputRef}
+              type="file"
+              accept="application/json,.json"
+              hidden
+              onChange={(event) => {
+                const file = event.target.files?.[0];
+                event.target.value = "";
+                if (file) handleImportFile(file);
+              }}
+            />
+            <Button size="large" onClick={() => setCollectionsOpen(true)}>
+              Collections
+            </Button>
+            <Dropdown
+              menu={{
+                items: [
+                  {
+                    key: "export",
+                    label: "Export backup",
+                    icon: <DownloadOutlined />,
+                    onClick: handleExport,
+                  },
+                  {
+                    key: "import",
+                    label: "Import backup",
+                    onClick: () => importInputRef.current?.click(),
+                  },
+                ],
+              }}
+            >
+              <Button size="large">Backup</Button>
+            </Dropdown>
+            <Button
+              className="new_note_button"
+              type="primary"
+              icon={<PlusOutlined />}
+              onClick={() => setModalVisible(true)}
+              size="large"
+            >
+              New Note
+            </Button>
+          </Space>
         </Col>
       </Row>
+
+      <Text type="secondary" style={{ display: "block", margin: "4px 0 12px" }}>
+        {filteredNotes.length} {filteredNotes.length === 1 ? "note" : "notes"}
+      </Text>
 
       {loading && notes.length === 0 ? (
         <div className="notes-loading">
@@ -839,7 +1048,7 @@ const NotesPage = () => {
                 onClick={() => handleView(note)}
                 style={{ cursor: "pointer" }}
                 actions={[
-                  ...(isNoteOwner(note)
+                  ...(viewFilter !== "trash"
                     ? [
                         <Button
                           key="favorite"
@@ -893,18 +1102,45 @@ const NotesPage = () => {
                         />,
                       ]
                     : []),
+                  ...(activeCollection &&
+                  (activeCollection.isOwner || isNoteOwner(note))
+                    ? [
+                        <Tooltip key="remove-collection" title="Remove from collection">
+                          <Button
+                            type="text"
+                            icon={<MinusCircleOutlined />}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleRemoveFromCollection(note.id);
+                            }}
+                          />
+                        </Tooltip>,
+                      ]
+                    : []),
                   ...(isNoteOwner(note)
                     ? [
-                        <Button
-                          key="delete"
-                          type="text"
-                          danger
-                          icon={<DeleteOutlined />}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDelete(note.id);
-                          }}
-                        />,
+                        viewFilter === "trash" ? (
+                          <Button
+                            key="restore"
+                            type="text"
+                            icon={<UndoOutlined />}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleRestore(note.id);
+                            }}
+                          />
+                        ) : (
+                          <Button
+                            key="delete"
+                            type="text"
+                            danger
+                            icon={<DeleteOutlined />}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDelete(note.id);
+                            }}
+                          />
+                        ),
                       ]
                     : []),
                 ]}
@@ -914,13 +1150,19 @@ const NotesPage = () => {
                     {note.category.toUpperCase()}
                   </Tag>
                   {note.isShared && <Tag color="purple">Shared</Tag>}
-                  {note.isFavorite && isNoteOwner(note) && (
+                  {note.collection?.name && (
+                    <Tag color="processing">{note.collection.name}</Tag>
+                  )}
+                  {note.isFavorite && (
                     <StarFilled style={{ color: "#faad14", fontSize: 16 }} />
                   )}
                 </div>
                 <Title level={5} ellipsis={{ rows: 1 }} className="note-title">
                   {note.title}
                 </Title>
+                {note.content?.decryptionFailed && (
+                  <Text type="danger">Could not decrypt this note</Text>
+                )}
 
                 {/* Custom Fields as Columns */}
                 {getCustomFields(note.content).length > 0 && (
@@ -1110,8 +1352,47 @@ const NotesPage = () => {
       <NoteModal
         visible={modalVisible}
         note={editingNote}
+        defaultCollectionId={
+          !editingNote &&
+          activeCollection &&
+          (activeCollection.permission === "owner" ||
+            activeCollection.permission === "edit")
+            ? activeCollection.id
+            : undefined
+        }
         onClose={handleModalClose}
-        onSaved={fetchWithCurrentFilters}
+        onSaved={() => {
+          fetchWithCurrentFilters();
+          loadCollections();
+        }}
+      />
+
+      <CollectionsDrawer
+        open={collectionsOpen}
+        collections={collections}
+        onClose={() => setCollectionsOpen(false)}
+        onOpen={(collection) => {
+          updateSearchParams({ collection: String(collection.id) });
+          setCollectionsOpen(false);
+        }}
+        onCreate={() => openCollectionDialog("create")}
+        onRename={(collection) => openCollectionDialog("rename", collection)}
+        onShare={(collection) => openCollectionDialog("share", collection)}
+        onAddNotes={(collection) => openCollectionDialog("add", collection)}
+        onDelete={handleDeleteCollection}
+      />
+
+      <CollectionDialogs
+        mode={collectionMode}
+        collection={dialogCollection}
+        onClose={() => {
+          setCollectionMode(null);
+          setDialogCollection(null);
+        }}
+        onChanged={() => {
+          loadCollections();
+          fetchWithCurrentFilters();
+        }}
       />
 
       <ShareModal

@@ -1,12 +1,17 @@
 module.exports = {
   apps: [
     {
-      name: 'hyeid-admin',
-      script: 'npm',
-      args: 'run preview',
+      name: "notes-frontend",
+      script: "npm",
+      args: "run preview",
+      cwd: __dirname,
+      instances: 1,
+      autorestart: true,
+      watch: false,
       env: {
-        PORT: 3001
-      }
-    }
-  ]
+        NODE_ENV: "production",
+        PORT: 3001,
+      },
+    },
+  ],
 };
