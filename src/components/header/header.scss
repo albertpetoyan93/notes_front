@@ -1,6 +1,57 @@
+.app-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 16px;
+  min-height: 64px;
+}
+
+.app-header > :last-child {
+  justify-self: end;
+}
+
 .header_child {
   display: flex;
   align-items: center;
-  gap: 12px;
-  height: 64px;
+  gap: 8px;
+  min-width: 0;
+}
+
+.header-brand {
+  margin: 0 !important;
+  font-size: 22px !important;
+  line-height: 1.2 !important;
+  white-space: nowrap;
+}
+
+.notes-search {
+  width: 360px;
+  max-width: 100%;
+
+  .ant-input-affix-wrapper {
+    height: 36px;
+    border-radius: 10px;
+    background: var(--surfaceCard);
+    border-color: var(--borderSubtle);
+  }
+}
+
+.header-user {
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--textMuted);
+  font-size: 13px;
+}
+
+.header-icon-button {
+  width: 36px;
+  min-width: 36px;
+  height: 36px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
 }

@@ -2,37 +2,58 @@ import axios from "axios";
 
 const axiosServices = axios.create({
   baseURL: import.meta.env.VITE_APP_API_URL || "http://localhost:9000/",
+  withCredentials: true,
 });
+
+const refreshClient = axios.create({
+  baseURL: axiosServices.defaults.baseURL,
+  withCredentials: true,
+});
+
 export const baseURL =
   import.meta.env.NEXT_PUBLIC_API_URL || "http://localhost:9000/";
-// ==============================|| AXIOS - FOR MOCK SERVICES ||============================== //
 
-axiosServices.interceptors.request.use(
-  async (config) => {
-    const accessToken = localStorage.getItem("access_token");
-    if (accessToken) {
-      config.headers["Authorization"] = `Bearer ${accessToken}`;
-    }
-    return config;
-  },
-  (error) => {
-    return Promise.reject(error);
+localStorage.removeItem("access_token");
+localStorage.removeItem("refresh_token");
+
+let refreshPromise: Promise<void> | null = null;
+
+function redirectToLogin() {
+  if (!window.location.href.includes("/auth/login")) {
+    window.location.href = "/auth/login";
   }
-);
+}
 
 axiosServices.interceptors.response.use(
   (response) => response,
-  (error) => {
-    if (
-      error.response?.status === 401 &&
-      !window.location.href.includes("/auth/login")
-    ) {
-      // Clear invalid tokens
-      localStorage.removeItem("access_token");
-      localStorage.removeItem("refresh_token");
-      // Redirect to login
-      window.location.href = "/auth/login";
+  async (error) => {
+    const original = error.config;
+    const status = error.response?.status;
+    const url = String(original?.url || "");
+    const skipRefresh =
+      url.includes("/api/auth/login") ||
+      url.includes("/api/auth/register") ||
+      url.includes("/api/auth/refresh") ||
+      url.includes("/api/auth/logout");
+
+    if (status === 401 && original && !original._retry && !skipRefresh) {
+      original._retry = true;
+      try {
+        if (!refreshPromise) {
+          refreshPromise = refreshClient
+            .post("/api/auth/refresh")
+            .then(() => undefined)
+            .finally(() => {
+              refreshPromise = null;
+            });
+        }
+        await refreshPromise;
+        return axiosServices(original);
+      } catch {
+        redirectToLogin();
+      }
     }
+
     return Promise.reject(
       (error.response && error.response.data) || "Wrong Services"
     );

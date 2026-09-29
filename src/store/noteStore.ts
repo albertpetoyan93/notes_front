@@ -28,6 +28,11 @@ export interface Note {
   permission?: "owner" | "view" | "edit";
   collectionId?: number | null;
   collection?: { id: number; name: string } | null;
+  passwordHealth?: {
+    weak: boolean;
+    reused: boolean;
+    stale: boolean;
+  };
 }
 
 export interface CollectionItem {
@@ -122,6 +127,12 @@ interface NoteStore {
   ) => Promise<{ shared: any[]; failed: { identifier: string; message: string }[] }>;
   getCollectionShares: (id: number) => Promise<any[]>;
   revokeCollectionShare: (id: number, userId: number) => Promise<void>;
+  emptyTrash: () => Promise<number>;
+  bulkUpdateNotes: (
+    noteIds: number[],
+    action: "trash" | "move",
+    collectionId?: number | null
+  ) => Promise<{ updated: number; skipped: number }>;
   setSelectedCategory: (category: string) => void;
   setSearchQuery: (query: string) => void;
 }
@@ -380,6 +391,20 @@ export const useNoteStore = create<NoteStore>((set, get) => ({
 
   revokeCollectionShare: async (id: number, userId: number) => {
     await axios.delete(`/api/collections/${id}/share/${userId}`);
+  },
+
+  emptyTrash: async () => {
+    const response = await axios.delete("/api/notes/trash");
+    return response.data.deleted;
+  },
+
+  bulkUpdateNotes: async (noteIds, action, collectionId = null) => {
+    const response = await axios.post("/api/notes/bulk", {
+      noteIds,
+      action,
+      collectionId,
+    });
+    return response.data;
   },
 
   setSelectedCategory: (category) => {

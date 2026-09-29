@@ -1,4 +1,3 @@
-// import { MenuFoldOutlined, MenuUnfoldOutlined } from "@ant-design/icons";
 import Title from "antd/es/typography/Title";
 import { useThemeVariant } from "../../contexts/ThemeVariantContext";
 
@@ -8,9 +7,9 @@ const LeftHeader = () => {
   return (
     <div className="header_child">
       <Title
-        level={2}
+        level={4}
+        className="header-brand"
         style={{
-          margin: 0,
           backgroundImage: gradientStyle,
           WebkitBackgroundClip: "text",
           WebkitTextFillColor: "transparent",

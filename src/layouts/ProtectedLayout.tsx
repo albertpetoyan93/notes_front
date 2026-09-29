@@ -1,7 +1,8 @@
-import { Col, Layout, Row } from "antd";
+import { Layout } from "antd";
 import React, { useEffect } from "react";
 import { Outlet, useNavigate } from "react-router-dom";
 import LeftHeader from "../components/header/LeftHeader";
+import NotesSearch from "../components/header/NotesSearch";
 import RightHeader from "../components/header/RightHeader";
 // import Sidebar from "../components/sidebar/Sidebar";
 import { useTheme } from "../contexts/ThemeContext";
@@ -14,32 +15,31 @@ const ProtectedLayout: React.FC = () => {
   const navigate = useNavigate();
   // const [collapsed, setCollapsed] = useState(false);
   const { theme } = useTheme();
-  const { getMe, logOut } = useAuth();
+  const { getMe } = useAuth();
   const { me } = useAuthStore();
 
   useEffect(() => {
-    const token = localStorage.getItem("access_token");
+    if (me) return;
 
-    if (token) {
-      if (!me) {
-        getMe()
-          .then((res) => {
-            if (!res) {
-              navigate("/auth/login");
-            }
-          })
-          .catch((e) => {
-            console.log("Authentication error:", e);
-            // logout
-            logOut();
-            navigate("/auth/login");
-          });
-      }
-    } else {
-      console.log("No token found, redirecting to login");
-      navigate("/auth/login");
-    }
-  }, [navigate, getMe, logOut, me]);
+    let cancelled = false;
+    getMe()
+      .then((res) => {
+        if (!cancelled && !res) {
+          navigate("/auth/login");
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          navigate("/auth/login");
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+    // Session check runs once. Later logins update the store themselves.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <Layout style={{}}>
@@ -51,19 +51,16 @@ const ProtectedLayout: React.FC = () => {
             padding: "0 24px",
             background: theme.token.colorBgContainer,
             borderRadius: 8,
-            height: "64px",
+            height: "auto",
+            minHeight: 64,
+            lineHeight: "normal",
           }}
         >
-          <Row style={{ alignItems: "center" }}>
-            <Col span={12}>
-              <LeftHeader
-              // collapsed={collapsed} setCollapsed={setCollapsed}
-              />
-            </Col>
-            <Col span={12}>
-              <RightHeader />
-            </Col>
-          </Row>
+          <div className="app-header">
+            <LeftHeader />
+            <NotesSearch />
+            <RightHeader />
+          </div>
         </Header>
         <Content
           style={{

@@ -19,7 +19,7 @@ const useAuth = () => {
       setStore({ me: response });
       return response;
     } catch (err) {
-      logOut();
+      setStore({ me: null });
       throw err;
     }
   };
@@ -27,9 +27,7 @@ const useAuth = () => {
   const login = async (newData: any) => {
     setStore({ loading: true });
     try {
-      const response = await fetcherPost(endpoints.login, newData);
-      localStorage.setItem("access_token", response.accessToken);
-      localStorage.setItem("refresh_token", response.refreshToken);
+      await fetcherPost(endpoints.login, newData);
       await getMe();
       navigate("/");
     } catch (err: any) {
@@ -44,9 +42,7 @@ const useAuth = () => {
   const register = async (newData: any) => {
     setStore({ loading: true });
     try {
-      const response = await fetcherPost(endpoints.register, newData);
-      localStorage.setItem("access_token", response.accessToken);
-      localStorage.setItem("refresh_token", response.refreshToken);
+      await fetcherPost(endpoints.register, newData);
       message.success("Registration successful!");
       await getMe();
       navigate("/");
@@ -59,12 +55,15 @@ const useAuth = () => {
     }
   };
 
-  const logOut = () => {
-    localStorage.removeItem("access_token");
-    localStorage.removeItem("refresh_token");
+  const logOut = async () => {
+    try {
+      await fetcherPost("/api/auth/logout", {});
+    } catch {
+      // The cookies are cleared when the server can; still leave the app.
+    }
+    setStore({ me: null });
     navigate("/auth/login");
     window.location.reload();
-    // // window.location.pathname = "/auth/login";
   };
 
   return {

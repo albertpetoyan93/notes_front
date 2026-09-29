@@ -63,10 +63,11 @@ const RightHeader = () => {
         alignItems: "center",
         justifyContent: "flex-end",
         gap: "8px",
+        marginLeft: "auto",
       }}
     >
-      <span style={{ marginRight: "10px" }}>
-        {me?.name} {me?.surname}
+      <span className="header-user">
+        {me?.fullName || me?.username}
       </span>
       <Dropdown
         trigger={["click"]}
@@ -141,15 +142,7 @@ const RightHeader = () => {
             type="text"
             aria-label="Notifications"
             icon={<BellOutlined style={{ fontSize: 18 }} />}
-            style={{
-              width: 32,
-              height: 32,
-              minWidth: 32,
-              padding: 0,
-              display: "inline-flex",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
+            className="header-icon-button"
           />
         </Badge>
       </Dropdown>
@@ -183,9 +176,8 @@ const RightHeader = () => {
         }}
       >
         <Avatar
-          size={32}
-          shape="square"
-          icon={<UserOutlined style={{ fontSize: 18 }} />}
+          size={36}
+          icon={<UserOutlined style={{ fontSize: 16 }} />}
           style={{
             background: "var(--secondary_1)",
             cursor: "pointer",

@@ -2,16 +2,45 @@
   margin: 0 auto;
   min-height: calc(100vh - 64px);
 
-  .notes-header {
+  .notes-toolbar {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
     align-items: center;
+    gap: 12px;
     margin-bottom: 16px;
+
+    .notes-toolbar-start {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      min-width: 0;
+    }
+
+    .notes-count {
+      white-space: nowrap;
+    }
+
+    .notes-filters {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      justify-self: center;
+
+      .ant-select {
+        width: 148px;
+      }
+    }
+
+    .notes-toolbar-actions {
+      justify-self: end;
+    }
 
     .switcher {
       border-radius: 14px;
       padding: 4px;
       border: 1px solid var(--borderSubtle);
-      order: 1;
-      max-width: 200px;
+      flex-shrink: 0;
 
       .ant-segmented-item {
         color: var(--textMuted);
@@ -23,16 +52,12 @@
         box-shadow: none;
       }
     }
+  }
 
-    h2 {
-      margin: 0;
-      background: linear-gradient(135deg, #8b5cf6 0%, #c084fc 100%);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
-      font-weight: 700;
-      font-size: 32px;
-    }
+  .notes-bulk-bar {
+    display: flex;
+    justify-content: flex-end;
+    margin: 0 0 12px;
   }
 
   .notes-loading {
@@ -62,7 +87,7 @@
       flex: 1;
       display: flex;
       flex-direction: column;
-      padding: 20px !important;
+      padding: 16px !important;
     }
 
     .note-card-header {
@@ -80,11 +105,29 @@
       }
     }
 
-    .note-title {
-      margin-top: 4px !important;
-      margin-bottom: 12px !important;
-      font-weight: 600 !important;
-      color: var(--colorText) !important;
+    .note-title-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 4px;
+      margin-bottom: 12px;
+
+      .note-select {
+        flex-shrink: 0;
+      }
+
+      .note-title {
+        margin: 0 !important;
+        flex: 1;
+        min-width: 0;
+        font-weight: 600 !important;
+        color: var(--colorText) !important;
+      }
+
+      .password-health-mark {
+        font-size: 14px;
+        flex-shrink: 0;
+      }
     }
 
     .note-content {

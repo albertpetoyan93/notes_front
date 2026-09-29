@@ -5,25 +5,26 @@ import {
   DeleteOutlined,
   DownloadOutlined,
   EditOutlined,
+  FolderOutlined,
   EyeInvisibleOutlined,
   EyeOutlined,
   LinkOutlined,
   MinusCircleOutlined,
   PlusOutlined,
-  SearchOutlined,
   ShareAltOutlined,
   StarFilled,
   StarOutlined,
   UndoOutlined,
   UnorderedListOutlined,
+  WarningOutlined,
 } from "@ant-design/icons";
 import {
   Button,
   Card,
+  Checkbox,
   Col,
   Dropdown,
   Empty,
-  Input,
   Modal,
   Row,
   Segmented,
@@ -46,10 +47,39 @@ import NoteViewModal from "./NoteViewModal";
 import CollectionDialogs from "./CollectionDialogs";
 import CollectionsDrawer from "./CollectionsDrawer";
 import dayjsExtra from "../../utils/dayjs";
+import { subscribeOpenCollections } from "../../utils/collectionsDrawer";
 import { CollectionItem } from "../../store/noteStore";
 
 const { Title, Text, Paragraph } = Typography;
-const { Search } = Input;
+
+const passwordHealthTip = (health: {
+  weak: boolean;
+  reused: boolean;
+  stale: boolean;
+}) =>
+  [
+    health.weak && "Weak password",
+    health.reused && "Reused password",
+    health.stale && "Not updated in 6 months",
+  ]
+    .filter(Boolean)
+    .join(" · ");
+
+const PasswordHealthMark = ({
+  health,
+}: {
+  health?: { weak: boolean; reused: boolean; stale: boolean };
+}) => {
+  if (!health) return null;
+  const color = health.weak ? "#ff4d4f" : health.reused ? "#fa8c16" : "#faad14";
+  return (
+    <Tooltip title={passwordHealthTip(health)}>
+      <span className="password-health-mark" style={{ color }}>
+        <WarningOutlined />
+      </span>
+    </Tooltip>
+  );
+};
 
 const categories = [
   { value: "all", label: "All Notes", color: "default" },
@@ -75,6 +105,8 @@ const NotesPage = () => {
     fetchCollections,
     deleteCollection,
     removeNoteFromCollection,
+    emptyTrash,
+    bulkUpdateNotes,
   } = useNoteStore();
 
   const [searchParams, setSearchParams] = useSearchParams();
@@ -82,8 +114,6 @@ const NotesPage = () => {
   const selectedCollection = searchParams.get("collection") || "all";
   const selectedTag = searchParams.get("tag") || "all";
   const searchQuery = searchParams.get("search") || "";
-  const [searchInput, setSearchInput] = useState(searchQuery);
-  const searchTimer = useRef<number>();
   const importInputRef = useRef<HTMLInputElement>(null);
   const viewFilter =
     searchParams.get("trash") === "true"
@@ -105,9 +135,10 @@ const NotesPage = () => {
     "create" | "rename" | "add" | "share" | null
   >(null);
   const [collectionsOpen, setCollectionsOpen] = useState(false);
-  const [dialogCollection, setDialogCollection] = useState<CollectionItem | null>(
-    null
-  );
+  const [dialogCollection, setDialogCollection] =
+    useState<CollectionItem | null>(null);
+  const [selectedIds, setSelectedIds] = useState<number[]>([]);
+  const [bulkCollection, setBulkCollection] = useState<string>();
   const [availableTags, setAvailableTags] = useState<string[]>([]);
   const [viewMode, setViewMode] = useState<"card" | "table">(() => {
     const saved = localStorage.getItem("notesViewMode");
@@ -115,7 +146,7 @@ const NotesPage = () => {
   });
   const [copiedFields, setCopiedFields] = useState<Set<string>>(new Set());
   const [visiblePasswords, setVisiblePasswords] = useState<Set<string>>(
-    new Set()
+    new Set(),
   );
 
   const isNoteOwner = (note: any) =>
@@ -148,10 +179,10 @@ const NotesPage = () => {
           });
           return next;
         },
-        { replace: true }
+        { replace: true },
       );
     },
-    [setSearchParams]
+    [setSearchParams],
   );
 
   const fetchWithCurrentFilters = useCallback(() => {
@@ -216,6 +247,7 @@ const NotesPage = () => {
 
   useEffect(() => {
     loadCollections();
+    return subscribeOpenCollections(() => setCollectionsOpen(true));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -245,7 +277,7 @@ const NotesPage = () => {
 
   const openCollectionDialog = (
     mode: "create" | "rename" | "add" | "share",
-    collection?: CollectionItem
+    collection?: CollectionItem,
   ) => {
     setDialogCollection(collection || null);
     setCollectionMode(mode);
@@ -254,7 +286,8 @@ const NotesPage = () => {
   const handleDeleteCollection = (collection: CollectionItem) => {
     Modal.confirm({
       title: `Delete "${collection.name}"?`,
-      content: "Notes in this collection stay in your list, without a collection.",
+      content:
+        "Notes in this collection stay in your list, without a collection.",
       okText: "Delete",
       okButtonProps: { danger: true },
       onOk: async () => {
@@ -306,6 +339,68 @@ const NotesPage = () => {
     }
   };
 
+  const toggleSelected = (id: number, checked: boolean) => {
+    setSelectedIds((current) =>
+      checked ? [...current, id] : current.filter((noteId) => noteId !== id),
+    );
+  };
+
+  const finishBulk = async (result: { updated: number; skipped: number }) => {
+    setSelectedIds([]);
+    setBulkCollection(undefined);
+    await fetchWithCurrentFilters();
+    if (result.skipped) {
+      message.warning(
+        `Updated ${result.updated}. Skipped ${result.skipped} you do not own.`,
+      );
+    } else {
+      message.success(`Updated ${result.updated} notes`);
+    }
+  };
+
+  const handleBulkMove = async () => {
+    if (!bulkCollection || !selectedIds.length) return;
+    try {
+      const result = await bulkUpdateNotes(
+        selectedIds,
+        "move",
+        bulkCollection === "none" ? null : Number(bulkCollection),
+      );
+      await loadCollections();
+      await finishBulk(result);
+    } catch (error: any) {
+      message.error(error?.message || "Could not move notes");
+    }
+  };
+
+  const handleBulkTrash = () => {
+    Modal.confirm({
+      title: `Move ${selectedIds.length} notes to trash?`,
+      okText: "Move to trash",
+      okButtonProps: { danger: true },
+      onOk: async () => {
+        const result = await bulkUpdateNotes(selectedIds, "trash");
+        await finishBulk(result);
+      },
+    });
+  };
+
+  const handleEmptyTrash = () => {
+    Modal.confirm({
+      title: "Empty trash?",
+      content: "This permanently deletes every note in the trash.",
+      okText: "Delete permanently",
+      okButtonProps: { danger: true },
+      onOk: async () => {
+        const deleted = await emptyTrash();
+        message.success(
+          deleted === 1 ? "Deleted 1 note" : `Deleted ${deleted} notes`,
+        );
+        fetchWithCurrentFilters();
+      },
+    });
+  };
+
   const handleEdit = (note: any) => {
     setEditingNote(note);
     setModalVisible(true);
@@ -324,20 +419,6 @@ const NotesPage = () => {
   const handleViewModalClose = () => {
     setViewModalVisible(false);
     setViewingNote(null);
-  };
-
-  const handleSearch = (value: string) => {
-    window.clearTimeout(searchTimer.current);
-    setSearchInput(value);
-    updateSearchParams({ search: value.trim() || null });
-  };
-
-  const handleSearchInput = (value: string) => {
-    setSearchInput(value);
-    window.clearTimeout(searchTimer.current);
-    searchTimer.current = window.setTimeout(() => {
-      updateSearchParams({ search: value.trim() || null });
-    }, 300);
   };
 
   const handleCategoryChange = (category: string) => {
@@ -374,7 +455,7 @@ const NotesPage = () => {
       URL.revokeObjectURL(url);
       if (backup.skipped) {
         message.warning(
-          `Exported ${backup.notes.length} notes. Skipped ${backup.skipped} that could not be decrypted.`
+          `Exported ${backup.notes.length} notes. Skipped ${backup.skipped} that could not be decrypted.`,
         );
       } else {
         message.success(`Exported ${backup.notes.length} notes`);
@@ -397,7 +478,7 @@ const NotesPage = () => {
       fetchWithCurrentFilters();
       if (result.failed?.length) {
         message.warning(
-          `Imported ${result.imported}. ${result.failed.length} could not be imported.`
+          `Imported ${result.imported}. ${result.failed.length} could not be imported.`,
         );
       } else {
         message.success(`Imported ${result.imported} notes`);
@@ -435,7 +516,7 @@ const NotesPage = () => {
       },
       () => {
         message.error("Failed to copy to clipboard");
-      }
+      },
     );
   };
 
@@ -470,7 +551,7 @@ const NotesPage = () => {
         ellipsis: true,
         sorter: (a: any, b: any) => a.title.localeCompare(b.title),
         render: (text: string, record: any) => (
-          <Space size={4}>
+          <Space size={4} wrap>
             <Text strong style={{ cursor: "pointer" }}>
               {text}
             </Text>
@@ -479,9 +560,11 @@ const NotesPage = () => {
                 Shared
               </Tag>
             )}
+            <PasswordHealthMark health={record.passwordHealth} />
           </Space>
         ),
-      },      {
+      },
+      {
         title: "Category",
         dataIndex: "category",
         key: "category",
@@ -560,7 +643,7 @@ const NotesPage = () => {
                   copyToClipboard(
                     content.mainContent,
                     fieldKey,
-                    "Main Content"
+                    "Main Content",
                   );
                 }}
               >
@@ -862,170 +945,170 @@ const NotesPage = () => {
 
   return (
     <div className="notes-page">
-      <Row className="notes-header" gutter={[16, 8]}>
-        <Col
-          xs={{ span: 12, order: 1 }}
-          sm={{ span: 12, order: 1 }}
-          md={{ span: 12, order: 1 }}
-          lg={{ span: 4, order: 1 }}
-        >
-          <Segmented
-            className="switcher"
-            value={viewMode}
-            onChange={(value) =>
-              handleViewModeChange(value as "card" | "table")
-            }
-            style={{ padding: "6px" }}
+      <div className="notes-toolbar">
+        <div className="notes-toolbar-start">
+        <Segmented
+          className="switcher"
+          value={viewMode}
+          onChange={(value) => handleViewModeChange(value as "card" | "table")}
+          options={[
+            {
+              label: "Cards",
+              value: "card",
+              icon: <AppstoreOutlined />,
+            },
+            {
+              label: "Table",
+              value: "table",
+              icon: <UnorderedListOutlined />,
+            },
+          ]}
+        />
+        <Text className="notes-count" type="secondary">
+          {filteredNotes.length} {filteredNotes.length === 1 ? "note" : "notes"}
+        </Text>
+        </div>
+        <div className="notes-filters">
+          <Select
+            value={selectedCategory}
+            onChange={handleCategoryChange}
+            popupClassName="notes-select-dropdown"
+            options={categories}
+          />
+          <Select
+            value={selectedCollection}
+            onChange={handleCollectionChange}
+            placeholder="Collection"
+            popupClassName="notes-select-dropdown"
+          >
+            <Select.Option value="all">All collections</Select.Option>
+            {collections.map((collection) => (
+              <Select.Option key={collection.id} value={String(collection.id)}>
+                {collection.name}
+                {!collection.isOwner ? " (shared)" : ""}
+              </Select.Option>
+            ))}
+          </Select>
+          <Select
+            value={selectedTag}
+            onChange={handleTagChange}
+            placeholder="Filter by tag"
+            popupClassName="notes-select-dropdown"
+          >
+            <Select.Option value="all">All Tags</Select.Option>
+            {availableTags.map((tag) => (
+              <Select.Option key={tag} value={tag}>
+                {tag}
+              </Select.Option>
+            ))}
+          </Select>
+          <Select
+            value={viewFilter}
+            onChange={handleViewFilterChange}
+            popupClassName="notes-select-dropdown"
             options={[
-              {
-                label: "Cards",
-                value: "card",
-                icon: <AppstoreOutlined />,
-              },
-              {
-                label: "Table",
-                value: "table",
-                icon: <UnorderedListOutlined />,
-              },
+              { value: "all", label: "Mine & shared" },
+              { value: "shared", label: "Shared with me" },
+              { value: "favorites", label: "Favorites" },
+              { value: "trash", label: "Trash" },
             ]}
           />
-        </Col>
-        <Col
-          xs={{ order: 3 }}
-          sm={{ order: 3 }}
-          md={{ span: 24, order: 3 }}
-          lg={{ span: 12, order: 2 }}
-        >
-          {" "}
-          <div className="notes-filters">
-            <Row align="middle" gutter={[8, 8]}>
-              <Col xs={24} sm={4}>
+        </div>
+        <Space className="notes-toolbar-actions">
+          <input
+            ref={importInputRef}
+            type="file"
+            accept="application/json,.json"
+            hidden
+            onChange={(event) => {
+              const file = event.target.files?.[0];
+              event.target.value = "";
+              if (file) handleImportFile(file);
+            }}
+          />
+          <Button
+            size="large"
+            icon={<FolderOutlined />}
+            onClick={() => setCollectionsOpen(true)}
+          >
+            Collections
+          </Button>
+          <Dropdown
+            menu={{
+              items: [
+                {
+                  key: "export",
+                  label: "Export backup",
+                  icon: <DownloadOutlined />,
+                  onClick: handleExport,
+                },
+                {
+                  key: "import",
+                  label: "Import backup",
+                  onClick: () => importInputRef.current?.click(),
+                },
+              ],
+            }}
+          >
+            <Button size="large">Backup</Button>
+          </Dropdown>
+          <Button
+            className="new_note_button"
+            type="primary"
+            icon={<PlusOutlined />}
+            onClick={() => setModalVisible(true)}
+            size="large"
+          >
+            New Note
+          </Button>
+        </Space>
+      </div>
+
+      {(viewFilter === "trash" && filteredNotes.length > 0) ||
+      (viewFilter !== "trash" && selectedIds.length > 0) ? (
+        <div className="notes-bulk-bar">
+          <Space wrap>
+            {viewFilter === "trash" && filteredNotes.length > 0 && (
+              <Button danger onClick={handleEmptyTrash}>
+                Empty trash
+              </Button>
+            )}
+            {viewFilter !== "trash" && selectedIds.length > 0 && (
+              <>
+                <Text>{selectedIds.length} selected</Text>
                 <Select
-                  value={selectedCategory}
-                  onChange={handleCategoryChange}
-                  style={{ width: "100%" }}
-                  popupClassName="notes-select-dropdown"
-                  options={categories}
-                />
-              </Col>
-              <Col xs={24} sm={4}>
-                <Select
-                  value={selectedCollection}
-                  onChange={handleCollectionChange}
-                  style={{ width: "100%" }}
                   placeholder="Collection"
-                  popupClassName="notes-select-dropdown"
-                >
-                  <Select.Option value="all">All collections</Select.Option>
-                  {collections.map((collection) => (
-                    <Select.Option key={collection.id} value={String(collection.id)}>
-                      {collection.name}
-                      {!collection.isOwner ? " (shared)" : ""}
-                    </Select.Option>
-                  ))}
-                </Select>
-              </Col>
-              <Col xs={24} sm={4}>
-                <Select
-                  value={selectedTag}
-                  onChange={handleTagChange}
-                  style={{ width: "100%" }}
-                  placeholder="Filter by tag"
-                  popupClassName="notes-select-dropdown"
-                >
-                  <Select.Option value="all">All Tags</Select.Option>
-                  {availableTags.map((tag) => (
-                    <Select.Option key={tag} value={tag}>
-                      {tag}
-                    </Select.Option>
-                  ))}
-                </Select>
-              </Col>
-              <Col xs={24} sm={4}>
-                <Select
-                  value={viewFilter}
-                  onChange={handleViewFilterChange}
-                  style={{ width: "100%" }}
-                  popupClassName="notes-select-dropdown"
+                  style={{ width: 180 }}
+                  value={bulkCollection}
+                  onChange={setBulkCollection}
                   options={[
-                    { value: "all", label: "Mine & shared" },
-                    { value: "shared", label: "Shared with me" },
-                    { value: "favorites", label: "Favorites" },
-                    { value: "trash", label: "Trash" },
+                    { value: "none", label: "No collection" },
+                    ...collections
+                      .filter(
+                        (collection) =>
+                          collection.permission === "owner" ||
+                          collection.permission === "edit",
+                      )
+                      .map((collection) => ({
+                        value: String(collection.id),
+                        label: collection.name,
+                      })),
                   ]}
                 />
-              </Col>
-              <Col xs={24} sm={8}>
-                <Search
-                  placeholder="Search notes..."
-                  allowClear
-                  value={searchInput}
-                  onChange={(event) => handleSearchInput(event.target.value)}
-                  onSearch={handleSearch}
-                  style={{ width: "100%" }}
-                  prefix={<SearchOutlined />}
-                />
-              </Col>
-            </Row>
-          </div>
-        </Col>
-        <Col
-          xs={{ span: 12, order: 2 }}
-          sm={{ span: 12, order: 2 }}
-          md={{ span: 12, order: 2 }}
-          lg={{ span: 8, order: 3 }}
-          style={{ textAlign: "right" }}
-        >
-          <Space>
-            <input
-              ref={importInputRef}
-              type="file"
-              accept="application/json,.json"
-              hidden
-              onChange={(event) => {
-                const file = event.target.files?.[0];
-                event.target.value = "";
-                if (file) handleImportFile(file);
-              }}
-            />
-            <Button size="large" onClick={() => setCollectionsOpen(true)}>
-              Collections
-            </Button>
-            <Dropdown
-              menu={{
-                items: [
-                  {
-                    key: "export",
-                    label: "Export backup",
-                    icon: <DownloadOutlined />,
-                    onClick: handleExport,
-                  },
-                  {
-                    key: "import",
-                    label: "Import backup",
-                    onClick: () => importInputRef.current?.click(),
-                  },
-                ],
-              }}
-            >
-              <Button size="large">Backup</Button>
-            </Dropdown>
-            <Button
-              className="new_note_button"
-              type="primary"
-              icon={<PlusOutlined />}
-              onClick={() => setModalVisible(true)}
-              size="large"
-            >
-              New Note
-            </Button>
+                <Button onClick={handleBulkMove} disabled={!bulkCollection}>
+                  Move
+                </Button>
+                <Button danger onClick={handleBulkTrash}>
+                  Move to trash
+                </Button>
+                <Button type="link" onClick={() => setSelectedIds([])}>
+                  Clear
+                </Button>
+              </>
+            )}
           </Space>
-        </Col>
-      </Row>
-
-      <Text type="secondary" style={{ display: "block", margin: "4px 0 12px" }}>
-        {filteredNotes.length} {filteredNotes.length === 1 ? "note" : "notes"}
-      </Text>
+        </div>
+      ) : null}
 
       {loading && notes.length === 0 ? (
         <div className="notes-loading">
@@ -1039,312 +1122,351 @@ const NotesPage = () => {
               image={Empty.PRESENTED_IMAGE_SIMPLE}
             />
           ) : viewMode === "card" ? (
-        <Row gutter={[16, 16]}>
-          {filteredNotes.map((note) => (
-            <Col xs={24} sm={12} lg={6} xl={4} key={note.id}>
-              <Card
-                className="note-card"
-                hoverable
-                onClick={() => handleView(note)}
-                style={{ cursor: "pointer" }}
-                actions={[
-                  ...(viewFilter !== "trash"
-                    ? [
-                        <Button
-                          key="favorite"
-                          type="text"
-                          icon={
-                            note.isFavorite ? (
-                              <StarFilled style={{ color: "#faad14" }} />
+            <Row gutter={[16, 16]}>
+              {filteredNotes.map((note) => (
+                <Col xs={24} sm={12} lg={6} xl={4} key={note.id}>
+                  <Card
+                    className="note-card"
+                    hoverable
+                    onClick={() => handleView(note)}
+                    style={{ cursor: "pointer" }}
+                    actions={[
+                      ...(viewFilter !== "trash"
+                        ? [
+                            <Button
+                              key="favorite"
+                              type="text"
+                              icon={
+                                note.isFavorite ? (
+                                  <StarFilled style={{ color: "#faad14" }} />
+                                ) : (
+                                  <StarOutlined />
+                                )
+                              }
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                toggleFavorite(note.id);
+                              }}
+                            />,
+                          ]
+                        : []),
+                      <Button
+                        key="view"
+                        type="text"
+                        icon={<EyeOutlined />}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleView(note);
+                        }}
+                      />,
+                      ...(isNoteOwner(note)
+                        ? [
+                            <Button
+                              key="share"
+                              type="text"
+                              icon={<ShareAltOutlined />}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleShare(note);
+                              }}
+                            />,
+                          ]
+                        : []),
+                      ...(canEditNote(note)
+                        ? [
+                            <Button
+                              key="edit"
+                              type="text"
+                              icon={<EditOutlined />}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleEdit(note);
+                              }}
+                            />,
+                          ]
+                        : []),
+                      ...(activeCollection &&
+                      (activeCollection.isOwner || isNoteOwner(note))
+                        ? [
+                            <Tooltip
+                              key="remove-collection"
+                              title="Remove from collection"
+                            >
+                              <Button
+                                type="text"
+                                icon={<MinusCircleOutlined />}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleRemoveFromCollection(note.id);
+                                }}
+                              />
+                            </Tooltip>,
+                          ]
+                        : []),
+                      ...(isNoteOwner(note)
+                        ? [
+                            viewFilter === "trash" ? (
+                              <Button
+                                key="restore"
+                                type="text"
+                                icon={<UndoOutlined />}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleRestore(note.id);
+                                }}
+                              />
                             ) : (
-                              <StarOutlined />
-                            )
+                              <Button
+                                key="delete"
+                                type="text"
+                                danger
+                                icon={<DeleteOutlined />}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDelete(note.id);
+                                }}
+                              />
+                            ),
+                          ]
+                        : []),
+                    ]}
+                  >
+                    <div className="note-card-header">
+                      <Tag color={getCategoryColor(note.category)}>
+                        {note.category.toUpperCase()}
+                      </Tag>
+                      {note.isShared && <Tag color="purple">Shared</Tag>}
+                      {note.collection?.name && (
+                        <Tag color="processing">{note.collection.name}</Tag>
+                      )}
+                      {note.isFavorite && (
+                        <StarFilled
+                          style={{ color: "#faad14", fontSize: 16 }}
+                        />
+                      )}
+                    </div>
+                    <div className="note-title-row">
+                      {isNoteOwner(note) && viewFilter !== "trash" && (
+                        <Checkbox
+                          className="note-select"
+                          checked={selectedIds.includes(note.id)}
+                          onClick={(event) => event.stopPropagation()}
+                          onChange={(event) =>
+                            toggleSelected(note.id, event.target.checked)
                           }
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            toggleFavorite(note.id);
-                          }}
-                        />,
-                      ]
-                    : []),
-                  <Button
-                    key="view"
-                    type="text"
-                    icon={<EyeOutlined />}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleView(note);
-                    }}
-                  />,
-                  ...(isNoteOwner(note)
-                    ? [
-                        <Button
-                          key="share"
-                          type="text"
-                          icon={<ShareAltOutlined />}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleShare(note);
-                          }}
-                        />,
-                      ]
-                    : []),
-                  ...(canEditNote(note)
-                    ? [
-                        <Button
-                          key="edit"
-                          type="text"
-                          icon={<EditOutlined />}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleEdit(note);
-                          }}
-                        />,
-                      ]
-                    : []),
-                  ...(activeCollection &&
-                  (activeCollection.isOwner || isNoteOwner(note))
-                    ? [
-                        <Tooltip key="remove-collection" title="Remove from collection">
-                          <Button
-                            type="text"
-                            icon={<MinusCircleOutlined />}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleRemoveFromCollection(note.id);
-                            }}
-                          />
-                        </Tooltip>,
-                      ]
-                    : []),
-                  ...(isNoteOwner(note)
-                    ? [
-                        viewFilter === "trash" ? (
-                          <Button
-                            key="restore"
-                            type="text"
-                            icon={<UndoOutlined />}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleRestore(note.id);
-                            }}
-                          />
-                        ) : (
-                          <Button
-                            key="delete"
-                            type="text"
-                            danger
-                            icon={<DeleteOutlined />}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleDelete(note.id);
-                            }}
-                          />
-                        ),
-                      ]
-                    : []),
-                ]}
-              >
-                <div className="note-card-header">
-                  <Tag color={getCategoryColor(note.category)}>
-                    {note.category.toUpperCase()}
-                  </Tag>
-                  {note.isShared && <Tag color="purple">Shared</Tag>}
-                  {note.collection?.name && (
-                    <Tag color="processing">{note.collection.name}</Tag>
-                  )}
-                  {note.isFavorite && (
-                    <StarFilled style={{ color: "#faad14", fontSize: 16 }} />
-                  )}
-                </div>
-                <Title level={5} ellipsis={{ rows: 1 }} className="note-title">
-                  {note.title}
-                </Title>
-                {note.content?.decryptionFailed && (
-                  <Text type="danger">Could not decrypt this note</Text>
-                )}
+                        />
+                      )}
+                      <Title
+                        level={5}
+                        ellipsis={{ rows: 1 }}
+                        className="note-title"
+                      >
+                        {note.title}
+                      </Title>
+                      <PasswordHealthMark health={note.passwordHealth} />
+                    </div>
+                    {note.content?.decryptionFailed && (
+                      <Text type="danger">Could not decrypt this note</Text>
+                    )}
 
-                {/* Custom Fields as Columns */}
-                {getCustomFields(note.content).length > 0 && (
-                  <div className="note-custom-fields">
-                    {getCustomFields(note.content).map(
-                      (field: any, index: number) => {
-                        const fieldKey = `${note.id}-${index}`;
-                        const isCopied = copiedFields.has(fieldKey);
-                        const isUrlField =
-                          field.label.toLowerCase() === "url" &&
-                          isURL(field.value);
-                        const isPasswordField =
-                          field.label.toLowerCase().includes("password") ||
-                          field.label.toLowerCase().includes("pass");
-                        const showPassword = visiblePasswords.has(fieldKey);
+                    {/* Custom Fields as Columns */}
+                    {getCustomFields(note.content).length > 0 && (
+                      <div className="note-custom-fields">
+                        {getCustomFields(note.content).map(
+                          (field: any, index: number) => {
+                            const fieldKey = `${note.id}-${index}`;
+                            const isCopied = copiedFields.has(fieldKey);
+                            const isUrlField =
+                              field.label.toLowerCase() === "url" &&
+                              isURL(field.value);
+                            const isPasswordField =
+                              field.label.toLowerCase().includes("password") ||
+                              field.label.toLowerCase().includes("pass");
+                            const showPassword = visiblePasswords.has(fieldKey);
 
-                        if (!field.value) return null;
+                            if (!field.value) return null;
 
-                        const displayValue =
-                          isPasswordField && !showPassword
-                            ? "•".repeat(Math.min(field.value.length, 12))
-                            : field.value;
+                            const displayValue =
+                              isPasswordField && !showPassword
+                                ? "•".repeat(Math.min(field.value.length, 12))
+                                : field.value;
 
-                        return (
-                          <div
-                            key={index}
-                            className={`custom-field-row ${
-                              isCopied ? "copied" : ""
-                            }`}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              copyToClipboard(
-                                field.value,
-                                fieldKey,
-                                field.label
-                              );
-                            }}
-                          >
-                            <Text type="secondary" className="field-label">
-                              {field.label}:
-                            </Text>
-                            <div className="field-value-container">
-                              <Text
-                                className="field-value"
-                                ellipsis={{ tooltip: field.value }}
-                                style={{
-                                  color: isUrlField
-                                    ? "var(--colorInfo)"
-                                    : undefined,
-                                  textDecoration: isUrlField
-                                    ? "underline"
-                                    : undefined,
-                                  marginLeft: 6,
-                                  fontFamily:
-                                    isPasswordField && !showPassword
-                                      ? "monospace"
-                                      : undefined,
-                                  letterSpacing:
-                                    isPasswordField && !showPassword
-                                      ? "2px"
-                                      : undefined,
+                            return (
+                              <div
+                                key={index}
+                                className={`custom-field-row ${
+                                  isCopied ? "copied" : ""
+                                }`}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  copyToClipboard(
+                                    field.value,
+                                    fieldKey,
+                                    field.label,
+                                  );
                                 }}
                               >
-                                {displayValue}
-                              </Text>
-                              <div className="field-actions">
-                                {isPasswordField && (
-                                  <Tooltip
-                                    title={
-                                      showPassword ? "Hide value" : "Show value"
-                                    }
+                                <Text type="secondary" className="field-label">
+                                  {field.label}:
+                                </Text>
+                                <div className="field-value-container">
+                                  <Text
+                                    className="field-value"
+                                    ellipsis={{ tooltip: field.value }}
+                                    style={{
+                                      color: isUrlField
+                                        ? "var(--colorInfo)"
+                                        : undefined,
+                                      textDecoration: isUrlField
+                                        ? "underline"
+                                        : undefined,
+                                      marginLeft: 6,
+                                      fontFamily:
+                                        isPasswordField && !showPassword
+                                          ? "monospace"
+                                          : undefined,
+                                      letterSpacing:
+                                        isPasswordField && !showPassword
+                                          ? "2px"
+                                          : undefined,
+                                    }}
                                   >
-                                    {showPassword ? (
-                                      <EyeInvisibleOutlined
-                                        className="password-toggle-icon"
+                                    {displayValue}
+                                  </Text>
+                                  <div className="field-actions">
+                                    {isPasswordField && (
+                                      <Tooltip
+                                        title={
+                                          showPassword
+                                            ? "Hide value"
+                                            : "Show value"
+                                        }
+                                      >
+                                        {showPassword ? (
+                                          <EyeInvisibleOutlined
+                                            className="password-toggle-icon"
+                                            style={{
+                                              color: "var(--iconMuted)",
+                                              fontSize: 12,
+                                            }}
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              togglePasswordVisibility(
+                                                fieldKey,
+                                              );
+                                            }}
+                                          />
+                                        ) : (
+                                          <EyeOutlined
+                                            className="password-toggle-icon"
+                                            style={{
+                                              color: "var(--iconMuted)",
+                                              fontSize: 12,
+                                            }}
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              togglePasswordVisibility(
+                                                fieldKey,
+                                              );
+                                            }}
+                                          />
+                                        )}
+                                      </Tooltip>
+                                    )}
+                                    {isUrlField && (
+                                      <Tooltip title="Open URL">
+                                        <LinkOutlined
+                                          className="link-icon"
+                                          style={{
+                                            color: "var(--colorInfo)",
+                                            fontSize: 12,
+                                            marginLeft: 4,
+                                          }}
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            openURL(field.value);
+                                          }}
+                                        />
+                                      </Tooltip>
+                                    )}
+                                    {isCopied ? (
+                                      <CheckOutlined
+                                        className="check-icon"
                                         style={{
-                                          color: "var(--iconMuted)",
+                                          color: "#52c41a",
                                           fontSize: 12,
-                                        }}
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          togglePasswordVisibility(fieldKey);
+                                          marginLeft: 4,
                                         }}
                                       />
                                     ) : (
-                                      <EyeOutlined
-                                        className="password-toggle-icon"
-                                        style={{
-                                          color: "var(--iconMuted)",
-                                          fontSize: 12,
-                                        }}
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          togglePasswordVisibility(fieldKey);
-                                        }}
-                                      />
+                                      <Tooltip title="Click to copy">
+                                        <CopyOutlined
+                                          className="copy-icon"
+                                          style={{ marginLeft: 4 }}
+                                        />
+                                      </Tooltip>
                                     )}
-                                  </Tooltip>
-                                )}
-                                {isUrlField && (
-                                  <Tooltip title="Open URL">
-                                    <LinkOutlined
-                                      className="link-icon"
-                                      style={{
-                                        color: "var(--colorInfo)",
-                                        fontSize: 12,
-                                        marginLeft: 4,
-                                      }}
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        openURL(field.value);
-                                      }}
-                                    />
-                                  </Tooltip>
-                                )}
-                                {isCopied ? (
-                                  <CheckOutlined
-                                    className="check-icon"
-                                    style={{
-                                      color: "#52c41a",
-                                      fontSize: 12,
-                                      marginLeft: 4,
-                                    }}
-                                  />
-                                ) : (
-                                  <Tooltip title="Click to copy">
-                                    <CopyOutlined
-                                      className="copy-icon"
-                                      style={{ marginLeft: 4 }}
-                                    />
-                                  </Tooltip>
-                                )}
+                                  </div>
+                                </div>
                               </div>
-                            </div>
-                          </div>
-                        );
-                      }
+                            );
+                          },
+                        )}
+                      </div>
                     )}
-                  </div>
-                )}
 
-                {/* Main Content */}
-                {typeof note.content === "object" &&
-                  note.content.mainContent && (
-                    <Paragraph
-                      ellipsis={{ rows: 2 }}
-                      className="note-content"
-                      style={{ marginTop: 8 }}
-                    >
-                      {note.content.mainContent}
-                    </Paragraph>
-                  )}
+                    {/* Main Content */}
+                    {typeof note.content === "object" &&
+                      note.content.mainContent && (
+                        <Paragraph
+                          ellipsis={{ rows: 2 }}
+                          className="note-content"
+                          style={{ marginTop: 8 }}
+                        >
+                          {note.content.mainContent}
+                        </Paragraph>
+                      )}
 
-                {note.tags && note.tags.length > 0 && (
-                  <div className="note-tags">
-                    {note.tags.slice(0, 3).map((tag, index) => (
-                      <Tag key={index} className="note-tag">
-                        {tag}
-                      </Tag>
-                    ))}
-                  </div>
-                )}
-                <Text type="secondary" className="note-date">
-                  {dayjsExtra(note.updatedAt).format("DD/MM/YYYY")}
-                </Text>
-              </Card>
-            </Col>
-          ))}
-        </Row>
-      ) : (
-        <Table
-          dataSource={filteredNotes}
-          rowKey="id"
-          pagination={{ pageSize: 10, showSizeChanger: true }}
-          columns={getTableColumns()}
-          scroll={{ x: 1200 }}
-          onRow={(record) => ({
-            onClick: () => handleView(record),
-            style: { cursor: "pointer" },
-          })}
-          size="middle"
-        />
+                    {note.tags && note.tags.length > 0 && (
+                      <div className="note-tags">
+                        {note.tags.slice(0, 3).map((tag, index) => (
+                          <Tag key={index} className="note-tag">
+                            {tag}
+                          </Tag>
+                        ))}
+                      </div>
+                    )}
+                    <Text type="secondary" className="note-date">
+                      {dayjsExtra(note.updatedAt).format("DD/MM/YYYY")}
+                    </Text>
+                  </Card>
+                </Col>
+              ))}
+            </Row>
+          ) : (
+            <Table
+              dataSource={filteredNotes}
+              rowKey="id"
+              pagination={{ pageSize: 10, showSizeChanger: true }}
+              columns={getTableColumns()}
+              scroll={{ x: 1200 }}
+              rowSelection={
+                viewFilter === "trash"
+                  ? undefined
+                  : {
+                      selectedRowKeys: selectedIds,
+                      onChange: (keys) => setSelectedIds(keys as number[]),
+                      getCheckboxProps: (record: any) => ({
+                        disabled: !isNoteOwner(record),
+                      }),
+                    }
+              }
+              onRow={(record) => ({
+                onClick: () => handleView(record),
+                style: { cursor: "pointer" },
+              })}
+              size="middle"
+            />
           )}
         </Spin>
       )}

@@ -9,27 +9,27 @@ const PublicLayout = () => {
   const { me } = useAuthStore();
 
   useEffect(() => {
-    // Check for token in localStorage first
-    const token = localStorage.getItem("access_token");
-    if (token) {
-      // Only call getMe if we have a token but no user data
-      if (!me) {
-        getMe()
-          .then((res) => {
-            if (res) {
-              // User is authenticated, redirect to dashboard
-              navigate("/");
-            }
-          })
-          .catch(() => {
-            // Token is invalid, stay on public layout
-          });
-      } else {
-        // We already have user data, redirect immediately
-        navigate("/");
-      }
+    if (me) {
+      navigate("/");
+      return;
     }
-  }, [navigate, getMe, me]);
+
+    let cancelled = false;
+    getMe()
+      .then((res) => {
+        if (!cancelled && res) {
+          navigate("/");
+        }
+      })
+      .catch(() => {
+        // No session cookie. Stay on the login page.
+      });
+
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <div
