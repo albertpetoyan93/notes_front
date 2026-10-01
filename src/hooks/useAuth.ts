@@ -2,6 +2,7 @@ import { useNavigate } from "react-router-dom";
 import { fetcherGet, fetcherPost } from "../configs/axios";
 import { useAuthStore } from "../store/authStore";
 import { message } from "antd";
+import { keevoReturnPath } from "../utils/keevoReturn";
 
 export const endpoints = {
   login: "/api/auth/login",
@@ -29,7 +30,7 @@ const useAuth = () => {
     try {
       await fetcherPost(endpoints.login, newData);
       await getMe();
-      navigate("/");
+      navigate(keevoReturnPath() || "/");
     } catch (err: any) {
       message.error(err.message || "Login failed");
       console.log(err);

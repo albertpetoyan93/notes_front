@@ -6,6 +6,7 @@ import ProtectedRoute from "../components/ProtectedRoute";
 import React from "react";
 import ProtectedRoutes from "./ProtectedRoutes";
 import PublicRoutes from "./PublicRoutes";
+import KeevoConnectPage from "../pages/keevo/KeevoConnectPage";
 
 // Type for route structure
 interface RouteConfig {
@@ -46,6 +47,7 @@ const AppRoutes = () => {
     <Routes>
       {/* Public routes - redirect to dashboard if authenticated */}
       <Route element={<PublicLayout />}>{renderRoutes(PublicRoutes)}</Route>
+      <Route path="/keevo" element={<KeevoConnectPage />} />
 
       {/* Protected routes - redirect to login if not authenticated */}
       <Route element={<ProtectedLayout />}>

@@ -3,6 +3,7 @@ import { Outlet, useNavigate } from "react-router-dom";
 import { BrandLockup } from "../components/header/LeftHeader";
 import useAuth from "../hooks/useAuth";
 import { useAuthStore } from "../store/authStore";
+import { keevoReturnPath } from "../utils/keevoReturn";
 
 const PublicLayout = () => {
   const navigate = useNavigate();
@@ -11,7 +12,7 @@ const PublicLayout = () => {
 
   useEffect(() => {
     if (me) {
-      navigate("/");
+      navigate(keevoReturnPath() || "/");
       return;
     }
 
@@ -19,7 +20,7 @@ const PublicLayout = () => {
     getMe()
       .then((res) => {
         if (!cancelled && res) {
-          navigate("/");
+          navigate(keevoReturnPath() || "/");
         }
       })
       .catch(() => {

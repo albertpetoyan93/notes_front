@@ -19,6 +19,11 @@ localStorage.removeItem("refresh_token");
 let refreshPromise: Promise<void> | null = null;
 
 function redirectToLogin() {
+  if (window.location.pathname.startsWith("/keevo")) {
+    const next = window.location.pathname + window.location.search;
+    window.location.href = `/auth/login?next=${encodeURIComponent(next)}`;
+    return;
+  }
   if (!window.location.href.includes("/auth/login")) {
     window.location.href = "/auth/login";
   }
