@@ -47,7 +47,6 @@ import "./NotesPage.scss";
 import NoteViewModal from "./NoteViewModal";
 import CollectionDialogs from "./CollectionDialogs";
 import CollectionsDrawer from "./CollectionsDrawer";
-import dayjsExtra from "../../utils/dayjs";
 import { subscribeOpenCollections } from "../../utils/collectionsDrawer";
 import { CollectionItem } from "../../store/noteStore";
 
@@ -217,27 +216,6 @@ const NotesPage = ({
   const handleViewModeChange = (mode: "card" | "table") => {
     setViewMode(mode);
     localStorage.setItem("notesViewMode", mode);
-  };
-
-  // Utility function to check if a value is a URL
-  const isURL = (value: any): boolean => {
-    if (!value) return false;
-    const strValue = String(value);
-    try {
-      const url = new URL(strValue);
-      return url.protocol === "http:" || url.protocol === "https:";
-    } catch {
-      // Try with http:// prefix if it looks like a URL
-      if (strValue.includes(".") && !strValue.includes(" ")) {
-        try {
-          new URL(`http://${strValue}`);
-          return true;
-        } catch {
-          return false;
-        }
-      }
-      return false;
-    }
   };
 
   // Open URL in new tab
