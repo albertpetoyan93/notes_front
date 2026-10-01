@@ -11,7 +11,7 @@ export interface NoteContent {
 }
 
 // Note categories
-export type NoteCategory = "note" | "password" | "login" | "command" | "other";
+export type NoteCategory = "note" | "password" | "command" | "other";
 
 // Full note interface
 export interface Note {
@@ -57,17 +57,13 @@ export function stringifyNoteContent(noteContent: NoteContent): string {
 export const CATEGORY_FIELD_TEMPLATES: Record<NoteCategory, CustomField[]> = {
   note: [],
   password: [
-    { label: "Platform/Website", value: "" },
-    { label: "Username/Email", value: "" },
-    { label: "Password", value: "" },
-    { label: "URL", value: "" },
-  ],
-  login: [
-    { label: "Service", value: "" },
+    { label: "Platform", value: "" },
     { label: "Username", value: "" },
     { label: "Email", value: "" },
     { label: "Password", value: "" },
-    { label: "2FA/Security", value: "" },
+    { label: "Key/Pass", value: "" },
+    { label: "URL", value: "" },
+    { label: "2FA", value: "" },
   ],
   command: [
     { label: "Server/Host", value: "" },

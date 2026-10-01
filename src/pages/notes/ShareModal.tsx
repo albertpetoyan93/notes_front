@@ -55,7 +55,7 @@ const ShareModal = ({ visible, note, onClose }: ShareModalProps) => {
 
     searchTimer.current = window.setTimeout(async () => {
       try {
-        const users = await searchUsers(query);
+        const users = await searchUsers(query, note?.collection?.companyId || undefined);
         setUserOptions(
           users.map((user) => ({
             value: user.email,
@@ -192,7 +192,11 @@ const ShareModal = ({ visible, note, onClose }: ShareModalProps) => {
               message: "Add at least one email or username",
             },
           ]}
-          extra="Type at least 2 characters, then pick a user"
+          extra={
+            note?.collection?.companyId
+              ? "Only people in this company. Type at least 2 characters, then pick a user."
+              : "Type at least 2 characters, then pick a user"
+          }
         >
           <Select
             mode="multiple"

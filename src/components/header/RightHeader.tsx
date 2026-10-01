@@ -2,15 +2,17 @@ import {
   BellOutlined,
   MoonOutlined,
   SunOutlined,
-  UserOutlined,
 } from "@ant-design/icons";
 import { Avatar, Badge, Button, Dropdown, Empty, theme } from "antd";
 import { useCallback, useEffect, useState } from "react";
 import { FaPowerOff } from "react-icons/fa6";
+import CompanyRequests from "../company/CompanyRequests";
 import axios from "../../configs/axios";
 import { useTheme } from "../../contexts/ThemeContext";
 import useAuth from "../../hooks/useAuth";
 import { useAuthStore } from "../../store/authStore";
+import { useCompanyStore } from "../../store/companyStore";
+import CompanyMenu from "./CompanyMenu";
 
 interface AppNotification {
   id: number;
@@ -27,6 +29,8 @@ const RightHeader = () => {
   const { token } = theme.useToken();
   const [items, setItems] = useState<AppNotification[]>([]);
   const [unread, setUnread] = useState(0);
+  const companies = useCompanyStore((state) => state.companies);
+  const inviteCount = companies.filter((company) => company.memberStatus === "invited").length;
 
   const loadNotifications = useCallback(async () => {
     try {
@@ -66,9 +70,8 @@ const RightHeader = () => {
         marginLeft: "auto",
       }}
     >
-      <span className="header-user">
-        {me?.fullName || me?.username}
-      </span>
+      <CompanyMenu />
+      <div className="header-account">
       <Dropdown
         trigger={["click"]}
         onOpenChange={(open) => {
@@ -86,6 +89,7 @@ const RightHeader = () => {
               padding: 12,
             }}
           >
+            <CompanyRequests compact />
             <div
               style={{
                 display: "flex",
@@ -137,7 +141,7 @@ const RightHeader = () => {
           </div>
         )}
       >
-        <Badge count={unread} size="small" offset={[-2, 2]}>
+        <Badge count={unread + inviteCount} size="small" offset={[-2, 2]}>
           <Button
             type="text"
             aria-label="Notifications"
@@ -148,6 +152,17 @@ const RightHeader = () => {
       </Dropdown>
       <Dropdown
         trigger={["click"]}
+        dropdownRender={(menu) => (
+          <div className="avatar-menu">
+            <div className="avatar-menu-id">
+              <div className="avatar-menu-name">
+                {me?.fullName || me?.username}
+              </div>
+              {me?.email && <div className="avatar-menu-meta">{me.email}</div>}
+            </div>
+            {menu}
+          </div>
+        )}
         menu={{
           items: [
             {
@@ -176,15 +191,18 @@ const RightHeader = () => {
         }}
       >
         <Avatar
+          className="header-avatar"
           size={36}
-          icon={<UserOutlined style={{ fontSize: 16 }} />}
           style={{
-            background: "var(--secondary_1)",
+            background: "#7c3aed",
             cursor: "pointer",
             flexShrink: 0,
           }}
-        />
+        >
+          {(me?.fullName || me?.username || "U").trim().charAt(0).toUpperCase()}
+        </Avatar>
       </Dropdown>
+      </div>
     </div>
   );
 };

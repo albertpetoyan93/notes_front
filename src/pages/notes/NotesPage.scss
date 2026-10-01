@@ -2,6 +2,11 @@
   margin: 0 auto;
   min-height: calc(100vh - 64px);
 
+  &.company-notes {
+    min-height: 0;
+    margin: 0;
+  }
+
   .notes-toolbar {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
@@ -27,6 +32,14 @@
       gap: 8px;
       justify-self: center;
 
+      .notes-search {
+        width: 220px;
+
+        .ant-input-affix-wrapper {
+          height: 32px;
+        }
+      }
+
       .ant-select {
         width: 148px;
       }
@@ -37,7 +50,7 @@
     }
 
     .switcher {
-      border-radius: 14px;
+      border-radius: 10px;
       padding: 4px;
       border: 1px solid var(--borderSubtle);
       flex-shrink: 0;
@@ -72,9 +85,13 @@
     display: flex;
     flex-direction: column;
     border-radius: 16px !important;
-    background: var(--surfaceCard) !important;
-    border: 1px solid var(--borderSubtle) !important;
-    box-shadow: var(--boxShadow) !important;
+    background: rgba(255, 255, 255, 0.38) !important;
+    border: 1px solid rgba(255, 255, 255, 0.55) !important;
+    backdrop-filter: blur(16px) saturate(160%);
+    -webkit-backdrop-filter: blur(16px) saturate(160%);
+    box-shadow:
+      0 10px 28px rgba(15, 23, 42, 0.08),
+      inset 0 1px 0 rgba(255, 255, 255, 0.7) !important;
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
     overflow: hidden;
 
@@ -94,6 +111,7 @@
       display: flex;
       justify-content: space-between;
       align-items: center;
+      gap: 8px;
       margin-bottom: 12px;
 
       .ant-tag {
@@ -101,8 +119,50 @@
         padding: 2px 10px;
         font-weight: 600;
         font-size: 11px;
-        border: none;
+        line-height: 18px;
       }
+
+      .note-category-password {
+        color: #be123c;
+        background: rgba(244, 63, 94, 0.12);
+        border-color: rgba(244, 63, 94, 0.28);
+      }
+
+      .note-category-login,
+      .note-category-db {
+        color: #1d4ed8;
+        background: rgba(59, 130, 246, 0.12);
+        border-color: rgba(59, 130, 246, 0.28);
+      }
+
+      .note-category-other {
+        color: #b45309;
+        background: rgba(245, 158, 11, 0.16);
+        border-color: rgba(245, 158, 11, 0.32);
+      }
+
+      .note-category-command,
+      .note-category-ssh {
+        color: #7e22ce;
+        background: rgba(168, 85, 247, 0.12);
+        border-color: rgba(168, 85, 247, 0.28);
+      }
+
+      .note-category-note {
+        color: #0e7490;
+        background: rgba(6, 182, 212, 0.14);
+        border-color: rgba(6, 182, 212, 0.28);
+      }
+
+      .note-collection {
+        color: #475569;
+        background: rgba(148, 163, 184, 0.2);
+        border-color: rgba(100, 116, 139, 0.28);
+      }
+    }
+
+    .member-card-top .note-title-row {
+      margin: 0;
     }
 
     .note-title-row {
@@ -137,44 +197,25 @@
     }
 
     .note-custom-fields {
-      margin-bottom: 12px;
-      background: var(--customFieldBg);
-      border-radius: 12px;
-      border: 1px solid var(--borderSubtle);
+      margin-bottom: 14px;
+      background: transparent;
+      border: none;
+      padding: 0;
 
       .custom-field-row {
         display: flex;
         justify-content: space-between;
         align-items: center;
-        padding: 8px;
-        border-bottom: 1px solid transparent;
+        gap: 12px;
+        padding: 5px 0;
         cursor: pointer;
-        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        border-radius: 8px;
-        margin-bottom: 4px;
-        background: var(--customFieldRowBg);
-
-        &:last-child {
-          border-bottom: none;
-          margin-bottom: 0;
-        }
-
-        &:hover {
-          background-color: var(--surfaceHover);
-          box-shadow: var(--boxShadow);
-          transform: translateX(2px);
-        }
-
-        &.copied {
-          background: rgba(52, 211, 153, 0.2);
-          border-color: rgba(52, 211, 153, 0.45);
-        }
+        background: transparent;
 
         .field-label {
-          font-size: 12px;
-          font-weight: 500;
-          min-width: 80px;
-          flex-shrink: 0;
+          font-size: 13px;
+          font-weight: 400;
+          flex: 1 1 auto;
+          min-width: 0;
           overflow: hidden;
           text-overflow: ellipsis;
           white-space: nowrap;
@@ -182,20 +223,20 @@
         }
 
         .field-value-container {
-          flex: 1;
           display: flex;
-          justify-content: space-between;
+          justify-content: flex-end;
           align-items: center;
-          min-width: 0; // Important for ellipsis to work
+          min-width: 0;
+          max-width: 58%;
           gap: 8px;
 
           .field-value {
-            flex: 1;
             font-size: 13px;
-            min-width: 0; // Important for ellipsis to work
+            min-width: 0;
             overflow: hidden;
             text-overflow: ellipsis;
             white-space: nowrap;
+            text-align: right;
             color: var(--colorText);
           }
 
@@ -206,10 +247,10 @@
             flex-shrink: 0;
           }
 
-          .copy-icon {
-            opacity: 0.65;
-            transition: opacity 0.2s;
-            font-size: 12px;
+          .copy-icon,
+          .password-toggle-icon {
+            opacity: 0.75;
+            font-size: 14px;
             color: var(--iconMuted);
             flex-shrink: 0;
           }
@@ -229,7 +270,8 @@
         }
 
         &:hover .copy-icon,
-        &:hover .link-icon {
+        &:hover .link-icon,
+        &:hover .password-toggle-icon {
           opacity: 1;
           color: var(--colorText);
         }
@@ -263,8 +305,382 @@
     }
 
     .note-date {
+      display: block;
+      margin-top: 4px;
       font-size: 12px;
       color: var(--textMuted);
+    }
+
+    .ant-card-actions {
+      display: flex;
+      margin: 0;
+      padding: 0;
+      background: rgba(255, 255, 255, 0.28);
+      border-top: 1px solid rgba(255, 255, 255, 0.4);
+
+      > li {
+        position: relative;
+        flex: 1;
+        width: auto !important;
+        margin: 0 !important;
+        border-inline-end: none !important;
+
+        &:not(:last-child)::after {
+          content: "";
+          position: absolute;
+          top: 50%;
+          right: 0;
+          width: 1px;
+          height: 30%;
+          transform: translateY(-50%);
+          background: rgba(148, 163, 184, 0.35);
+        }
+
+        > span {
+          display: block;
+          width: 100%;
+        }
+      }
+
+      .ant-btn {
+        width: 100%;
+        min-width: 0;
+        height: 40px;
+        padding: 0;
+        color: #64748b;
+        border-radius: 0;
+
+        .anticon {
+          font-size: 15px;
+        }
+
+        &:hover {
+          color: #334155;
+          background: transparent;
+        }
+      }
+
+      .ant-btn-dangerous {
+        color: #e11d48;
+
+        &:hover {
+          color: #be123c;
+          background: transparent;
+        }
+      }
+    }
+  }
+}
+
+.notes-page .notes-table {
+  .ant-table {
+    overflow: hidden;
+    border-radius: 16px;
+    border: 1px solid rgba(255, 255, 255, 0.55);
+    background: rgba(255, 255, 255, 0.38) !important;
+    backdrop-filter: blur(16px) saturate(160%);
+    -webkit-backdrop-filter: blur(16px) saturate(160%);
+    box-shadow:
+      0 10px 28px rgba(15, 23, 42, 0.08),
+      inset 0 1px 0 rgba(255, 255, 255, 0.7);
+  }
+
+  .ant-table-container,
+  .ant-table-content,
+  .ant-table-body,
+  .ant-table-header {
+    background: transparent !important;
+  }
+
+  .ant-table-thead > tr > th {
+    background: rgba(255, 255, 255, 0.28) !important;
+    color: var(--textMuted) !important;
+    font-size: 12px;
+    font-weight: 600;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.4) !important;
+
+    &::before {
+      background: rgba(148, 163, 184, 0.35) !important;
+    }
+  }
+
+  .ant-table-tbody > tr > td {
+    background: transparent !important;
+    border-bottom: 1px solid rgba(15, 23, 42, 0.06) !important;
+  }
+
+  .ant-table-tbody > tr:hover > td,
+  .ant-table-tbody > tr > td.ant-table-cell-row-hover {
+    background: rgba(255, 255, 255, 0.34) !important;
+  }
+
+  .ant-table-cell-fix-left,
+  .ant-table-cell-fix-right {
+    background: rgba(255, 255, 255, 0.72) !important;
+  }
+
+  .ant-table-tbody > tr:hover > td.ant-table-cell-fix-left,
+  .ant-table-tbody > tr:hover > td.ant-table-cell-fix-right {
+    background: rgba(255, 255, 255, 0.88) !important;
+  }
+
+  .ant-pagination {
+    margin-top: 14px;
+  }
+
+  .note-category,
+  .note-collection,
+  .note-tag {
+    margin: 0;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 11px;
+  }
+
+  .note-category-password {
+    color: #be123c;
+    background: rgba(244, 63, 94, 0.12);
+    border-color: rgba(244, 63, 94, 0.28);
+  }
+
+  .note-category-login,
+  .note-category-db {
+    color: #1d4ed8;
+    background: rgba(59, 130, 246, 0.12);
+    border-color: rgba(59, 130, 246, 0.28);
+  }
+
+  .note-category-other {
+    color: #b45309;
+    background: rgba(245, 158, 11, 0.16);
+    border-color: rgba(245, 158, 11, 0.32);
+  }
+
+  .note-category-command,
+  .note-category-ssh {
+    color: #7e22ce;
+    background: rgba(168, 85, 247, 0.12);
+    border-color: rgba(168, 85, 247, 0.28);
+  }
+
+  .note-category-note {
+    color: #0e7490;
+    background: rgba(6, 182, 212, 0.14);
+    border-color: rgba(6, 182, 212, 0.28);
+  }
+
+  .note-collection,
+  .note-tag {
+    color: #475569;
+    background: rgba(148, 163, 184, 0.2);
+    border-color: rgba(100, 116, 139, 0.28);
+  }
+
+  .table-fields {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .table-field {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 120px;
+    max-width: 180px;
+    padding: 8px 10px;
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.55);
+    background: rgba(255, 255, 255, 0.42);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.65);
+    cursor: pointer;
+
+    &:hover {
+      background: rgba(255, 255, 255, 0.7);
+    }
+  }
+
+  .table-field-single {
+    width: fit-content;
+    max-width: 360px;
+  }
+
+  .table-field-label {
+    font-size: 11px !important;
+    font-weight: 600 !important;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--textMuted) !important;
+  }
+
+  .table-field-value {
+    font-size: 13px !important;
+    font-weight: 500 !important;
+    color: var(--colorText) !important;
+
+    &.is-url {
+      color: var(--colorInfo) !important;
+    }
+
+    &.is-secret {
+      font-family: monospace;
+      letter-spacing: 2px;
+    }
+  }
+
+  [data-theme="dark"] & {
+    .ant-table {
+      border-color: rgba(255, 255, 255, 0.1);
+      background: rgba(17, 24, 39, 0.42) !important;
+      box-shadow:
+        0 10px 28px rgba(0, 0, 0, 0.28),
+        inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    }
+
+    .ant-table-thead > tr > th {
+      background: rgba(255, 255, 255, 0.04) !important;
+      color: #94a3b8 !important;
+      border-bottom-color: rgba(255, 255, 255, 0.08) !important;
+    }
+
+    .ant-table-tbody > tr > td {
+      border-bottom-color: rgba(255, 255, 255, 0.06) !important;
+    }
+
+    .ant-table-tbody > tr:hover > td,
+    .ant-table-tbody > tr > td.ant-table-cell-row-hover {
+      background: rgba(255, 255, 255, 0.05) !important;
+    }
+
+    .ant-table-cell-fix-left,
+    .ant-table-cell-fix-right,
+    .ant-table-thead > tr > th.ant-table-cell-fix-left,
+    .ant-table-thead > tr > th.ant-table-cell-fix-right {
+      background: rgba(17, 24, 39, 0.94) !important;
+    }
+
+    .ant-table-tbody > tr:hover > td.ant-table-cell-fix-left,
+    .ant-table-tbody > tr:hover > td.ant-table-cell-fix-right {
+      background: rgba(30, 41, 59, 0.96) !important;
+    }
+
+    .note-category-password {
+      color: #fda4af;
+      background: rgba(244, 63, 94, 0.16);
+      border-color: rgba(244, 63, 94, 0.45);
+    }
+
+    .note-category-login,
+    .note-category-db {
+      color: #93c5fd;
+      background: rgba(59, 130, 246, 0.16);
+      border-color: rgba(59, 130, 246, 0.4);
+    }
+
+    .note-category-other {
+      color: #fcd34d;
+      background: rgba(245, 158, 11, 0.16);
+      border-color: rgba(245, 158, 11, 0.4);
+    }
+
+    .note-category-command,
+    .note-category-ssh {
+      color: #d8b4fe;
+      background: rgba(168, 85, 247, 0.16);
+      border-color: rgba(168, 85, 247, 0.4);
+    }
+
+    .note-category-note {
+      color: #67e8f9;
+      background: rgba(6, 182, 212, 0.16);
+      border-color: rgba(6, 182, 212, 0.4);
+    }
+
+    .note-collection,
+    .note-tag {
+      color: #cbd5e1;
+      background: rgba(148, 163, 184, 0.16);
+      border-color: rgba(148, 163, 184, 0.35);
+    }
+
+    .table-field {
+      background: rgba(255, 255, 255, 0.06);
+      border-color: rgba(255, 255, 255, 0.14);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12);
+
+      &:hover {
+        background: rgba(255, 255, 255, 0.1);
+      }
+    }
+  }
+}
+
+[data-theme="dark"] .note-card {
+  background: rgba(17, 24, 39, 0.42) !important;
+  border-color: rgba(255, 255, 255, 0.1) !important;
+  box-shadow:
+    0 10px 28px rgba(0, 0, 0, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08) !important;
+
+  .note-card-header {
+    .note-category-password {
+      color: #fda4af;
+      background: rgba(244, 63, 94, 0.16);
+      border-color: rgba(244, 63, 94, 0.45);
+    }
+
+    .note-category-login,
+    .note-category-db {
+      color: #93c5fd;
+      background: rgba(59, 130, 246, 0.16);
+      border-color: rgba(59, 130, 246, 0.4);
+    }
+
+    .note-category-other {
+      color: #fcd34d;
+      background: rgba(245, 158, 11, 0.16);
+      border-color: rgba(245, 158, 11, 0.4);
+    }
+
+    .note-category-command,
+    .note-category-ssh {
+      color: #d8b4fe;
+      background: rgba(168, 85, 247, 0.16);
+      border-color: rgba(168, 85, 247, 0.4);
+    }
+
+    .note-category-note {
+      color: #67e8f9;
+      background: rgba(6, 182, 212, 0.16);
+      border-color: rgba(6, 182, 212, 0.4);
+    }
+
+    .note-collection {
+      color: #cbd5e1;
+      background: rgba(148, 163, 184, 0.16);
+      border-color: rgba(148, 163, 184, 0.35);
+    }
+  }
+
+  .ant-card-actions {
+    background: rgba(255, 255, 255, 0.04);
+    border-top-color: rgba(255, 255, 255, 0.08);
+
+    .ant-btn {
+      color: #8eb4d4;
+
+      &:hover {
+        color: #d5e6f5;
+      }
+    }
+
+    .ant-btn-dangerous {
+      color: #e85d6a;
+
+      &:hover {
+        color: #ff9aa4;
+      }
     }
   }
 }

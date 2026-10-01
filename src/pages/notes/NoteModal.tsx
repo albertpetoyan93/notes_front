@@ -17,6 +17,8 @@ interface NoteModalProps {
   visible: boolean;
   note?: any;
   defaultCollectionId?: number;
+  collections?: CollectionItem[];
+  requireCollection?: boolean;
   onClose: () => void;
   onSaved?: () => void;
 }
@@ -30,6 +32,8 @@ const NoteModal = ({
   visible,
   note,
   defaultCollectionId,
+  collections: providedCollections,
+  requireCollection,
   onClose,
   onSaved,
 }: NoteModalProps) => {
@@ -41,8 +45,9 @@ const NoteModal = ({
 
   useEffect(() => {
     if (visible && note) {
-      form.setFieldsValue(note);
-      setSelectedCategory(note.category || "note");
+      const category = note.category === "login" ? "password" : note.category || "note";
+      form.setFieldsValue({ ...note, category });
+      setSelectedCategory(category);
 
       // Parse custom fields from content if it's an object (JSONB)
       const content = note.content;
@@ -76,10 +81,14 @@ const NoteModal = ({
 
   useEffect(() => {
     if (!visible) return;
+    if (providedCollections) {
+      setCollections(providedCollections);
+      return;
+    }
     fetchCollections()
       .then(setCollections)
       .catch(() => setCollections([]));
-  }, [visible, fetchCollections]);
+  }, [visible, fetchCollections, providedCollections]);
 
   const handleCategoryChange = (value: string) => {
     setSelectedCategory(value);
@@ -88,21 +97,13 @@ const NoteModal = ({
     switch (value) {
       case "password":
         setCustomFields([
-          { label: "Platform/Website", value: "" },
-          { label: "Username/Email", value: "" },
-          { label: "Password", value: "" },
-          { label: "Key/Password", value: "" },
-          { label: "URL", value: "" },
-        ]);
-        break;
-      case "login":
-        setCustomFields([
-          { label: "Service Name", value: "" },
+          { label: "Platform", value: "" },
           { label: "Username", value: "" },
           { label: "Email", value: "" },
           { label: "Password", value: "" },
-          { label: "Key/Password", value: "" },
-          { label: "2FA/Security", value: "" },
+          { label: "Key/Pass", value: "" },
+          { label: "URL", value: "" },
+          { label: "2FA", value: "" },
         ]);
         break;
       case "command":
@@ -228,15 +229,13 @@ const NoteModal = ({
           <Select
             onChange={(value) => {
               handleCategoryChange(value);
-              // Auto-enable encryption for password and login
-              if (value === "password" || value === "login") {
+              if (value === "password") {
                 form.setFieldValue("isEncrypted", true);
               }
             }}
           >
             <Select.Option value="note">Note</Select.Option>
-            <Select.Option value="password">Password</Select.Option>
-            <Select.Option value="login">Login</Select.Option>
+            <Select.Option value="password">Login</Select.Option>
             <Select.Option value="command">Command</Select.Option>
             <Select.Option value="ssh">SSH</Select.Option>
             <Select.Option value="db">Database</Select.Option>
@@ -244,7 +243,15 @@ const NoteModal = ({
           </Select>
         </Form.Item>
 
-        <Form.Item name="collectionId" label="Collection">
+        <Form.Item
+          name="collectionId"
+          label="Collection"
+          rules={
+            requireCollection
+              ? [{ required: true, message: "Choose a collection" }]
+              : undefined
+          }
+        >
           <Select
             allowClear
             placeholder="No collection"

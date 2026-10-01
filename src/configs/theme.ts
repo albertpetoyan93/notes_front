@@ -78,8 +78,20 @@ export const getThemeConfig = (
 ) => {
   const colors = colorVariants[variant];
 
+  const components = {
+    Button: {
+      borderRadius: 10,
+      borderRadiusLG: 10,
+      borderRadiusSM: 10,
+      colorPrimary: "#7c3aed",
+      colorPrimaryHover: "#6d28d9",
+      colorPrimaryActive: "#6d28d9",
+    },
+  };
+
   return {
     light: {
+      components,
       token: {
         primary: colors.light.primary,
         secondary_1: colors.light.secondary_1,
@@ -117,6 +129,7 @@ export const getThemeConfig = (
       },
     },
     dark: {
+      components,
       token: {
         primary: colors.dark.primary,
         secondary_1: colors.dark.secondary_1,

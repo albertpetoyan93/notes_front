@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { Outlet, useNavigate } from "react-router-dom";
+import { BrandLockup } from "../components/header/LeftHeader";
 import useAuth from "../hooks/useAuth";
 import { useAuthStore } from "../store/authStore";
 
@@ -35,11 +36,13 @@ const PublicLayout = () => {
     <div
       style={{
         display: "flex",
+        flexDirection: "column",
         justifyContent: "center",
         alignItems: "center",
         height: "100vh",
       }}
     >
+      <BrandLockup large />
       <Outlet />
     </div>
   );

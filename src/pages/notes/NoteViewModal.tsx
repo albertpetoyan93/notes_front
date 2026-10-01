@@ -1,5 +1,6 @@
 import { ShareAltOutlined } from "@ant-design/icons";
 import { Button, Drawer, Descriptions, Space, Tag, Typography } from "antd";
+import PlatformIcon from "../../components/platformIcon/PlatformIcon";
 
 const { Paragraph, Title } = Typography;
 
@@ -38,9 +39,12 @@ const NoteViewModal = ({
     <Drawer
       title={
         <Space style={{ width: "100%", justifyContent: "space-between" }}>
-          <Title level={4} style={{ margin: 0 }}>
-            {note.title}
-          </Title>
+          <Space size={8}>
+            <PlatformIcon note={note} size={28} />
+            <Title level={4} style={{ margin: 0 }}>
+              {note.title}
+            </Title>
+          </Space>
           {onShare && (
             <Button
               type="text"
@@ -62,22 +66,26 @@ const NoteViewModal = ({
           <Space>
             <Tag
               color={
-                note.category === "password"
+                note.category === "password" || note.category === "login"
                   ? "red"
-                  : note.category === "login"
-                  ? "green"
                   : note.category === "command"
                   ? "purple"
                   : "blue"
               }
             >
-              {note.category.toUpperCase()}
+              {note.category === "password" || note.category === "login"
+                ? "LOGIN"
+                : note.category.toUpperCase()}
             </Tag>
-            {note.isShared && <Tag color="purple">Shared with you</Tag>}
+            {note.isShared && (
+              <Tag color="purple">
+                Shared by {note.sharedByName || "someone"}
+              </Tag>
+            )}
           </Space>
         </Descriptions.Item>
 
-        {note.collection?.name && (
+        {!note.isShared && note.collection?.name && (
           <Descriptions.Item label="Collection">
             <Tag color="processing">{note.collection.name}</Tag>
           </Descriptions.Item>

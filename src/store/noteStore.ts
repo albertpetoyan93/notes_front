@@ -25,9 +25,10 @@ export interface Note {
   updatedAt: string;
   isOwner?: boolean;
   isShared?: boolean;
+  sharedByName?: string;
   permission?: "owner" | "view" | "edit";
   collectionId?: number | null;
-  collection?: { id: number; name: string } | null;
+  collection?: { id: number; name: string; companyId?: number | null } | null;
   passwordHealth?: {
     weak: boolean;
     reused: boolean;
@@ -76,6 +77,7 @@ interface NoteStore {
     sharedOnly?: boolean;
     trash?: boolean;
     collectionId?: number;
+    companyId?: number;
   }) => Promise<void>;
   getNote: (id: number) => Promise<Note>;
   createNote: (note: Partial<Note>) => Promise<Note>;
@@ -83,7 +85,8 @@ interface NoteStore {
   deleteNote: (id: number) => Promise<void>;
   restoreNote: (id: number) => Promise<void>;
   searchUsers: (
-    query: string
+    query: string,
+    companyId?: number
   ) => Promise<
     { id: number; username: string; email: string; fullName?: string }[]
   >;
@@ -173,6 +176,9 @@ export const useNoteStore = create<NoteStore>((set, get) => ({
       if (filters?.collectionId) {
         params.append("collection", String(filters.collectionId));
       }
+      if (filters?.companyId) {
+        params.append("company", String(filters.companyId));
+      }
 
       const response = await axios.get(`/api/notes?${params.toString()}`);
       set({ notes: response.data, loading: false });
@@ -251,9 +257,9 @@ export const useNoteStore = create<NoteStore>((set, get) => ({
     }
   },
 
-  searchUsers: async (query) => {
+  searchUsers: async (query, companyId) => {
     const response = await axios.get("/api/auth/users", {
-      params: { q: query },
+      params: { q: query, ...(companyId ? { company: companyId } : {}) },
     });
     return response.data;
   },

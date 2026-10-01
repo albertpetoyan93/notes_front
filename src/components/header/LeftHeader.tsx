@@ -1,30 +1,16 @@
-import Title from "antd/es/typography/Title";
-import { useThemeVariant } from "../../contexts/ThemeVariantContext";
+export const BrandLockup = ({ large = false }: { large?: boolean }) => (
+  <span className={large ? "brand-lockup large" : "brand-lockup"}>
+    <span className="header-logo-plate">
+      <img src="/logo.png" alt="" />
+    </span>
+    <img src="/keevo-word.png" alt="keevo" className="header-word" />
+  </span>
+);
 
 const LeftHeader = () => {
-  const { gradientStyle } = useThemeVariant();
-
   return (
     <div className="header_child">
-      <Title
-        level={4}
-        className="header-brand"
-        style={{
-          backgroundImage: gradientStyle,
-          WebkitBackgroundClip: "text",
-          WebkitTextFillColor: "transparent",
-          color: "transparent",
-          fontWeight: 700,
-        }}
-      >
-        My Notes
-      </Title>
-      {/* <span
-        style={{ cursor: "pointer", fontSize: "18px", width: 64, height: 64 }}
-        onClick={() => setCollapsed(!collapsed)}
-      >
-        {collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
-      </span> */}
+      <BrandLockup />
     </div>
   );
 };
