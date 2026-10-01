@@ -1,19 +1,7 @@
-import RegisterForm from "./RegisterForm";
+import AuthPanel from "../auth/AuthPanel";
 
 const RegisterPage = () => {
-  return (
-    <div
-      style={{
-        width: "30%",
-        minWidth: "300px",
-        maxWidth: "400px",
-        margin: "auto",
-        marginTop: "8%",
-      }}
-    >
-      <RegisterForm />
-    </div>
-  );
+  return <AuthPanel mode="register" />;
 };
 
 export default RegisterPage;

@@ -1,19 +1,7 @@
-import LoginForm from "./LoginForm";
+import AuthPanel from "../auth/AuthPanel";
 
 const LoginPage = () => {
-  return (
-    <div
-      style={{
-        width: "30%",
-        minWidth: "300px",
-        maxWidth: "350px",
-        margin: "auto",
-        marginTop: "10%",
-      }}
-    >
-      <LoginForm />
-    </div>
-  );
+  return <AuthPanel mode="login" />;
 };
 
 export default LoginPage;

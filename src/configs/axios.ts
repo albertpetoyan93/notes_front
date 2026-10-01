@@ -24,9 +24,8 @@ function redirectToLogin() {
     window.location.href = `/auth/login?next=${encodeURIComponent(next)}`;
     return;
   }
-  if (!window.location.href.includes("/auth/login")) {
-    window.location.href = "/auth/login";
-  }
+  if (window.location.pathname.startsWith("/auth/")) return;
+  window.location.href = "/auth/login";
 }
 
 axiosServices.interceptors.response.use(
