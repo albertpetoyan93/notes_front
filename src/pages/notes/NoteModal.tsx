@@ -2,6 +2,18 @@ import { DeleteOutlined, PlusOutlined } from "@ant-design/icons";
 import { Button, Col, Form, Input, Modal, Row, Select, Switch } from "antd";
 import { useEffect, useState } from "react";
 import { useNoteStore, CollectionItem } from "../../store/noteStore";
+import {
+  CARD_BRANDS,
+  cardBrandFromFields,
+  cardFieldKind,
+  formatCardField,
+  cardNumberPlaceholder,
+  cvvPlaceholder,
+  formatCardNumber,
+  formatCvv,
+  isAmexBrand,
+} from "../../utils/cardField";
+import { isSecretField } from "../../utils/secretField";
 
 const { TextArea } = Input;
 
@@ -133,6 +145,30 @@ const NoteModal = ({
           { label: "DB_PASSWORD", value: "" },
         ]);
         break;
+      case "address":
+        setCustomFields([
+          { label: "Full name", value: "" },
+          { label: "Organization", value: "" },
+          { label: "Email", value: "" },
+          { label: "Phone", value: "" },
+          { label: "Address", value: "" },
+          { label: "Address 2", value: "" },
+          { label: "City", value: "" },
+          { label: "State", value: "" },
+          { label: "Postal code", value: "" },
+          { label: "Country", value: "" },
+        ]);
+        break;
+      case "card":
+        setCustomFields([
+          { label: "Cardholder", value: "" },
+          { label: "Brand", value: "" },
+          { label: "Number", value: "" },
+          { label: "Expires", value: "" },
+          { label: "CVV", value: "" },
+          { label: "PIN", value: "" },
+        ]);
+        break;
       default:
         setCustomFields([]);
     }
@@ -155,6 +191,18 @@ const NoteModal = ({
     const newFields = [...customFields];
     newFields[index][field] = newValue;
     setCustomFields(newFields);
+  };
+
+  const setBrand = (brand: string) => {
+    setCustomFields((current) =>
+      current.map((field) => {
+        const kind = cardFieldKind(field.label);
+        if (kind === "brand") return { ...field, value: brand };
+        if (kind === "number") return { ...field, value: formatCardNumber(field.value, brand) };
+        if (kind === "cvv") return { ...field, value: formatCvv(field.value, brand) };
+        return field;
+      })
+    );
   };
 
   const handleSubmit = async () => {
@@ -235,7 +283,7 @@ const NoteModal = ({
           <Select
             onChange={(value) => {
               handleCategoryChange(value);
-              if (value === "password") {
+              if (value === "password" || value === "address" || value === "card") {
                 form.setFieldValue("isEncrypted", true);
               }
             }}
@@ -245,6 +293,8 @@ const NoteModal = ({
             <Select.Option value="command">Command</Select.Option>
             <Select.Option value="ssh">SSH</Select.Option>
             <Select.Option value="db">Database</Select.Option>
+            <Select.Option value="address">Address</Select.Option>
+            <Select.Option value="card">Card</Select.Option>
             <Select.Option value="other">Other</Select.Option>
           </Select>
         </Form.Item>
@@ -308,7 +358,11 @@ const NoteModal = ({
                 Add Field
               </Button>
             </div>
-            {customFields.map((field, index) => (
+            {customFields.map((field, index) => {
+              const brand = cardBrandFromFields(customFields);
+              const amex = isAmexBrand(brand);
+              const kind = cardFieldKind(field.label);
+              return (
               <Row
                 key={index}
                 gutter={[8, 8]}
@@ -326,13 +380,58 @@ const NoteModal = ({
                   />
                 </Col>
                 <Col flex="auto">
-                  <Input
-                    placeholder="Value"
-                    value={field.value}
-                    onChange={(e) =>
-                      updateCustomField(index, "value", e.target.value)
-                    }
-                  />
+                  {kind === "brand" ? (
+                    <Select
+                      placeholder="Brand"
+                      value={field.value || undefined}
+                      style={{ width: "100%" }}
+                      options={(
+                        field.value &&
+                        !CARD_BRANDS.includes(field.value as (typeof CARD_BRANDS)[number])
+                          ? [field.value, ...CARD_BRANDS]
+                          : [...CARD_BRANDS]
+                      ).map((item) => ({ value: item, label: item }))}
+                      onChange={setBrand}
+                    />
+                  ) : isSecretField(field.label) ? (
+                    <Input.Password
+                      key={kind === "cvv" ? `cvv-${brand}` : undefined}
+                      placeholder={kind === "cvv" ? cvvPlaceholder(brand) : "Value"}
+                      inputMode={kind === "cvv" ? "numeric" : undefined}
+                      maxLength={kind === "cvv" ? (amex ? 4 : 3) : undefined}
+                      value={formatCardField(field.label, field.value, "", brand)}
+                      onChange={(e) =>
+                        updateCustomField(
+                          index,
+                          "value",
+                          formatCardField(field.label, e.target.value, field.value, brand)
+                        )
+                      }
+                    />
+                  ) : (
+                    <Input
+                      key={kind === "number" ? `number-${brand}` : undefined}
+                      placeholder={
+                        kind === "number"
+                          ? cardNumberPlaceholder(brand)
+                          : kind === "expires"
+                            ? "MM/YY"
+                            : "Value"
+                      }
+                      inputMode={kind ? "numeric" : undefined}
+                      maxLength={
+                        kind === "number" ? (amex ? 17 : 19) : kind === "expires" ? 5 : undefined
+                      }
+                      value={formatCardField(field.label, field.value, "", brand)}
+                      onChange={(e) =>
+                        updateCustomField(
+                          index,
+                          "value",
+                          formatCardField(field.label, e.target.value, field.value, brand)
+                        )
+                      }
+                    />
+                  )}
                 </Col>
                 {field.label.toLowerCase().includes("pass") && (
                   <Col>
@@ -356,7 +455,8 @@ const NoteModal = ({
                   />
                 </Col>
               </Row>
-            ))}
+              );
+            })}
           </div>
         )}
 

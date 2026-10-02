@@ -17,6 +17,8 @@ import { Button, Card, Checkbox, Tag, Tooltip, Typography, message } from "antd"
 import { useState } from "react";
 import PlatformIcon from "../../components/platformIcon/PlatformIcon";
 import { Note } from "../../store/noteStore";
+import { cardBrandFromFields, formatCardField } from "../../utils/cardField";
+import { isSecretField } from "../../utils/secretField";
 import dayjsExtra from "../../utils/dayjs";
 import "./NotesPage.scss";
 
@@ -257,7 +259,11 @@ const NoteCard = ({
         >
           {note.category === "password" || note.category === "login"
             ? "LOGIN"
-            : note.category.toUpperCase()}
+            : note.category === "address"
+              ? "ADDRESS"
+              : note.category === "card"
+                ? "CARD"
+                : note.category.toUpperCase()}
         </Tag>
         {note.isShared && !note.collection?.companyId && (
           <Tooltip title={`Shared by ${note.sharedByName || "someone"}`}>
@@ -300,22 +306,26 @@ const NoteCard = ({
             const fieldKey = `${note.id}-${index}`;
             const isCopied = copiedFields.has(fieldKey);
             const isUrlField = field.label.toLowerCase() === "url" && isURL(field.value);
-            const isPasswordField =
-              field.label.toLowerCase().includes("password") ||
-              field.label.toLowerCase().includes("pass");
+            const isPasswordField = isSecretField(field.label);
             const showPassword = visiblePasswords.has(fieldKey);
             if (!field.value) return null;
+            const shownValue = formatCardField(
+              field.label,
+              field.value,
+              "",
+              cardBrandFromFields(customFields(note.content))
+            );
             const displayValue =
               isPasswordField && !showPassword
-                ? "•".repeat(Math.min(field.value.length, 12))
-                : field.value;
+                ? "•".repeat(Math.min(shownValue.length, 12))
+                : shownValue;
             return (
               <div
                 key={index}
                 className={`custom-field-row ${isCopied ? "copied" : ""}`}
                 onClick={(event) => {
                   event.stopPropagation();
-                  copyToClipboard(field.value, fieldKey, field.label);
+                  copyToClipboard(shownValue, fieldKey, field.label);
                 }}
               >
                 <Text type="secondary" className="field-label">
@@ -324,7 +334,7 @@ const NoteCard = ({
                 <div className="field-value-container">
                   <Text
                     className="field-value"
-                    ellipsis={{ tooltip: field.value }}
+                    ellipsis={{ tooltip: shownValue }}
                     style={{
                       color: isUrlField ? "var(--colorInfo)" : undefined,
                       textDecoration: isUrlField ? "underline" : undefined,
@@ -371,17 +381,16 @@ const NoteCard = ({
                         />
                       </Tooltip>
                     )}
-                    {!isPasswordField &&
-                      (isCopied ? (
-                        <CheckOutlined
-                          className="check-icon"
-                          style={{ color: "#52c41a", fontSize: 14 }}
-                        />
-                      ) : (
-                        <Tooltip title="Click to copy">
-                          <CopyOutlined className="copy-icon" />
-                        </Tooltip>
-                      ))}
+                    {isCopied ? (
+                      <CheckOutlined
+                        className="check-icon"
+                        style={{ color: "#52c41a", fontSize: 14 }}
+                      />
+                    ) : (
+                      <Tooltip title="Click to copy">
+                        <CopyOutlined className="copy-icon" />
+                      </Tooltip>
+                    )}
                   </div>
                 </div>
               </div>

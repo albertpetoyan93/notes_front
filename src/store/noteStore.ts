@@ -15,7 +15,16 @@ export interface Note {
   title: string;
   content: NoteContent | Record<string, any>;
   comment?: string;
-  category: "note" | "password" | "login" | "command" | "ssh" | "db" | "other";
+  category:
+    | "note"
+    | "password"
+    | "login"
+    | "command"
+    | "ssh"
+    | "db"
+    | "address"
+    | "card"
+    | "other";
   project?: string;
   tags?: string[];
   isFavorite: boolean;

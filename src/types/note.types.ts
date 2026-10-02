@@ -11,7 +11,15 @@ export interface NoteContent {
 }
 
 // Note categories
-export type NoteCategory = "note" | "password" | "command" | "other";
+export type NoteCategory =
+  | "note"
+  | "password"
+  | "command"
+  | "ssh"
+  | "db"
+  | "address"
+  | "card"
+  | "other";
 
 // Full note interface
 export interface Note {
@@ -71,6 +79,41 @@ export const CATEGORY_FIELD_TEMPLATES: Record<NoteCategory, CustomField[]> = {
     { label: "Port", value: "" },
     { label: "Username", value: "" },
     { label: "Command", value: "" },
+  ],
+  ssh: [
+    { label: "Host", value: "" },
+    { label: "Port", value: "22" },
+    { label: "Username", value: "" },
+    { label: "Password", value: "" },
+    { label: "SSH Key Path", value: "" },
+    { label: "Connection String", value: "" },
+  ],
+  db: [
+    { label: "DB_HOST", value: "localhost" },
+    { label: "DB_PORT", value: "5432" },
+    { label: "DB_USER", value: "" },
+    { label: "DB_NAME", value: "" },
+    { label: "DB_PASSWORD", value: "" },
+  ],
+  address: [
+    { label: "Full name", value: "" },
+    { label: "Organization", value: "" },
+    { label: "Email", value: "" },
+    { label: "Phone", value: "" },
+    { label: "Address", value: "" },
+    { label: "Address 2", value: "" },
+    { label: "City", value: "" },
+    { label: "State", value: "" },
+    { label: "Postal code", value: "" },
+    { label: "Country", value: "" },
+  ],
+  card: [
+    { label: "Cardholder", value: "" },
+    { label: "Brand", value: "" },
+    { label: "Number", value: "" },
+    { label: "Expires", value: "" },
+    { label: "CVV", value: "" },
+    { label: "PIN", value: "" },
   ],
   other: [],
 };

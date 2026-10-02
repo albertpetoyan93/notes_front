@@ -50,6 +50,8 @@ import NoteViewModal from "./NoteViewModal";
 import CollectionDialogs from "./CollectionDialogs";
 import { subscribeOpenCollections } from "../../utils/collectionsDrawer";
 import { CollectionItem } from "../../store/noteStore";
+import { cardBrandFromFields, formatCardField } from "../../utils/cardField";
+import { isSecretField } from "../../utils/secretField";
 
 const { Text } = Typography;
 
@@ -89,6 +91,8 @@ const categories = [
   { value: "command", label: "Commands", color: "purple" },
   { value: "ssh", label: "SSH", color: "volcano" },
   { value: "db", label: "Database", color: "blue" },
+  { value: "address", label: "Address", color: "green" },
+  { value: "card", label: "Card", color: "orange" },
   { value: "other", label: "Other", color: "gold" },
 ];
 
@@ -577,7 +581,13 @@ const NotesPage = ({
               category === "login" ? "password" : category
             }`}
           >
-            {category === "password" || category === "login" ? "LOGIN" : category.toUpperCase()}
+            {category === "password" || category === "login"
+              ? "LOGIN"
+              : category === "address"
+                ? "ADDRESS"
+                : category === "card"
+                  ? "CARD"
+                  : category.toUpperCase()}
           </Tag>
         ),
       },
@@ -633,6 +643,7 @@ const NotesPage = ({
         width: 600,
         render: (content: any, record: any) => {
           const customFields = getCustomFields(content);
+          const cardBrand = cardBrandFromFields(customFields);
           if (content.mainContent) {
             const fieldKey = `table-main-${record.id}`;
             const isCopied = copiedFields.has(fieldKey);
@@ -688,15 +699,19 @@ const NotesPage = ({
               {customFields.map((field: any, idx: number) => {
                 const fieldKey = `table-${record.id}-${idx}`;
                 const isCopied = copiedFields.has(fieldKey);
-                const isPasswordField =
-                  field.label?.toLowerCase().includes("password") ||
-                  field.label?.toLowerCase().includes("pass");
+                const isPasswordField = isSecretField(field.label);
                 const isUrlField = field.label === "URL";
                 const showPassword = visiblePasswords.has(fieldKey);
+                const shownValue = formatCardField(
+                  field.label,
+                  String(field.value ?? ""),
+                  "",
+                  cardBrand
+                );
                 const displayValue =
                   isPasswordField && !showPassword
-                    ? "•".repeat(Math.min(String(field.value).length, 12))
-                    : field.value;
+                    ? "•".repeat(Math.min(shownValue.length, 12))
+                    : shownValue;
 
                 if (!field.value) return null;
                 return (
@@ -705,7 +720,7 @@ const NotesPage = ({
                     className="table-field"
                     onClick={(e) => {
                       e.stopPropagation();
-                      copyToClipboard(field.value, fieldKey, field.label);
+                      copyToClipboard(shownValue, fieldKey, field.label);
                     }}
                   >
                     <Text className="table-field-label">{field.label}</Text>

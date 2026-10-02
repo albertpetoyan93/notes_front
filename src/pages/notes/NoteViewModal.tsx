@@ -1,6 +1,9 @@
-import { ShareAltOutlined } from "@ant-design/icons";
+import { EyeInvisibleOutlined, EyeOutlined, ShareAltOutlined } from "@ant-design/icons";
 import { Button, Drawer, Descriptions, Space, Tag, Typography } from "antd";
+import { useState } from "react";
 import PlatformIcon from "../../components/platformIcon/PlatformIcon";
+import { cardBrandFromFields, formatCardField } from "../../utils/cardField";
+import { isSecretField } from "../../utils/secretField";
 
 const { Paragraph, Title } = Typography;
 
@@ -17,6 +20,7 @@ const NoteViewModal = ({
   onClose,
   onShare,
 }: NoteViewModalProps) => {
+  const [shownSecrets, setShownSecrets] = useState<Set<number>>(new Set());
   if (!note) return null;
 
   const parseContent = (content: any) => {
@@ -34,6 +38,7 @@ const NoteViewModal = ({
   };
 
   const { mainContent, customFields } = parseContent(note.content);
+  const cardBrand = cardBrandFromFields(customFields);
 
   return (
     <Drawer
@@ -102,13 +107,36 @@ const NoteViewModal = ({
 
         {customFields && customFields.length > 0 && (
           <>
-            {customFields.map((field: any, index: number) => (
-              <Descriptions.Item key={index} label={field.label}>
-                <span style={{ wordBreak: "break-all" }}>
-                  {String(field.value)}
-                </span>
-              </Descriptions.Item>
-            ))}
+            {customFields.map((field: any, index: number) => {
+              const secret = isSecretField(field.label);
+              const shown = shownSecrets.has(index);
+              const value = formatCardField(field.label, String(field.value ?? ""), "", cardBrand);
+              return (
+                <Descriptions.Item key={index} label={field.label}>
+                  <Space size={6}>
+                    <span style={{ wordBreak: "break-all" }}>
+                      {secret && !shown ? "•".repeat(Math.min(value.length, 12)) : value}
+                    </span>
+                    {secret && value && (
+                      <Button
+                        type="text"
+                        size="small"
+                        aria-label={shown ? "Hide value" : "Show value"}
+                        icon={shown ? <EyeInvisibleOutlined /> : <EyeOutlined />}
+                        onClick={() =>
+                          setShownSecrets((current) => {
+                            const next = new Set(current);
+                            if (next.has(index)) next.delete(index);
+                            else next.add(index);
+                            return next;
+                          })
+                        }
+                      />
+                    )}
+                  </Space>
+                </Descriptions.Item>
+              );
+            })}
           </>
         )}
 

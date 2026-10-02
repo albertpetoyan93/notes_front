@@ -168,7 +168,14 @@ const BRANDS = new Map<string, Brand>([
   ...brand(SiAirbnb, "#FF5A5F", "Airbnb", ["airbnb", "airbnb.com"]),
 ]);
 
-const CREDENTIAL_CATEGORIES = new Set(["password", "login", "ssh", "db"]);
+const CREDENTIAL_CATEGORIES = new Set([
+  "password",
+  "login",
+  "ssh",
+  "db",
+  "address",
+  "card",
+]);
 const SKIP_WORDS = new Set(["my", "the", "app", "login", "account", "work", "personal", "new", "old", "test"]);
 const MULTI_TLDS = new Set(["co.uk", "com.au", "co.jp", "com.br", "co.nz", "com.tr", "co.za"]);
 
@@ -233,7 +240,7 @@ const matchBrand = (sources: string[]) => {
 
 export const resolvePlatform = (note: NoteLike) => {
   const fields = customFields(note.content);
-  const platform = fieldValue(fields, /platform|service/i);
+  const platform = fieldValue(fields, /platform|service|^brand$/i);
   const url = fieldValue(fields, /^(url|uri|website|connect)$/i);
   const host = fieldValue(fields, /^host$/i);
   const credential = CREDENTIAL_CATEGORIES.has(note.category || "");
