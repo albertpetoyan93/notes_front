@@ -46,7 +46,12 @@ const NoteModal = ({
   useEffect(() => {
     if (visible && note) {
       const category = note.category === "login" ? "password" : note.category || "note";
-      form.setFieldsValue({ ...note, category });
+      const collectionIds = note.collections?.length
+        ? note.collections.map((collection: { id: number }) => collection.id)
+        : note.collectionId
+          ? [note.collectionId]
+          : [];
+      form.setFieldsValue({ ...note, category, collectionIds });
       setSelectedCategory(category);
 
       // Parse custom fields from content if it's an object (JSONB)
@@ -74,7 +79,7 @@ const NoteModal = ({
       setSelectedCategory("note");
       setCustomFields([]);
       if (defaultCollectionId) {
-        form.setFieldValue("collectionId", defaultCollectionId);
+        form.setFieldValue("collectionIds", [defaultCollectionId]);
       }
     }
   }, [visible, note, form, defaultCollectionId]);
@@ -172,10 +177,11 @@ const NoteModal = ({
 
       const canChooseCollection = !note || note.isOwner;
       if (canChooseCollection) {
-        values.collectionId = values.collectionId || null;
+        values.collectionIds = values.collectionIds || [];
       } else {
-        delete values.collectionId;
+        delete values.collectionIds;
       }
+      delete values.collectionId;
 
       if (note) {
         await updateNote(note.id, values);
@@ -244,15 +250,23 @@ const NoteModal = ({
         </Form.Item>
 
         <Form.Item
-          name="collectionId"
-          label="Collection"
+          name="collectionIds"
+          label="Collections"
           rules={
             requireCollection
-              ? [{ required: true, message: "Choose a collection" }]
+              ? [
+                  {
+                    validator: (_, value) =>
+                      Array.isArray(value) && value.length
+                        ? Promise.resolve()
+                        : Promise.reject(new Error("Choose a collection")),
+                  },
+                ]
               : undefined
           }
         >
           <Select
+            mode="multiple"
             allowClear
             placeholder="No collection"
             disabled={!!note && !note.isOwner}
@@ -261,6 +275,9 @@ const NoteModal = ({
                 (collection) =>
                   collection.permission === "owner" ||
                   collection.permission === "edit" ||
+                  note?.collections?.some(
+                    (item: { id: number }) => item.id === collection.id
+                  ) ||
                   collection.id === note?.collectionId
               )
               .map((collection) => ({

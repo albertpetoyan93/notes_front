@@ -29,6 +29,7 @@ export interface Note {
   permission?: "owner" | "view" | "edit";
   collectionId?: number | null;
   collection?: { id: number; name: string; companyId?: number | null } | null;
+  collections?: { id: number; name: string; companyId?: number | null }[];
   passwordHealth?: {
     weak: boolean;
     reused: boolean;

@@ -47,6 +47,11 @@
 
     .notes-toolbar-actions {
       justify-self: end;
+
+      .ant-btn {
+        height: 32px;
+        padding-inline: 12px;
+      }
     }
 
     .switcher {

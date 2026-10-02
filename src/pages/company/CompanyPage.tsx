@@ -275,17 +275,28 @@ const CompanyPage = () => {
   };
 
   const removeMember = (member: MemberRow) => {
+    const deleting = member.status === "removed";
     Modal.confirm({
-      title: member.status === "invited" ? "Cancel this invite?" : `Remove ${member.email}?`,
+      title: deleting
+        ? "Delete this person?"
+        : member.status === "invited"
+          ? "Cancel this invite?"
+          : `Remove ${member.email}?`,
       content:
         member.status === "invited"
           ? "They will not be able to join unless you invite them again."
-          : "They lose this company. Their personal notes stay theirs.",
-      okText: member.status === "invited" ? "Cancel invite" : "Remove",
+          : "They disappear from the list. You can invite them again later. Their personal notes stay theirs.",
+      okText: deleting ? "Delete" : member.status === "invited" ? "Cancel invite" : "Remove",
       okButtonProps: { danger: true },
       onOk: async () => {
         await axios.delete(`/api/companies/${companyId}/members/${member.id}`);
-        message.success(member.status === "invited" ? "Invite cancelled" : "Member removed");
+        message.success(
+          deleting
+            ? "Deleted"
+            : member.status === "invited"
+              ? "Invite cancelled"
+              : "Member removed"
+        );
         await loadMembers();
       },
     });
@@ -448,10 +459,11 @@ const CompanyPage = () => {
                             company.role === "owner" &&
                             member.role !== "owner" &&
                             member.status !== "removed";
-                          const canRemove =
+                          const canManageMember =
                             member.role !== "owner" &&
-                            member.status !== "removed" &&
                             (company.role === "owner" || member.role === "member");
+                          const canRemove = canManageMember && member.status !== "removed";
+                          const canDelete = canManageMember && member.status === "removed";
                           const statusLabel =
                             member.status === "active"
                               ? "Active"
@@ -463,17 +475,29 @@ const CompanyPage = () => {
                               <Card
                                 className="note-card"
                                 actions={
-                                  canRemove
+                                  canRemove || canDelete
                                     ? [
                                         <Tooltip
                                           key="remove"
-                                          title={member.status === "invited" ? "Cancel invite" : "Remove"}
+                                          title={
+                                            canDelete
+                                              ? "Delete"
+                                              : member.status === "invited"
+                                                ? "Cancel invite"
+                                                : "Remove"
+                                          }
                                         >
                                           <Button
                                             type="text"
                                             danger
                                             icon={<DeleteOutlined />}
-                                            aria-label={member.status === "invited" ? "Cancel invite" : "Remove"}
+                                            aria-label={
+                                              canDelete
+                                                ? "Delete"
+                                                : member.status === "invited"
+                                                  ? "Cancel invite"
+                                                  : "Remove"
+                                            }
                                             onClick={() => removeMember(member)}
                                           />
                                         </Tooltip>,

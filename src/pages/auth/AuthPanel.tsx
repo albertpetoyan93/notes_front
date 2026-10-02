@@ -1,11 +1,36 @@
+import { MoonOutlined, SunOutlined } from "@ant-design/icons";
 import { Button, Form, Input } from "antd";
+import type { ReactNode } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 import { BrandLockup } from "../../components/header/LeftHeader";
+import { useTheme } from "../../contexts/ThemeContext";
 import useAuth from "../../hooks/useAuth";
 import { useAuthStore } from "../../store/authStore";
 import "./AuthPanel.scss";
 
 type AuthMode = "login" | "register";
+
+export const AuthFrame = ({ children }: { children: ReactNode }) => {
+  const { mode: themeMode, handleThemeChange } = useTheme();
+  const nextMode = themeMode === "light" ? "dark" : "light";
+
+  return (
+    <div className="auth-panel">
+      <button
+        type="button"
+        className="auth-theme"
+        aria-label={
+          nextMode === "dark" ? "Switch to dark mode" : "Switch to light mode"
+        }
+        onClick={() => handleThemeChange(nextMode)}
+      >
+        {themeMode === "light" ? <MoonOutlined /> : <SunOutlined />}
+      </button>
+      <BrandLockup large />
+      <div className="auth-card">{children}</div>
+    </div>
+  );
+};
 
 const AuthPanel = ({ mode }: { mode: AuthMode }) => {
   const { login, register } = useAuth();
@@ -32,9 +57,7 @@ const AuthPanel = ({ mode }: { mode: AuthMode }) => {
   };
 
   return (
-    <div className="auth-panel">
-      <BrandLockup large />
-      <div className="auth-card">
+    <AuthFrame>
         <div className="auth-tabs">
           <NavLink
             to={{ pathname: "/auth/login", search: location.search }}
@@ -65,15 +88,23 @@ const AuthPanel = ({ mode }: { mode: AuthMode }) => {
             >
               <Input placeholder="Email address" />
             </Form.Item>
-            <Form.Item
-              name="password"
-              label="Password"
-              rules={[
-                { required: true, message: "Please enter your password" },
-              ]}
-            >
-              <Input.Password placeholder="Password" />
-            </Form.Item>
+            <div className="auth-password-wrap">
+              <NavLink
+                className="forgot-link"
+                to={{ pathname: "/auth/forgot", search: location.search }}
+              >
+                Forgot?
+              </NavLink>
+              <Form.Item
+                name="password"
+                label="Password"
+                rules={[
+                  { required: true, message: "Please enter your password" },
+                ]}
+              >
+                <Input.Password placeholder="Password" />
+              </Form.Item>
+            </div>
             <Button
               className="auth-submit"
               type="primary"
@@ -170,8 +201,7 @@ const AuthPanel = ({ mode }: { mode: AuthMode }) => {
             </p>
           </Form>
         )}
-      </div>
-    </div>
+    </AuthFrame>
   );
 };
 

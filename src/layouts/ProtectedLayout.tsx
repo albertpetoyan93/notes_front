@@ -2,6 +2,7 @@ import { Layout } from "antd";
 import React, { useEffect } from "react";
 import { Outlet, useNavigate } from "react-router-dom";
 import CompanyTabs from "../components/header/CompanyTabs";
+import PersonalTabs from "../components/header/PersonalTabs";
 import LeftHeader from "../components/header/LeftHeader";
 import RightHeader from "../components/header/RightHeader";
 // import Sidebar from "../components/sidebar/Sidebar";
@@ -59,6 +60,7 @@ const ProtectedLayout: React.FC = () => {
             <LeftHeader />
             <div className="header-nav">
               <CompanyTabs />
+              <PersonalTabs />
             </div>
             <RightHeader />
           </div>

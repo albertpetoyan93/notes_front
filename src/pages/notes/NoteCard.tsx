@@ -264,9 +264,16 @@ const NoteCard = ({
             <Tag color="purple">{note.sharedByName || "Shared"}</Tag>
           </Tooltip>
         )}
-        {note.collection?.name && (!note.isShared || note.collection.companyId) && (
-          <Tag className="note-collection">{note.collection.name}</Tag>
-        )}
+        {(note.collections?.length
+          ? note.collections
+          : note.collection?.name
+            ? [note.collection]
+            : []
+        ).map((collection: { id: number; name: string }) => (
+          <Tag key={collection.id} className="note-collection">
+            {collection.name}
+          </Tag>
+        ))}
         {note.isFavorite && <StarFilled style={{ color: "#faad14", fontSize: 16 }} />}
       </div>
       <div className="note-title-row">

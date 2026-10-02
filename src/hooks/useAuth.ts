@@ -56,6 +56,33 @@ const useAuth = () => {
     }
   };
 
+  const requestPasswordReset = async (email: string) => {
+    setStore({ loading: true });
+    try {
+      const data = await fetcherPost("/api/auth/forgot-password", { email });
+      return String(data?.message || "");
+    } catch (err: any) {
+      message.error(err.message || "Could not send the reset email");
+      throw err;
+    } finally {
+      setStore({ loading: false });
+    }
+  };
+
+  const resetPassword = async (token: string, password: string) => {
+    setStore({ loading: true });
+    try {
+      await fetcherPost("/api/auth/reset-password", { token, password });
+      message.success("Password updated. Sign in with the new password.");
+      navigate("/auth/login");
+    } catch (err: any) {
+      message.error(err.message || "Could not reset the password");
+      throw err;
+    } finally {
+      setStore({ loading: false });
+    }
+  };
+
   const logOut = async () => {
     try {
       await fetcherPost("/api/auth/logout", {});
@@ -71,6 +98,8 @@ const useAuth = () => {
     logOut,
     login,
     register,
+    requestPasswordReset,
+    resetPassword,
     getMe,
   };
 };

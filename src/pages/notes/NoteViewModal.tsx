@@ -85,9 +85,18 @@ const NoteViewModal = ({
           </Space>
         </Descriptions.Item>
 
-        {!note.isShared && note.collection?.name && (
-          <Descriptions.Item label="Collection">
-            <Tag color="processing">{note.collection.name}</Tag>
+        {(note.collections?.length || note.collection?.name) && (
+          <Descriptions.Item label="Collections">
+            <Space size={4} wrap>
+              {(note.collections?.length
+                ? note.collections
+                : [note.collection]
+              ).map((collection: { id: number; name: string }) => (
+                <Tag key={collection.id} color="processing">
+                  {collection.name}
+                </Tag>
+              ))}
+            </Space>
           </Descriptions.Item>
         )}
 

@@ -5,7 +5,8 @@ import {
   DeleteOutlined,
   DownloadOutlined,
   EditOutlined,
-  FolderOutlined,
+  FileAddOutlined,
+  FileTextOutlined,
   EyeInvisibleOutlined,
   EyeOutlined,
   LinkOutlined,
@@ -15,12 +16,13 @@ import {
   StarOutlined,
   UndoOutlined,
   UnorderedListOutlined,
+  UploadOutlined,
   WarningOutlined,
 } from "@ant-design/icons";
 import {
   Button,
+  Card,
   Col,
-  Dropdown,
   Empty,
   Modal,
   Row,
@@ -46,7 +48,6 @@ import ShareModal from "./ShareModal";
 import "./NotesPage.scss";
 import NoteViewModal from "./NoteViewModal";
 import CollectionDialogs from "./CollectionDialogs";
-import CollectionsDrawer from "./CollectionsDrawer";
 import { subscribeOpenCollections } from "../../utils/collectionsDrawer";
 import { CollectionItem } from "../../store/noteStore";
 
@@ -140,7 +141,8 @@ const NotesPage = ({
   const [collectionMode, setCollectionMode] = useState<
     "create" | "rename" | "add" | "share" | null
   >(null);
-  const [collectionsOpen, setCollectionsOpen] = useState(false);
+  const showCollections =
+    !companyId && searchParams.get("tab") === "collections";
   const [dialogCollection, setDialogCollection] =
     useState<CollectionItem | null>(null);
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
@@ -235,14 +237,11 @@ const NotesPage = ({
   useEffect(() => {
     loadCollections();
     if (companyId) return;
-    return subscribeOpenCollections(() => setCollectionsOpen(true));
+    return subscribeOpenCollections(() =>
+      updateSearchParams({ tab: "collections" })
+    );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [companyId, collectionKey]);
-
-  useEffect(() => {
-    if (collectionsOpen) loadCollections();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [collectionsOpen]);
 
   useEffect(() => {
     if (selectedTag !== "all") return;
@@ -587,12 +586,24 @@ const NotesPage = ({
         key: "collection",
         width: 140,
         ellipsis: true,
-        render: (_: string, record: any) =>
-          !record.isShared && record.collection?.name ? (
-            <Tag className="note-collection">{record.collection.name}</Tag>
+        render: (_: string, record: any) => {
+          const collections = record.collections?.length
+            ? record.collections
+            : record.collection?.name
+              ? [record.collection]
+              : [];
+          return collections.length ? (
+            <Space size={4} wrap>
+              {collections.map((collection: { id: number; name: string }) => (
+                <Tag key={collection.id} className="note-collection">
+                  {collection.name}
+                </Tag>
+              ))}
+            </Space>
           ) : (
             <Text type="secondary">-</Text>
-          ),
+          );
+        },
       },
       {
         title: "Tags",
@@ -885,6 +896,99 @@ const NotesPage = ({
 
   return (
     <div className={companyId ? "notes-page company-notes" : "notes-page"}>
+      {showCollections ? (
+        <Space direction="vertical" size={12} style={{ width: "100%" }}>
+          <div style={{ display: "flex", justifyContent: "flex-end" }}>
+            <Button onClick={() => openCollectionDialog("create")}>
+              New collection
+            </Button>
+          </div>
+          {collections.length === 0 ? (
+            <Empty description="No collections yet." />
+          ) : (
+            <Row gutter={[16, 16]}>
+              {collections.map((collection) => {
+                const canEdit =
+                  collection.permission === "owner" ||
+                  collection.permission === "edit";
+                const actions = [
+                  <Tooltip key="notes" title="Notes">
+                    <Button
+                      type="text"
+                      icon={<FileTextOutlined />}
+                      aria-label="Notes"
+                      onClick={() =>
+                        updateSearchParams({
+                          collection: String(collection.id),
+                          tab: null,
+                        })
+                      }
+                    />
+                  </Tooltip>,
+                ];
+                if (canEdit) {
+                  actions.push(
+                    <Tooltip key="add" title="Add notes">
+                      <Button
+                        type="text"
+                        icon={<FileAddOutlined />}
+                        aria-label="Add notes"
+                        onClick={() => openCollectionDialog("add", collection)}
+                      />
+                    </Tooltip>
+                  );
+                }
+                if (collection.isOwner) {
+                  actions.push(
+                    <Tooltip key="share" title="Share">
+                      <Button
+                        type="text"
+                        icon={<ShareAltOutlined />}
+                        aria-label="Share"
+                        onClick={() => openCollectionDialog("share", collection)}
+                      />
+                    </Tooltip>,
+                    <Tooltip key="rename" title="Rename">
+                      <Button
+                        type="text"
+                        icon={<EditOutlined />}
+                        aria-label="Rename"
+                        onClick={() => openCollectionDialog("rename", collection)}
+                      />
+                    </Tooltip>,
+                    <Tooltip key="delete" title="Delete">
+                      <Button
+                        type="text"
+                        danger
+                        icon={<DeleteOutlined />}
+                        aria-label="Delete"
+                        onClick={() => handleDeleteCollection(collection)}
+                      />
+                    </Tooltip>
+                  );
+                }
+                return (
+                  <Col xs={24} sm={12} lg={6} xl={4} key={collection.id}>
+                    <Card className="note-card" actions={actions}>
+                      <div className="note-title-row">
+                        <Text strong ellipsis className="note-title">
+                          {collection.name}
+                        </Text>
+                      </div>
+                      <Text type="secondary">
+                        {collection.noteCount}{" "}
+                        {collection.noteCount === 1 ? "note" : "notes"}
+                        {!collection.isOwner ? " · Shared with you" : ""}
+                      </Text>
+                    </Card>
+                  </Col>
+                );
+              })}
+            </Row>
+          )}
+        </Space>
+      ) : (
+      <>
       <div className="notes-toolbar">
         <div className="notes-toolbar-start">
         <Segmented
@@ -975,34 +1079,17 @@ const NotesPage = ({
             }}
           />
           {!companyId && (
-          <Button
-            size="large"
-            icon={<FolderOutlined />}
-            onClick={() => setCollectionsOpen(true)}
-          >
-            Collections
-          </Button>
+            <Button icon={<DownloadOutlined />} onClick={handleExport}>
+              Export
+            </Button>
           )}
           {!companyId && (
-          <Dropdown
-            menu={{
-              items: [
-                {
-                  key: "export",
-                  label: "Export backup",
-                  icon: <DownloadOutlined />,
-                  onClick: handleExport,
-                },
-                {
-                  key: "import",
-                  label: "Import backup",
-                  onClick: () => importInputRef.current?.click(),
-                },
-              ],
-            }}
-          >
-            <Button size="large">Backup</Button>
-          </Dropdown>
+            <Button
+              icon={<UploadOutlined />}
+              onClick={() => importInputRef.current?.click()}
+            >
+              Import
+            </Button>
           )}
           <Button
             className="new_note_button"
@@ -1016,7 +1103,6 @@ const NotesPage = ({
               )
             }
             onClick={() => setModalVisible(true)}
-            size="large"
           >
             New Note
           </Button>
@@ -1137,6 +1223,8 @@ const NotesPage = ({
           )}
         </Spin>
       )}
+      </>
+      )}
 
       <NoteModal
         visible={modalVisible}
@@ -1156,21 +1244,6 @@ const NotesPage = ({
           fetchWithCurrentFilters();
           loadCollections();
         }}
-      />
-
-      <CollectionsDrawer
-        open={collectionsOpen}
-        collections={collections}
-        onClose={() => setCollectionsOpen(false)}
-        onOpen={(collection) => {
-          updateSearchParams({ collection: String(collection.id) });
-          setCollectionsOpen(false);
-        }}
-        onCreate={() => openCollectionDialog("create")}
-        onRename={(collection) => openCollectionDialog("rename", collection)}
-        onShare={(collection) => openCollectionDialog("share", collection)}
-        onAddNotes={(collection) => openCollectionDialog("add", collection)}
-        onDelete={handleDeleteCollection}
       />
 
       <CollectionDialogs
