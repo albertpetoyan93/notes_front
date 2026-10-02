@@ -7,7 +7,11 @@
   padding: 32px 16px;
   overflow: auto;
   background:
-    radial-gradient(80% 50% at 50% 0%, rgba(124, 92, 255, 0.16), transparent 55%),
+    radial-gradient(
+      80% 50% at 50% 0%,
+      rgba(124, 92, 255, 0.16),
+      transparent 55%
+    ),
     #e8eef6;
 }
 
@@ -48,7 +52,6 @@
   .ant-input,
   .ant-input-affix-wrapper {
     height: 42px;
-    border-radius: 10px !important;
     background: #f4f6fb !important;
     border: 1px solid #e2e8f0 !important;
     box-shadow: none !important;
@@ -59,6 +62,26 @@
     height: auto;
     background: transparent !important;
     border: 0 !important;
+  }
+
+  input::-webkit-credentials-auto-fill-button,
+  input::-webkit-strong-password-auto-fill-button {
+    visibility: hidden;
+    pointer-events: none;
+    position: absolute;
+    right: 0;
+    width: 0;
+    height: 0;
+    margin: 0;
+  }
+
+  .ant-input:-webkit-autofill,
+  .ant-input:-webkit-autofill:hover,
+  .ant-input:-webkit-autofill:focus {
+    -webkit-text-fill-color: #0f172a;
+    caret-color: #0f172a;
+    box-shadow: 0 0 0 1000px #f4f6fb inset !important;
+    transition: background-color 99999s ease-out;
   }
 
   .auth-submit.ant-btn {
@@ -110,7 +133,11 @@
 
 [data-theme="dark"] .auth-layout {
   background:
-    radial-gradient(70% 45% at 50% 0%, rgba(88, 70, 180, 0.28), transparent 60%),
+    radial-gradient(
+      70% 45% at 50% 0%,
+      rgba(88, 70, 180, 0.28),
+      transparent 60%
+    ),
     #0b1020;
 }
 
@@ -130,12 +157,19 @@
   .ant-input,
   .ant-input-affix-wrapper {
     background: #1c2538 !important;
-    border-color: rgba(255, 255, 255, 0.08) !important;
     color: #f8fafc;
   }
 
   .ant-input::placeholder {
     color: #64748b;
+  }
+
+  .ant-input:-webkit-autofill,
+  .ant-input:-webkit-autofill:hover,
+  .ant-input:-webkit-autofill:focus {
+    -webkit-text-fill-color: #f8fafc;
+    caret-color: #f8fafc;
+    box-shadow: 0 0 0 1000px #1c2538 inset !important;
   }
 
   .ant-input-password-icon {

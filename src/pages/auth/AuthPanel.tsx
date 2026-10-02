@@ -36,7 +36,10 @@ const AuthPanel = ({ mode }: { mode: AuthMode }) => {
       <BrandLockup large />
       <div className="auth-card">
         <div className="auth-tabs">
-          <NavLink to={{ pathname: "/auth/login", search: location.search }} end>
+          <NavLink
+            to={{ pathname: "/auth/login", search: location.search }}
+            end
+          >
             Sign In
           </NavLink>
           <NavLink to={{ pathname: "/auth/register", search: location.search }}>
@@ -65,7 +68,9 @@ const AuthPanel = ({ mode }: { mode: AuthMode }) => {
             <Form.Item
               name="password"
               label="Password"
-              rules={[{ required: true, message: "Please enter your password" }]}
+              rules={[
+                { required: true, message: "Please enter your password" },
+              ]}
             >
               <Input.Password placeholder="Password" />
             </Form.Item>
@@ -80,7 +85,9 @@ const AuthPanel = ({ mode }: { mode: AuthMode }) => {
             </Button>
             <p className="auth-switch">
               Don't have an account?{" "}
-              <NavLink to={{ pathname: "/auth/register", search: location.search }}>
+              <NavLink
+                to={{ pathname: "/auth/register", search: location.search }}
+              >
                 Register here
               </NavLink>
             </p>
@@ -155,7 +162,9 @@ const AuthPanel = ({ mode }: { mode: AuthMode }) => {
             </Button>
             <p className="auth-switch">
               Already have an account?{" "}
-              <NavLink to={{ pathname: "/auth/login", search: location.search }}>
+              <NavLink
+                to={{ pathname: "/auth/login", search: location.search }}
+              >
                 Sign in here
               </NavLink>
             </p>
