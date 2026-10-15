@@ -1,85 +1,19 @@
-import {
-  CheckOutlined,
-  CopyOutlined,
-  DeleteOutlined,
-  EditOutlined,
-  EyeInvisibleOutlined,
-  EyeOutlined,
-  LinkOutlined,
-  MinusCircleOutlined,
-  ShareAltOutlined,
-  StarFilled,
-  StarOutlined,
-  UndoOutlined,
-  WarningOutlined,
-} from "@ant-design/icons";
-import { Button, Card, Checkbox, Tag, Tooltip, Typography, message } from "antd";
-import { useState } from "react";
+import { Card, Checkbox, Tag, Tooltip, Typography } from "antd";
+import CategoryDot from "../../components/noteCategory/CategoryDot";
+import FieldActions from "../../components/noteField/FieldActions";
+import PasswordHealthMark from "../../components/passwordHealth/PasswordHealthMark";
 import PlatformIcon from "../../components/platformIcon/PlatformIcon";
+import UpdatedAt from "../../components/updatedAt/UpdatedAt";
+import useFieldClipboard from "../../hooks/useFieldClipboard";
 import { Note } from "../../store/noteStore";
 import { cardBrandFromFields, formatCardField } from "../../utils/cardField";
+import { isURL } from "../../utils/isUrl";
+import { categoryClass } from "../../utils/noteCategory";
 import { isSecretField } from "../../utils/secretField";
-import dayjsExtra from "../../utils/dayjs";
+import { buildNoteActions, isNoteOwner, type NoteActionHandlers } from "./NoteActions";
 import "./NotesPage.scss";
 
-const { Title, Text, Paragraph } = Typography;
-
-const passwordHealthTip = (health: {
-  weak: boolean;
-  reused: boolean;
-  stale: boolean;
-}) =>
-  [
-    health.weak && "Weak password",
-    health.reused && "Reused password",
-    health.stale && "Not updated in 6 months",
-  ]
-    .filter(Boolean)
-    .join(" · ");
-
-const PasswordHealthMark = ({
-  health,
-}: {
-  health?: { weak: boolean; reused: boolean; stale: boolean };
-}) => {
-  if (!health) return null;
-  const color = health.weak ? "#ff4d4f" : health.reused ? "#fa8c16" : "#faad14";
-  return (
-    <Tooltip title={passwordHealthTip(health)}>
-      <span className="password-health-mark" style={{ color }}>
-        <WarningOutlined />
-      </span>
-    </Tooltip>
-  );
-};
-
-const isURL = (value: unknown) => {
-  if (!value) return false;
-  const strValue = String(value);
-  try {
-    const url = new URL(strValue);
-    return url.protocol === "http:" || url.protocol === "https:";
-  } catch {
-    if (strValue.includes(".") && !strValue.includes(" ")) {
-      try {
-        new URL(`http://${strValue}`);
-        return true;
-      } catch {
-        return false;
-      }
-    }
-    return false;
-  }
-};
-
-const openURL = (value: unknown) => {
-  const strValue = String(value);
-  const url =
-    strValue.startsWith("http://") || strValue.startsWith("https://")
-      ? strValue
-      : `http://${strValue}`;
-  window.open(url, "_blank", "noopener,noreferrer");
-};
+const { Text, Paragraph } = Typography;
 
 const customFields = (content: Note["content"]) => {
   if (typeof content === "object" && content !== null) {
@@ -88,17 +22,11 @@ const customFields = (content: Note["content"]) => {
   return [];
 };
 
-interface NoteCardProps {
+interface NoteCardProps extends NoteActionHandlers {
   note: Note;
   trash?: boolean;
   selected?: boolean;
   onView: (note: Note) => void;
-  onEdit?: (note: Note) => void;
-  onShare?: (note: Note) => void;
-  onDelete?: (note: Note) => void;
-  onRestore?: (note: Note) => void;
-  onFavorite?: (note: Note) => void;
-  onRemoveFromCollection?: (note: Note) => void;
   onToggleSelect?: (id: number, checked: boolean) => void;
 }
 
@@ -107,302 +35,119 @@ const NoteCard = ({
   trash = false,
   selected = false,
   onView,
-  onEdit,
-  onShare,
-  onDelete,
-  onRestore,
-  onFavorite,
-  onRemoveFromCollection,
   onToggleSelect,
+  ...handlers
 }: NoteCardProps) => {
-  const [copiedFields, setCopiedFields] = useState<Set<string>>(new Set());
-  const [visiblePasswords, setVisiblePasswords] = useState<Set<string>>(new Set());
-  const isOwner = note.isOwner === true || note.permission === "owner";
-  const canEdit = isOwner || note.permission === "edit";
-
-  const copyToClipboard = (text: string, fieldKey: string, label?: string) => {
-    navigator.clipboard.writeText(text).then(
-      () => {
-        setCopiedFields((prev) => new Set(prev).add(fieldKey));
-        window.setTimeout(() => {
-          setCopiedFields((prev) => {
-            const next = new Set(prev);
-            next.delete(fieldKey);
-            return next;
-          });
-        }, 2000);
-        message.success(`${label || "Text"} copied!`, 1.5);
-      },
-      () => {
-        message.error("Failed to copy to clipboard");
-      }
-    );
-  };
-
-  const togglePasswordVisibility = (fieldKey: string) => {
-    setVisiblePasswords((prev) => {
-      const next = new Set(prev);
-      if (next.has(fieldKey)) next.delete(fieldKey);
-      else next.add(fieldKey);
-      return next;
-    });
-  };
+  const clipboard = useFieldClipboard();
+  const fields = customFields(note.content).filter((field) => field.value);
+  const cardBrand = cardBrandFromFields(fields);
+  const collections = note.collections?.length
+    ? note.collections
+    : note.collection?.name
+      ? [note.collection]
+      : [];
 
   return (
     <Card
-      className="note-card"
+      className={`note-card ${categoryClass(note.category)}${selected ? " is-selected" : ""}`}
       hoverable
       onClick={() => onView(note)}
-      style={{ cursor: "pointer" }}
-      actions={[
-        ...(!trash && onFavorite
-          ? [
-              <Button
-                key="favorite"
-                type="text"
-                icon={
-                  note.isFavorite ? (
-                    <StarFilled style={{ color: "#faad14" }} />
-                  ) : (
-                    <StarOutlined />
-                  )
-                }
-                onClick={(event) => {
-                  event.stopPropagation();
-                  onFavorite(note);
-                }}
-              />,
-            ]
-          : []),
-        <Button
-          key="view"
-          type="text"
-          icon={<EyeOutlined />}
-          onClick={(event) => {
-            event.stopPropagation();
-            onView(note);
-          }}
-        />,
-        ...(isOwner && onShare
-          ? [
-              <Button
-                key="share"
-                type="text"
-                icon={<ShareAltOutlined />}
-                onClick={(event) => {
-                  event.stopPropagation();
-                  onShare(note);
-                }}
-              />,
-            ]
-          : []),
-        ...(canEdit && onEdit
-          ? [
-              <Button
-                key="edit"
-                type="text"
-                icon={<EditOutlined />}
-                onClick={(event) => {
-                  event.stopPropagation();
-                  onEdit(note);
-                }}
-              />,
-            ]
-          : []),
-        ...(onRemoveFromCollection
-          ? [
-              <Tooltip key="remove-collection" title="Remove from collection">
-                <Button
-                  type="text"
-                  icon={<MinusCircleOutlined />}
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    onRemoveFromCollection(note);
-                  }}
-                />
-              </Tooltip>,
-            ]
-          : []),
-        ...(isOwner && (trash ? onRestore : onDelete)
-          ? [
-              trash ? (
-                <Button
-                  key="restore"
-                  type="text"
-                  icon={<UndoOutlined />}
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    onRestore?.(note);
-                  }}
-                />
-              ) : (
-                <Button
-                  key="delete"
-                  type="text"
-                  danger
-                  icon={<DeleteOutlined />}
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    onDelete?.(note);
-                  }}
-                />
-              ),
-            ]
-          : []),
-      ]}
+      actions={buildNoteActions(note, { trash, onView, ...handlers })}
     >
       <div className="note-card-header">
-        <Tag
-          className={`note-category note-category-${
-            note.category === "login" ? "password" : note.category
-          }`}
-        >
-          {note.category === "password" || note.category === "login"
-            ? "LOGIN"
-            : note.category === "address"
-              ? "ADDRESS"
-              : note.category === "card"
-                ? "CARD"
-                : note.category.toUpperCase()}
-        </Tag>
-        {note.isShared && !note.collection?.companyId && (
-          <Tooltip title={`Shared by ${note.sharedByName || "someone"}`}>
-            <Tag color="purple">{note.sharedByName || "Shared"}</Tag>
-          </Tooltip>
-        )}
-        {(note.collections?.length
-          ? note.collections
-          : note.collection?.name
-            ? [note.collection]
-            : []
-        ).map((collection: { id: number; name: string }) => (
-          <Tag key={collection.id} className="note-collection">
-            {collection.name}
-          </Tag>
-        ))}
-        {note.isFavorite && <StarFilled style={{ color: "#faad14", fontSize: 16 }} />}
+        <CategoryDot category={note.category} />
+        <div className="note-card-badges">
+          {note.isShared && !note.collection?.companyId && (
+            <Tooltip title={`Shared by ${note.sharedByName || "someone"}`}>
+              <Tag className="note-shared">{note.sharedByName || "Shared"}</Tag>
+            </Tooltip>
+          )}
+          {collections.map((collection: { id: number; name: string }) => (
+            <Tag key={collection.id} className="note-collection">
+              {collection.name}
+            </Tag>
+          ))}
+        </div>
       </div>
+
       <div className="note-title-row">
-        {isOwner && !trash && onToggleSelect && (
+        {isNoteOwner(note) && !trash && onToggleSelect && (
           <Checkbox
             className="note-select"
+            aria-label={`Select ${note.title}`}
             checked={selected}
             onClick={(event) => event.stopPropagation()}
             onChange={(event) => onToggleSelect(note.id, event.target.checked)}
           />
         )}
         <PlatformIcon note={note} />
-        <Title level={5} ellipsis={{ rows: 1 }} className="note-title">
-          {note.title}
-        </Title>
+        <h5 className="note-title">
+          <button
+            type="button"
+            className="note-title-button"
+            title={note.title}
+            onClick={(event) => {
+              event.stopPropagation();
+              onView(note);
+            }}
+          >
+            {note.title}
+          </button>
+        </h5>
         <PasswordHealthMark health={note.passwordHealth} />
       </div>
+
       {typeof note.content === "object" && note.content?.decryptionFailed && (
         <Text type="danger">Could not decrypt this note</Text>
       )}
-      {customFields(note.content).length > 0 && (
-        <div className="note-custom-fields">
-          {customFields(note.content).map((field, index) => {
+
+      {fields.length > 0 && (
+        <dl className="note-custom-fields">
+          {fields.map((field, index) => {
             const fieldKey = `${note.id}-${index}`;
-            const isCopied = copiedFields.has(fieldKey);
-            const isUrlField = field.label.toLowerCase() === "url" && isURL(field.value);
-            const isPasswordField = isSecretField(field.label);
-            const showPassword = visiblePasswords.has(fieldKey);
-            if (!field.value) return null;
-            const shownValue = formatCardField(
-              field.label,
-              field.value,
-              "",
-              cardBrandFromFields(customFields(note.content))
-            );
-            const displayValue =
-              isPasswordField && !showPassword
-                ? "•".repeat(Math.min(shownValue.length, 12))
-                : shownValue;
+            const secret = isSecretField(field.label);
+            const url = field.label.toLowerCase() === "url" && isURL(field.value);
+            const shownValue = formatCardField(field.label, field.value, "", cardBrand);
+            const hidden = secret && !clipboard.isVisible(fieldKey);
             return (
-              <div
-                key={index}
-                className={`custom-field-row ${isCopied ? "copied" : ""}`}
-                onClick={(event) => {
-                  event.stopPropagation();
-                  copyToClipboard(shownValue, fieldKey, field.label);
-                }}
-              >
-                <Text type="secondary" className="field-label">
-                  {field.label}:
-                </Text>
-                <div className="field-value-container">
+              <div key={index} className="custom-field-row">
+                <dt className="field-label">{field.label}</dt>
+                <dd className="field-value-container">
                   <Text
-                    className="field-value"
-                    ellipsis={{ tooltip: shownValue }}
-                    style={{
-                      color: isUrlField ? "var(--colorInfo)" : undefined,
-                      textDecoration: isUrlField ? "underline" : undefined,
-                      marginLeft: 6,
-                      fontFamily: isPasswordField && !showPassword ? "monospace" : undefined,
-                      letterSpacing: isPasswordField && !showPassword ? "2px" : undefined,
-                    }}
+                    className={`field-value${hidden ? " is-secret" : ""}${url ? " is-url" : ""}`}
+                    ellipsis={{ tooltip: hidden ? undefined : shownValue }}
                   >
-                    {displayValue}
+                    {hidden ? "•".repeat(Math.min(shownValue.length, 12)) : shownValue}
                   </Text>
-                  <div className="field-actions">
-                    {isPasswordField && (
-                      <Tooltip title={showPassword ? "Hide value" : "Show value"}>
-                        {showPassword ? (
-                          <EyeInvisibleOutlined
-                            className="password-toggle-icon"
-                            style={{ color: "var(--iconMuted)", fontSize: 12 }}
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              togglePasswordVisibility(fieldKey);
-                            }}
-                          />
-                        ) : (
-                          <EyeOutlined
-                            className="password-toggle-icon"
-                            style={{ color: "var(--iconMuted)", fontSize: 12 }}
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              togglePasswordVisibility(fieldKey);
-                            }}
-                          />
-                        )}
-                      </Tooltip>
-                    )}
-                    {isUrlField && (
-                      <Tooltip title="Open URL">
-                        <LinkOutlined
-                          className="link-icon"
-                          style={{ color: "var(--colorInfo)", fontSize: 12, marginLeft: 4 }}
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            openURL(field.value);
-                          }}
-                        />
-                      </Tooltip>
-                    )}
-                    {isCopied ? (
-                      <CheckOutlined
-                        className="check-icon"
-                        style={{ color: "#52c41a", fontSize: 14 }}
-                      />
-                    ) : (
-                      <Tooltip title="Click to copy">
-                        <CopyOutlined className="copy-icon" />
-                      </Tooltip>
-                    )}
-                  </div>
-                </div>
+                  <FieldActions
+                    fieldKey={fieldKey}
+                    label={field.label}
+                    value={shownValue}
+                    secret={secret}
+                    url={url}
+                    clipboard={clipboard}
+                  />
+                </dd>
               </div>
             );
           })}
+        </dl>
+      )}
+
+      {typeof note.content === "object" && note.content?.mainContent && (
+        <div className="note-body">
+          <Paragraph ellipsis={{ rows: 2 }} className="note-content">
+            {note.content.mainContent}
+          </Paragraph>
+          <FieldActions
+            fieldKey={`${note.id}-body`}
+            label="Note"
+            value={note.content.mainContent}
+            clipboard={clipboard}
+          />
         </div>
       )}
-      {typeof note.content === "object" && note.content?.mainContent && (
-        <Paragraph ellipsis={{ rows: 2 }} className="note-content" style={{ marginTop: 8 }}>
-          {note.content.mainContent}
-        </Paragraph>
-      )}
+
       {note.tags && note.tags.length > 0 && (
         <div className="note-tags">
           {note.tags.slice(0, 3).map((tag, index) => (
@@ -410,11 +155,11 @@ const NoteCard = ({
               {tag}
             </Tag>
           ))}
+          {note.tags.length > 3 && <Tag className="note-tag">+{note.tags.length - 3}</Tag>}
         </div>
       )}
-      <Text type="secondary" className="note-date">
-        {dayjsExtra(note.updatedAt).format("DD/MM/YYYY")}
-      </Text>
+
+      <UpdatedAt value={note.updatedAt} className="note-date" />
     </Card>
   );
 };

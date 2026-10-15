@@ -6,10 +6,8 @@
  *
  * Available Variants:
  * - Ocean Blue: Professional & Trustworthy (blue/cyan tones)
- * - Sunset Orange: Energetic & Creative (orange/amber tones)
  * - Forest Green: Natural & Calm (green/teal tones)
- * - Royal Purple: Elegant & Luxurious (violet/purple tones) - DEFAULT
- * - Coral Pink: Modern & Playful (pink/rose tones)
+ * - Keevo Indigo: matches the Keevo website - DEFAULT
  *
  * Each variant includes:
  * - Light and dark mode colors
@@ -20,8 +18,6 @@
  * 1. ThemeSelector component in the header
  * 2. Or programmatically using the useThemeVariant hook
  */
-
-const white = "#ffffff";
 
 // Color variants configuration
 export const colorVariants = {
@@ -55,20 +51,21 @@ export const colorVariants = {
     },
     gradient: "linear-gradient(135deg, #10B981 0%, #14B8A6 100%)",
   },
+  // Matches the Keevo website (notes_web): indigo and lilac.
   purple: {
-    name: "Royal Purple",
-    description: "Elegant & Luxurious",
+    name: "Keevo Indigo",
+    description: "Matches the Keevo website",
     light: {
-      primary: "#8B5CF6",
-      secondary_1: "#A78BFA",
-      secondary_2: "#C084FC",
+      primary: "#5b4fc4",
+      secondary_1: "#7d6fe0",
+      secondary_2: "#b9a8ff",
     },
     dark: {
-      primary: "#A78BFA",
-      secondary_1: "#C4B5FD",
-      secondary_2: "#DDD6FE",
+      primary: "#7d6ce6",
+      secondary_1: "#b9a8ff",
+      secondary_2: "#d9cfff",
     },
-    gradient: "linear-gradient(135deg, #8B5CF6 0%, #C084FC 100%)",
+    gradient: "linear-gradient(135deg, #5b4fc4 0%, #b9a8ff 100%)",
   },
 };
 
@@ -83,89 +80,102 @@ export const getThemeConfig = (
       borderRadius: 10,
       borderRadiusLG: 10,
       borderRadiusSM: 10,
-      colorPrimary: "#7c3aed",
-      colorPrimaryHover: "#6d28d9",
-      colorPrimaryActive: "#6d28d9",
     },
+  };
+
+  // Shared by light and dark. Same key-tag colours as the website.
+  const shared = {
+    fontFamily: "'Bricolage Grotesque', system-ui, -apple-system, 'Segoe UI', sans-serif",
+    fontFamilyCode: "'JetBrains Mono', ui-monospace, monospace",
+    borderRadius: 12,
+    fontSize: 14,
+    catLogin: "#b9a8ff",
+    catNote: "#f3d36b",
+    catCommand: "#72d6e0",
+    catSsh: "#ff9cbc",
+    catDb: "#b5e07a",
+    catAddress: "#8cc3ff",
+    catCard: "#f2b65e",
+    catOther: "#cfcbe3",
+    healthWeak: "#e2607a",
+    healthReused: "#e8a33c",
+    healthStale: "#7d84b8",
   };
 
   return {
     light: {
       components,
       token: {
+        ...shared,
         primary: colors.light.primary,
         secondary_1: colors.light.secondary_1,
         secondary_2: colors.light.secondary_2,
-        //
         colorPrimary: colors.light.primary,
-        colorSuccess: "#10B981",
-        colorWarning: "#F59E0B",
-        colorError: "#EF4444",
-        colorInfo: "#3B82F6",
-        colorBgContainer: white,
-        colorBgLayout: "#b5c2ca",
-        colorBgElevated: white,
-        colorText: "#1F2937",
-        colorTextSecondary: "#6B7280",
-        colorTextPlaceholder: "#9CA3AF",
-        colorBorder: "#E5E7EB",
-        borderRadius: 12,
-        fontSize: 14,
-        boxShadow:
-          "0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px -1px rgba(0, 0, 0, 0.1)",
-        colorBgMenu: "#FFFFFF",
-        colorTextMenu: "#1F2937",
-        colorBgMenuItem: "#F9FAFB",
-        colorPrimaryBg: "#F3F4F6",
-        colorPrimaryBgHover: "#E5E7EB",
-        surfaceCard: "rgba(255, 255, 255, 0.98)",
-        surfaceMuted: "#F8FAFC",
-        surfaceHover: "#EEF2FF",
-        textMuted: "#64748B",
-        iconMuted: "#94A3B8",
-        borderSubtle: "rgba(15, 23, 42, 0.08)",
-        customFieldBg: "#e5e8ed",
-        customFieldRowBg: "#e5e8ed",
+        colorSuccess: "#2f9e6e",
+        colorWarning: "#e8a33c",
+        colorError: "#d64562",
+        colorInfo: "#3d6fd6",
+        colorBgLayout: "#eeecf6",
+        colorBgContainer: "#fbfaff",
+        colorBgElevated: "#ffffff",
+        colorText: "#18192f",
+        colorTextSecondary: "#565876",
+        colorTextPlaceholder: "#8a8ca8",
+        colorBorder: "#d9d7e8",
+        colorBorderSecondary: "#e6e4f0",
+        boxShadow: "0 1px 3px rgba(24, 25, 47, 0.08), 0 1px 2px -1px rgba(24, 25, 47, 0.08)",
+        colorBgMenu: "#fbfaff",
+        colorTextMenu: "#18192f",
+        colorBgMenuItem: "#f4f2fb",
+        colorPrimaryBg: "#ece9f9",
+        colorPrimaryBgHover: "#e0dcf6",
+        surfaceCard: "#fbfaff",
+        surfaceMuted: "#f4f2fb",
+        surfaceHover: "#ece9f9",
+        textMuted: "#5f6182",
+        iconMuted: "#8a8ca8",
+        borderSubtle: "rgba(24, 25, 47, 0.1)",
+        customFieldBg: "#f4f2fb",
+        customFieldRowBg: "#f4f2fb",
       },
     },
     dark: {
       components,
       token: {
+        ...shared,
         primary: colors.dark.primary,
         secondary_1: colors.dark.secondary_1,
         secondary_2: colors.dark.secondary_2,
         colorPrimary: colors.dark.primary,
-        colorSuccess: "#34D399",
-        colorWarning: "#FBBF24",
-        colorError: "#F87171",
-        colorInfo: "#60A5FA",
-        colorBgContainer: "#1F2937",
-        colorBgElevated: "#111827",
-        colorBgLayout: "#111827",
-        colorTextSecondary: "#9CA3AF",
-        colorTextTertiary: "#D1D5DB",
-        colorIcon: "#E5E7EB",
-        colorText: "#F9FAFB",
-        colorTextPlaceholder: "#9CA3AF",
-        colorTextQuaternary: "#9CA3AF",
-        colorBorder: "#374151",
-        borderRadius: 12,
-        fontSize: 14,
-        boxShadow:
-          "0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -2px rgba(0, 0, 0, 0.3)",
-        colorBgMenu: "#1F2937",
-        colorTextMenu: "#F9FAFB",
-        colorBgMenuItem: "#111827",
-        colorPrimaryBg: "#312E81",
-        colorPrimaryBgHover: "#3730A3",
-        surfaceCard: "#111827",
-        surfaceMuted: "rgba(148, 163, 184, 0.12)",
-        surfaceHover: "rgba(148, 163, 184, 0.2)",
-        textMuted: "#94A3B8",
-        iconMuted: "#94A3B8",
-        borderSubtle: "rgba(148, 163, 184, 0.18)",
-        customFieldBg: "rgba(148, 163, 184, 0.12)",
-        customFieldRowBg: "#1F2937",
+        colorSuccess: "#5fc99a",
+        colorWarning: "#f0b65c",
+        colorError: "#f07a92",
+        colorInfo: "#8cb4ff",
+        colorBgLayout: "#161834",
+        colorBgContainer: "#1e2147",
+        colorBgElevated: "#292d5c",
+        colorText: "#f4f2ea",
+        colorTextSecondary: "#b3b4d4",
+        colorTextTertiary: "#c9c9e2",
+        colorTextQuaternary: "#9a9cc4",
+        colorTextPlaceholder: "#9a9cc4",
+        colorIcon: "#d6d5ea",
+        colorBorder: "#3a3e72",
+        colorBorderSecondary: "#2f3364",
+        boxShadow: "0 4px 12px rgba(6, 7, 26, 0.45)",
+        colorBgMenu: "#1e2147",
+        colorTextMenu: "#f4f2ea",
+        colorBgMenuItem: "#161834",
+        colorPrimaryBg: "#2f2a6b",
+        colorPrimaryBgHover: "#3a3482",
+        surfaceCard: "#1e2147",
+        surfaceMuted: "rgba(232, 229, 255, 0.06)",
+        surfaceHover: "rgba(232, 229, 255, 0.1)",
+        textMuted: "#b3b4d4",
+        iconMuted: "#9a9cc4",
+        borderSubtle: "rgba(232, 229, 255, 0.12)",
+        customFieldBg: "rgba(232, 229, 255, 0.06)",
+        customFieldRowBg: "#1e2147",
       },
     },
   };

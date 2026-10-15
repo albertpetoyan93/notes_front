@@ -1,7 +1,9 @@
 import { EyeInvisibleOutlined, EyeOutlined, ShareAltOutlined } from "@ant-design/icons";
 import { Button, Drawer, Descriptions, Space, Tag, Typography } from "antd";
 import { useState } from "react";
+import FieldActions from "../../components/noteField/FieldActions";
 import PlatformIcon from "../../components/platformIcon/PlatformIcon";
+import useFieldClipboard from "../../hooks/useFieldClipboard";
 import { cardBrandFromFields, formatCardField } from "../../utils/cardField";
 import { isSecretField } from "../../utils/secretField";
 
@@ -21,6 +23,7 @@ const NoteViewModal = ({
   onShare,
 }: NoteViewModalProps) => {
   const [shownSecrets, setShownSecrets] = useState<Set<number>>(new Set());
+  const clipboard = useFieldClipboard();
   if (!note) return null;
 
   const parseContent = (content: any) => {
@@ -144,9 +147,17 @@ const NoteViewModal = ({
           <Descriptions.Item
             label={customFields.length > 0 ? "Additional Notes" : "Content"}
           >
-            <Paragraph style={{ whiteSpace: "pre-wrap", margin: 0 }}>
-              {mainContent}
-            </Paragraph>
+            <Space align="start" size={6}>
+              <Paragraph style={{ whiteSpace: "pre-wrap", margin: 0 }}>
+                {mainContent}
+              </Paragraph>
+              <FieldActions
+                fieldKey={`view-body-${note.id}`}
+                label="Note"
+                value={mainContent}
+                clipboard={clipboard}
+              />
+            </Space>
           </Descriptions.Item>
         )}
 

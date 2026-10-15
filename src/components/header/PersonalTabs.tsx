@@ -30,19 +30,21 @@ const PersonalTabs = () => {
   };
 
   return (
-    <div className="company-tabs">
+    <nav className="company-tabs" aria-label="Sections">
       {tabs.map((tab) => (
         <button
           key={tab.key}
           type="button"
           className={current === tab.key ? "company-tab active" : "company-tab"}
+          aria-current={current === tab.key ? "page" : undefined}
+          title={tab.label}
           onClick={() => openTab(tab.key)}
         >
           {tab.icon}
-          {tab.label}
+          <span className="tab-label">{tab.label}</span>
         </button>
       ))}
-    </div>
+    </nav>
   );
 };
 

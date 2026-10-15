@@ -194,7 +194,7 @@ const RightHeader = () => {
           className="header-avatar"
           size={36}
           style={{
-            background: "#7c3aed",
+            background: token.colorPrimary,
             cursor: "pointer",
             flexShrink: 0,
           }}

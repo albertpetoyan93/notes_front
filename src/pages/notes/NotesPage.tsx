@@ -1,33 +1,32 @@
 import {
   AppstoreOutlined,
-  CheckOutlined,
-  CopyOutlined,
+  CloudSyncOutlined,
   DeleteOutlined,
+  DownOutlined,
   DownloadOutlined,
   EditOutlined,
   FileAddOutlined,
   FileTextOutlined,
-  EyeInvisibleOutlined,
-  EyeOutlined,
-  LinkOutlined,
+  FilterOutlined,
   PlusOutlined,
   ShareAltOutlined,
-  StarFilled,
-  StarOutlined,
-  UndoOutlined,
   UnorderedListOutlined,
   UploadOutlined,
-  WarningOutlined,
 } from "@ant-design/icons";
 import {
+  Badge,
   Button,
   Card,
   Col,
+  Drawer,
+  Dropdown,
   Empty,
+  Grid,
   Modal,
   Row,
   Segmented,
   Select,
+  Skeleton,
   Space,
   Spin,
   Table,
@@ -36,11 +35,16 @@ import {
   Typography,
   message,
 } from "antd";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { useSearchParams } from "react-router-dom";
 import NotesSearch from "../../components/header/NotesSearch";
+import CategoryDot from "../../components/noteCategory/CategoryDot";
+import FieldActions from "../../components/noteField/FieldActions";
+import PasswordHealthMark from "../../components/passwordHealth/PasswordHealthMark";
 import PlatformIcon from "../../components/platformIcon/PlatformIcon";
+import UpdatedAt from "../../components/updatedAt/UpdatedAt";
 import axios from "../../configs/axios";
+import useFieldClipboard from "../../hooks/useFieldClipboard";
 import { useNoteStore } from "../../store/noteStore";
 import NoteCard from "./NoteCard";
 import NoteModal from "./NoteModal";
@@ -51,50 +55,56 @@ import CollectionDialogs from "./CollectionDialogs";
 import { subscribeOpenCollections } from "../../utils/collectionsDrawer";
 import { CollectionItem } from "../../store/noteStore";
 import { cardBrandFromFields, formatCardField } from "../../utils/cardField";
+import { isURL } from "../../utils/isUrl";
+import { categoryKey } from "../../utils/noteCategory";
 import { isSecretField } from "../../utils/secretField";
+import { buildNoteActions, isNoteOwner } from "./NoteActions";
 
 const { Text } = Typography;
 
-const passwordHealthTip = (health: {
-  weak: boolean;
-  reused: boolean;
-  stale: boolean;
-}) =>
-  [
-    health.weak && "Weak password",
-    health.reused && "Reused password",
-    health.stale && "Not updated in 6 months",
-  ]
-    .filter(Boolean)
-    .join(" · ");
-
-const PasswordHealthMark = ({
-  health,
-}: {
-  health?: { weak: boolean; reused: boolean; stale: boolean };
-}) => {
-  if (!health) return null;
-  const color = health.weak ? "#ff4d4f" : health.reused ? "#fa8c16" : "#faad14";
-  return (
-    <Tooltip title={passwordHealthTip(health)}>
-      <span className="password-health-mark" style={{ color }}>
-        <WarningOutlined />
-      </span>
-    </Tooltip>
-  );
-};
-
 const categories = [
-  { value: "all", label: "All Notes", color: "default" },
-  { value: "note", label: "Notes", color: "cyan" },
-  { value: "password", label: "Login", color: "magenta" },
-  { value: "command", label: "Commands", color: "purple" },
-  { value: "ssh", label: "SSH", color: "volcano" },
-  { value: "db", label: "Database", color: "blue" },
-  { value: "address", label: "Address", color: "green" },
-  { value: "card", label: "Card", color: "orange" },
-  { value: "other", label: "Other", color: "gold" },
+  { value: "all", label: "All categories" },
+  { value: "note", label: "Notes" },
+  { value: "password", label: "Login" },
+  { value: "command", label: "Commands" },
+  { value: "ssh", label: "SSH" },
+  { value: "db", label: "Database" },
+  { value: "address", label: "Address" },
+  { value: "card", label: "Card" },
+  { value: "other", label: "Other" },
 ];
+
+// Same column widths for cards everywhere: 1 / 2 / 3 / 4 / 6 per row.
+const gridCol = { xs: 24, sm: 12, lg: 8, xl: 6, xxl: 4 };
+
+// Moving to trash can be undone, so it acts at once and offers Undo instead of asking first.
+const undoToast = (text: string, undo: () => Promise<void>) => {
+  const key = `undo-${Date.now()}`;
+  message.open({
+    key,
+    type: "success",
+    duration: 6,
+    content: (
+      <span className="undo-toast">
+        {text}
+        <Button
+          type="link"
+          size="small"
+          onClick={async () => {
+            message.destroy(key);
+            try {
+              await undo();
+            } catch {
+              message.error("Could not undo");
+            }
+          }}
+        >
+          Undo
+        </Button>
+      </span>
+    ),
+  });
+};
 
 const NotesPage = ({
   companyId,
@@ -114,11 +124,14 @@ const NotesPage = ({
     importNotes,
     fetchCollections,
     deleteCollection,
+    addNotesToCollection,
     removeNoteFromCollection,
     emptyTrash,
     bulkUpdateNotes,
   } = useNoteStore();
 
+  const screens = Grid.useBreakpoint();
+  const inlineFilters = !!screens.xl;
   const [searchParams, setSearchParams] = useSearchParams();
   const categoryParam = searchParams.get("category") || "all";
   const selectedCategory = categoryParam === "login" ? "password" : categoryParam;
@@ -152,20 +165,12 @@ const NotesPage = ({
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [bulkCollection, setBulkCollection] = useState<string>();
   const [availableTags, setAvailableTags] = useState<string[]>([]);
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [viewMode, setViewMode] = useState<"card" | "table">(() => {
     const saved = localStorage.getItem("notesViewMode");
     return (saved as "card" | "table") || "card";
   });
-  const [copiedFields, setCopiedFields] = useState<Set<string>>(new Set());
-  const [visiblePasswords, setVisiblePasswords] = useState<Set<string>>(
-    new Set(),
-  );
-
-  const isNoteOwner = (note: any) =>
-    note?.isOwner === true || note?.permission === "owner";
-
-  const canEditNote = (note: any) =>
-    isNoteOwner(note) || note?.permission === "edit";
+  const clipboard = useFieldClipboard();
 
   const handleShare = (note: any) => {
     setSharingNote(note);
@@ -198,7 +203,7 @@ const NotesPage = ({
   );
 
   const fetchWithCurrentFilters = useCallback(() => {
-    fetchNotes({
+    return fetchNotes({
       category: selectedCategory !== "all" ? selectedCategory : undefined,
       tag: selectedTag !== "all" ? selectedTag : undefined,
       search: searchQuery || undefined,
@@ -222,16 +227,6 @@ const NotesPage = ({
   const handleViewModeChange = (mode: "card" | "table") => {
     setViewMode(mode);
     localStorage.setItem("notesViewMode", mode);
-  };
-
-  // Open URL in new tab
-  const openURL = (value: any) => {
-    const strValue = String(value);
-    let url = strValue;
-    if (!strValue.startsWith("http://") && !strValue.startsWith("https://")) {
-      url = `http://${strValue}`;
-    }
-    window.open(url, "_blank", "noopener,noreferrer");
   };
 
   useEffect(() => {
@@ -284,6 +279,7 @@ const NotesPage = ({
     setCollectionMode(mode);
   };
 
+  // Deleting a collection drops its sharing for good, so this one still asks first.
   const handleDeleteCollection = (collection: CollectionItem) => {
     Modal.confirm({
       title: `Delete "${collection.name}"?`,
@@ -304,31 +300,31 @@ const NotesPage = ({
 
   const handleRemoveFromCollection = async (noteId: number) => {
     if (!activeCollection) return;
+    const collection = activeCollection;
     try {
-      await removeNoteFromCollection(activeCollection.id, noteId);
-      message.success("Removed from collection");
+      await removeNoteFromCollection(collection.id, noteId);
       fetchWithCurrentFilters();
       loadCollections();
+      undoToast(`Removed from ${collection.name}`, async () => {
+        await addNotesToCollection(collection.id, [noteId]);
+        await fetchWithCurrentFilters();
+        loadCollections();
+      });
     } catch (error: any) {
       message.error(error?.message || "Could not remove note");
     }
   };
 
-  const handleDelete = (id: number) => {
-    Modal.confirm({
-      title: "Move this note to trash?",
-      content: "You can restore it later from the Trash filter.",
-      okText: "Move to trash",
-      okButtonProps: { danger: true },
-      onOk: async () => {
-        try {
-          await deleteNote(id);
-          message.success("Note moved to trash");
-        } catch {
-          message.error("Failed to delete note");
-        }
-      },
-    });
+  const handleDelete = async (id: number) => {
+    try {
+      await deleteNote(id);
+      undoToast("Note moved to trash", async () => {
+        await restoreNote(id);
+        await fetchWithCurrentFilters();
+      });
+    } catch {
+      message.error("Failed to delete note");
+    }
   };
 
   const handleRestore = async (id: number) => {
@@ -374,18 +370,26 @@ const NotesPage = ({
     }
   };
 
-  const handleBulkTrash = () => {
-    Modal.confirm({
-      title: `Move ${selectedIds.length} notes to trash?`,
-      okText: "Move to trash",
-      okButtonProps: { danger: true },
-      onOk: async () => {
-        const result = await bulkUpdateNotes(selectedIds, "trash");
-        await finishBulk(result);
-      },
-    });
+  const handleBulkTrash = async () => {
+    const ids = [...selectedIds];
+    try {
+      const result = await bulkUpdateNotes(ids, "trash");
+      setSelectedIds([]);
+      await fetchWithCurrentFilters();
+      const moved = result.updated === 1 ? "1 note" : `${result.updated} notes`;
+      undoToast(
+        `Moved ${moved} to trash${result.skipped ? `. Skipped ${result.skipped} you do not own` : ""}`,
+        async () => {
+          await Promise.allSettled(ids.map((id) => restoreNote(id)));
+          await fetchWithCurrentFilters();
+        },
+      );
+    } catch (error: any) {
+      message.error(error?.message || "Could not move notes to trash");
+    }
   };
 
+  // Emptying the trash is permanent, so it asks first.
   const handleEmptyTrash = () => {
     Modal.confirm({
       title: "Empty trash?",
@@ -420,18 +424,6 @@ const NotesPage = ({
   const handleViewModalClose = () => {
     setViewModalVisible(false);
     setViewingNote(null);
-  };
-
-  const handleCategoryChange = (category: string) => {
-    updateSearchParams({ category });
-  };
-
-  const handleCollectionChange = (collection: string) => {
-    updateSearchParams({ collection });
-  };
-
-  const handleTagChange = (tag: string) => {
-    updateSearchParams({ tag });
   };
 
   const handleViewFilterChange = (value: string) => {
@@ -494,40 +486,19 @@ const NotesPage = ({
       ? notes.filter((note) => note.isFavorite)
       : notes;
 
-  const copyToClipboard = (text: string, fieldKey: string, label?: string) => {
-    navigator.clipboard.writeText(text).then(
-      () => {
-        // Add to copied fields
-        setCopiedFields((prev) => new Set(prev).add(fieldKey));
-
-        // Remove after 2 seconds
-        setTimeout(() => {
-          setCopiedFields((prev) => {
-            const newSet = new Set(prev);
-            newSet.delete(fieldKey);
-            return newSet;
-          });
-        }, 2000);
-
-        message.success(`${label || "Text"} copied!`, 1.5);
-      },
-      () => {
-        message.error("Failed to copy to clipboard");
-      },
-    );
-  };
-
-  const togglePasswordVisibility = (fieldKey: string) => {
-    setVisiblePasswords((prev) => {
-      const newSet = new Set(prev);
-      if (newSet.has(fieldKey)) {
-        newSet.delete(fieldKey);
-      } else {
-        newSet.add(fieldKey);
-      }
-      return newSet;
-    });
-  };
+  const actionHandlers = (note: any) => ({
+    trash: viewFilter === "trash",
+    onView: handleView,
+    onFavorite: (item: any) => toggleFavorite(item.id),
+    onShare: handleShare,
+    onEdit: handleEdit,
+    onDelete: (item: any) => handleDelete(item.id),
+    onRestore: (item: any) => handleRestore(item.id),
+    onRemoveFromCollection:
+      activeCollection && (activeCollection.isOwner || isNoteOwner(note))
+        ? (item: any) => handleRemoveFromCollection(item.id)
+        : undefined,
+  });
 
   const getCustomFields = (content: any) => {
     if (typeof content === "object" && content !== null) {
@@ -536,26 +507,32 @@ const NotesPage = ({
     return [];
   };
 
-  // Generate table columns with custom fields under content
   const getTableColumns = () => {
     return [
       {
         title: "Title",
         dataIndex: "title",
         key: "title",
-        width: 200,
+        width: 220,
         fixed: "left" as const,
         ellipsis: true,
         sorter: (a: any, b: any) => a.title.localeCompare(b.title),
         render: (text: string, record: any) => (
-          <Space size={4} wrap>
+          <Space size={6} wrap>
             <PlatformIcon note={record} size={20} />
-            <Text strong style={{ cursor: "pointer" }}>
+            <button
+              type="button"
+              className="note-title-button table-title"
+              onClick={(event) => {
+                event.stopPropagation();
+                handleView(record);
+              }}
+            >
               {text}
-            </Text>
+            </button>
             {record.isShared && !record.collection?.companyId && (
               <Tooltip title={`Shared by ${record.sharedByName || "someone"}`}>
-                <Tag color="purple" style={{ margin: 0 }}>
+                <Tag className="note-shared" style={{ margin: 0 }}>
                   {record.sharedByName || "Shared"}
                 </Tag>
               </Tooltip>
@@ -568,28 +545,13 @@ const NotesPage = ({
         title: "Category",
         dataIndex: "category",
         key: "category",
-        width: 120,
+        width: 130,
         filters: categories.slice(1).map((cat) => ({
           text: cat.label,
           value: cat.value,
         })),
-        onFilter: (value: any, record: any) =>
-          (record.category === "login" ? "password" : record.category) === value,
-        render: (category: string) => (
-          <Tag
-            className={`note-category note-category-${
-              category === "login" ? "password" : category
-            }`}
-          >
-            {category === "password" || category === "login"
-              ? "LOGIN"
-              : category === "address"
-                ? "ADDRESS"
-                : category === "card"
-                  ? "CARD"
-                  : category.toUpperCase()}
-          </Tag>
-        ),
+        onFilter: (value: any, record: any) => categoryKey(record.category) === value,
+        render: (category: string) => <CategoryDot category={category} />,
       },
       {
         title: "Collection",
@@ -629,7 +591,7 @@ const NotesPage = ({
                 </Tag>
               ))}
               {tags.length > 3 && (
-                <Tag style={{ margin: 0 }}>+{tags.length - 3}</Tag>
+                <Tag className="note-tag">+{tags.length - 3}</Tag>
               )}
             </Space>
           ) : (
@@ -645,48 +607,18 @@ const NotesPage = ({
           const customFields = getCustomFields(content);
           const cardBrand = cardBrandFromFields(customFields);
           if (content.mainContent) {
-            const fieldKey = `table-main-${record.id}`;
-            const isCopied = copiedFields.has(fieldKey);
-
             return (
-              <div
-                className="table-field table-field-single"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  copyToClipboard(
-                    content.mainContent,
-                    fieldKey,
-                    "Main Content",
-                  );
-                }}
-              >
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                  }}
-                >
-                  <Text>{content.mainContent}</Text>
-                  {isCopied ? (
-                    <CheckOutlined
-                      style={{
-                        color: "#52c41a",
-                        fontSize: 12,
-                        marginLeft: 8,
-                      }}
-                    />
-                  ) : (
-                    <CopyOutlined
-                      style={{
-                        color: "var(--iconMuted)",
-                        fontSize: 11,
-                        opacity: 0.5,
-                        marginLeft: 8,
-                        cursor: "pointer",
-                      }}
-                    />
-                  )}
+              <div className="table-field table-field-single">
+                <div className="table-field-line">
+                  <Text className="table-field-value" ellipsis>
+                    {content.mainContent}
+                  </Text>
+                  <FieldActions
+                    fieldKey={`table-main-${record.id}`}
+                    label="Content"
+                    value={content.mainContent}
+                    clipboard={clipboard}
+                  />
                 </div>
               </div>
             );
@@ -697,114 +629,38 @@ const NotesPage = ({
           return (
             <div className="table-fields">
               {customFields.map((field: any, idx: number) => {
+                if (!field.value) return null;
                 const fieldKey = `table-${record.id}-${idx}`;
-                const isCopied = copiedFields.has(fieldKey);
-                const isPasswordField = isSecretField(field.label);
-                const isUrlField = field.label === "URL";
-                const showPassword = visiblePasswords.has(fieldKey);
+                const secret = isSecretField(field.label);
+                const url = field.label.toLowerCase() === "url" && isURL(String(field.value));
                 const shownValue = formatCardField(
                   field.label,
                   String(field.value ?? ""),
                   "",
                   cardBrand
                 );
-                const displayValue =
-                  isPasswordField && !showPassword
-                    ? "•".repeat(Math.min(shownValue.length, 12))
-                    : shownValue;
-
-                if (!field.value) return null;
+                const hidden = secret && !clipboard.isVisible(fieldKey);
                 return (
-                  <div
-                    key={idx}
-                    className="table-field"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      copyToClipboard(shownValue, fieldKey, field.label);
-                    }}
-                  >
+                  <div key={idx} className="table-field">
                     <Text className="table-field-label">{field.label}</Text>
-                    <div
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "space-between",
-                      }}
-                    >
+                    <div className="table-field-line">
                       <Text
                         ellipsis
-                        className={`table-field-value${isUrlField ? " is-url" : ""}${
-                          isPasswordField && !showPassword ? " is-secret" : ""
+                        className={`table-field-value${url ? " is-url" : ""}${
+                          hidden ? " is-secret" : ""
                         }`}
-                        title={field.value}
+                        title={hidden ? undefined : shownValue}
                       >
-                        {displayValue}
+                        {hidden ? "•".repeat(Math.min(shownValue.length, 12)) : shownValue}
                       </Text>
-
-                      <div style={{ display: "flex", alignItems: "center" }}>
-                        {isPasswordField && (
-                          <Tooltip
-                            title={showPassword ? "Hide value" : "Show value"}
-                          >
-                            {showPassword ? (
-                              <EyeInvisibleOutlined
-                                style={{
-                                  color: "var(--iconMuted)",
-                                  fontSize: 12,
-                                  marginLeft: 8,
-                                }}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  togglePasswordVisibility(fieldKey);
-                                }}
-                              />
-                            ) : (
-                              <EyeOutlined
-                                style={{
-                                  color: "var(--iconMuted)",
-                                  fontSize: 12,
-                                  marginLeft: 8,
-                                }}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  togglePasswordVisibility(fieldKey);
-                                }}
-                              />
-                            )}
-                          </Tooltip>
-                        )}
-                        {isUrlField && (
-                          <LinkOutlined
-                            style={{
-                              color: "var(--iconMuted)",
-                              fontSize: 11,
-                              marginLeft: 8,
-                            }}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              openURL(field.value);
-                            }}
-                          />
-                        )}
-                        {isCopied ? (
-                          <CheckOutlined
-                            style={{
-                              color: "#52c41a",
-                              fontSize: 12,
-                              marginLeft: 8,
-                            }}
-                          />
-                        ) : (
-                          <CopyOutlined
-                            style={{
-                              color: "var(--iconMuted)",
-                              fontSize: 11,
-                              opacity: 0.5,
-                              marginLeft: 8,
-                            }}
-                          />
-                        )}
-                      </div>
+                      <FieldActions
+                        fieldKey={fieldKey}
+                        label={field.label}
+                        value={shownValue}
+                        secret={secret}
+                        url={url}
+                        clipboard={clipboard}
+                      />
                     </div>
                   </div>
                 );
@@ -814,99 +670,184 @@ const NotesPage = ({
         },
       },
       {
+        title: "Updated",
+        dataIndex: "updatedAt",
+        key: "updatedAt",
+        width: 150,
+        sorter: (a: any, b: any) =>
+          new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime(),
+        render: (value: string) => <UpdatedAt value={value} className="note-date" />,
+      },
+      {
         title: "Actions",
         key: "actions",
-        width: 160,
+        width: 190,
         fixed: "right" as const,
         render: (_: any, record: any) => (
-          <Space size="small">
-            {viewFilter !== "trash" && (
-              <Tooltip title="Toggle Favorite">
-                <Button
-                  type="text"
-                  size="small"
-                  icon={
-                    record.isFavorite ? (
-                      <StarFilled style={{ color: "#faad14" }} />
-                    ) : (
-                      <StarOutlined />
-                    )
-                  }
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    toggleFavorite(record.id);
-                  }}
-                />
-              </Tooltip>
-            )}
-            <Tooltip title="View">
-              <Button
-                type="text"
-                size="small"
-                icon={<EyeOutlined />}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleView(record);
-                }}
-              />
-            </Tooltip>
-            {isNoteOwner(record) && (
-              <Tooltip title="Share">
-                <Button
-                  type="text"
-                  size="small"
-                  icon={<ShareAltOutlined />}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleShare(record);
-                  }}
-                />
-              </Tooltip>
-            )}
-            {canEditNote(record) && (
-              <Tooltip title="Edit">
-                <Button
-                  type="text"
-                  size="small"
-                  icon={<EditOutlined />}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleEdit(record);
-                  }}
-                />
-              </Tooltip>
-            )}
-            {isNoteOwner(record) &&
-              (viewFilter === "trash" ? (
-                <Tooltip title="Restore">
-                  <Button
-                    type="text"
-                    size="small"
-                    icon={<UndoOutlined />}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleRestore(record.id);
-                    }}
-                  />
-                </Tooltip>
-              ) : (
-                <Tooltip title="Delete">
-                  <Button
-                    type="text"
-                    size="small"
-                    danger
-                    icon={<DeleteOutlined />}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleDelete(record.id);
-                    }}
-                  />
-                </Tooltip>
-              ))}
+          <Space size={2}>
+            {buildNoteActions(record, { ...actionHandlers(record), size: "small" })}
           </Space>
         ),
       },
     ];
+  };
+
+  const activeFilterCount = [
+    selectedCategory,
+    selectedCollection,
+    selectedTag,
+    viewFilter,
+  ].filter((value) => value !== "all").length;
+
+  const filterControls: ReactNode[] = [
+    <Select
+      key="category"
+      aria-label="Category"
+      value={selectedCategory}
+      onChange={(category) => updateSearchParams({ category })}
+      popupClassName="notes-select-dropdown"
+      options={categories}
+    />,
+    <Select
+      key="collection"
+      aria-label="Collection"
+      value={selectedCollection}
+      onChange={(collection) => updateSearchParams({ collection })}
+      popupClassName="notes-select-dropdown"
+      options={[
+        { value: "all", label: "All collections" },
+        ...collections.map((collection) => ({
+          value: String(collection.id),
+          label: `${collection.name}${!companyId && !collection.isOwner ? " (shared)" : ""}`,
+        })),
+      ]}
+    />,
+    <Select
+      key="tag"
+      aria-label="Tag"
+      value={selectedTag}
+      onChange={(tag) => updateSearchParams({ tag })}
+      popupClassName="notes-select-dropdown"
+      options={[
+        { value: "all", label: "All tags" },
+        ...availableTags.map((tag) => ({ value: tag, label: tag })),
+      ]}
+    />,
+    <Select
+      key="view"
+      aria-label="Show"
+      value={viewFilter}
+      onChange={handleViewFilterChange}
+      popupClassName="notes-select-dropdown"
+      options={
+        companyId
+          ? [
+              { value: "all", label: "All notes" },
+              { value: "favorites", label: "Favorites" },
+            ]
+          : [
+              { value: "all", label: "Mine & shared" },
+              { value: "shared", label: "Shared with me" },
+              { value: "favorites", label: "Favorites" },
+              { value: "trash", label: "Trash" },
+            ]
+      }
+    />,
+  ];
+
+  const clearFilters = () =>
+    updateSearchParams({
+      category: null,
+      collection: null,
+      tag: null,
+      shared: null,
+      trash: null,
+      favorites: null,
+    });
+
+  const newNoteDisabled =
+    !!companyId &&
+    !collections.some(
+      (collection) =>
+        collection.permission === "owner" || collection.permission === "edit"
+    );
+
+  const renderNotes = () => {
+    if (loading && notes.length === 0) {
+      return viewMode === "card" ? (
+        <Row gutter={[16, 16]} aria-busy="true" aria-label="Loading notes">
+          {Array.from({ length: 8 }, (_, index) => (
+            <Col {...gridCol} key={index}>
+              <Card className="note-card note-card-skeleton">
+                <Skeleton active title={{ width: "60%" }} paragraph={{ rows: 3 }} />
+              </Card>
+            </Col>
+          ))}
+        </Row>
+      ) : (
+        <Table
+          className="notes-table"
+          loading
+          dataSource={[]}
+          columns={getTableColumns()}
+          scroll={{ x: 1350 }}
+          rowKey="id"
+        />
+      );
+    }
+
+    if (filteredNotes.length === 0) {
+      return (
+        <Empty
+          description={
+            companyId && collections.length === 0
+              ? "No notes yet. Notes show up here after a collection is shared with you."
+              : "No notes found. Try adjusting your filters or create a new note!"
+          }
+          image={Empty.PRESENTED_IMAGE_SIMPLE}
+        />
+      );
+    }
+
+    return viewMode === "card" ? (
+      <Row gutter={[16, 16]}>
+        {filteredNotes.map((note) => (
+          <Col {...gridCol} key={note.id}>
+            <NoteCard
+              note={note}
+              selected={selectedIds.includes(note.id)}
+              onToggleSelect={toggleSelected}
+              {...actionHandlers(note)}
+            />
+          </Col>
+        ))}
+      </Row>
+    ) : (
+      <Table
+        className="notes-table"
+        dataSource={filteredNotes}
+        rowKey="id"
+        pagination={{ pageSize: 10, showSizeChanger: true }}
+        columns={getTableColumns()}
+        scroll={{ x: 1350 }}
+        rowSelection={
+          viewFilter === "trash"
+            ? undefined
+            : {
+                selectedRowKeys: selectedIds,
+                onChange: (keys) => setSelectedIds(keys as number[]),
+                getCheckboxProps: (record: any) => ({
+                  disabled: !isNoteOwner(record),
+                }),
+              }
+        }
+        onRow={(record) => ({
+          onClick: () => handleView(record),
+          style: { cursor: "pointer" },
+        })}
+        size="middle"
+      />
+    );
   };
 
   return (
@@ -983,7 +924,7 @@ const NotesPage = ({
                   );
                 }
                 return (
-                  <Col xs={24} sm={12} lg={6} xl={4} key={collection.id}>
+                  <Col {...gridCol} key={collection.id}>
                     <Card className="note-card" actions={actions}>
                       <div className="note-title-row">
                         <Text strong ellipsis className="note-title">
@@ -1005,81 +946,46 @@ const NotesPage = ({
       ) : (
       <>
       <div className="notes-toolbar">
-        <div className="notes-toolbar-start">
-        <Segmented
-          className="switcher"
-          value={viewMode}
-          onChange={(value) => handleViewModeChange(value as "card" | "table")}
-          options={[
-            {
-              label: "Cards",
-              value: "card",
-              icon: <AppstoreOutlined />,
-            },
-            {
-              label: "Table",
-              value: "table",
-              icon: <UnorderedListOutlined />,
-            },
-          ]}
-        />
-        <Text className="notes-count" type="secondary">
-          {filteredNotes.length} {filteredNotes.length === 1 ? "note" : "notes"}
-        </Text>
-        </div>
         <div className="notes-filters">
           <NotesSearch />
-          <Select
-            value={selectedCategory}
-            onChange={handleCategoryChange}
-            popupClassName="notes-select-dropdown"
-            options={categories}
+          {inlineFilters ? (
+            filterControls
+          ) : (
+            <Badge count={activeFilterCount} size="small">
+              <Button icon={<FilterOutlined />} onClick={() => setFiltersOpen(true)}>
+                Filters
+              </Button>
+            </Badge>
+          )}
+          {inlineFilters && activeFilterCount > 0 && (
+            <Button type="link" onClick={clearFilters}>
+              Clear
+            </Button>
+          )}
+        </div>
+        <div className="notes-toolbar-start">
+          <Segmented
+            className="switcher"
+            value={viewMode}
+            onChange={(value) => handleViewModeChange(value as "card" | "table")}
+            options={[
+              {
+                label: screens.sm ? "Cards" : undefined,
+                value: "card",
+                icon: <AppstoreOutlined />,
+                title: "Cards",
+              },
+              {
+                label: screens.sm ? "Table" : undefined,
+                value: "table",
+                icon: <UnorderedListOutlined />,
+                title: "Table",
+              },
+            ]}
           />
-          <Select
-            value={selectedCollection}
-            onChange={handleCollectionChange}
-            placeholder="Collection"
-            popupClassName="notes-select-dropdown"
-          >
-            <Select.Option value="all">All collections</Select.Option>
-            {collections.map((collection) => (
-              <Select.Option key={collection.id} value={String(collection.id)}>
-                {collection.name}
-                {!companyId && !collection.isOwner ? " (shared)" : ""}
-              </Select.Option>
-            ))}
-          </Select>
-          <Select
-            value={selectedTag}
-            onChange={handleTagChange}
-            placeholder="Filter by tag"
-            popupClassName="notes-select-dropdown"
-          >
-            <Select.Option value="all">All Tags</Select.Option>
-            {availableTags.map((tag) => (
-              <Select.Option key={tag} value={tag}>
-                {tag}
-              </Select.Option>
-            ))}
-          </Select>
-          <Select
-            value={viewFilter}
-            onChange={handleViewFilterChange}
-            popupClassName="notes-select-dropdown"
-            options={
-              companyId
-                ? [
-                    { value: "all", label: "All notes" },
-                    { value: "favorites", label: "Favorites" },
-                  ]
-                : [
-                    { value: "all", label: "Mine & shared" },
-                    { value: "shared", label: "Shared with me" },
-                    { value: "favorites", label: "Favorites" },
-                    { value: "trash", label: "Trash" },
-                  ]
-            }
-          />
+          <Text className="notes-count" type="secondary">
+            {filteredNotes.length} {filteredNotes.length === 1 ? "note" : "notes"}
+          </Text>
         </div>
         <Space className="notes-toolbar-actions">
           <input
@@ -1094,35 +1000,84 @@ const NotesPage = ({
             }}
           />
           {!companyId && (
-            <Button icon={<DownloadOutlined />} onClick={handleExport}>
-              Export
-            </Button>
-          )}
-          {!companyId && (
-            <Button
-              icon={<UploadOutlined />}
-              onClick={() => importInputRef.current?.click()}
+            <Dropdown
+              trigger={["click"]}
+              placement="bottomRight"
+              overlayClassName="backup-dropdown"
+              menu={{
+                items: [
+                  {
+                    key: "export",
+                    label: (
+                      <span className="backup-option">
+                        <span className="backup-icon export">
+                          <DownloadOutlined />
+                        </span>
+                        <span className="backup-copy">
+                          <strong>Export notes</strong>
+                          <small>Download your vault as a .json backup</small>
+                        </span>
+                      </span>
+                    ),
+                    onClick: handleExport,
+                  },
+                  {
+                    key: "import",
+                    label: (
+                      <span className="backup-option">
+                        <span className="backup-icon import">
+                          <UploadOutlined />
+                        </span>
+                        <span className="backup-copy">
+                          <strong>Import notes</strong>
+                          <small>Add notes from a Keevo .json file</small>
+                        </span>
+                      </span>
+                    ),
+                    onClick: () => importInputRef.current?.click(),
+                  },
+                ],
+              }}
             >
-              Import
-            </Button>
+              <Button icon={<CloudSyncOutlined />} aria-label="Backup: export or import notes">
+                {screens.md && (
+                  <>
+                    Backup <DownOutlined className="backup-caret" />
+                  </>
+                )}
+              </Button>
+            </Dropdown>
           )}
           <Button
             className="new_note_button"
             type="primary"
             icon={<PlusOutlined />}
-            disabled={
-              !!companyId &&
-              !collections.some(
-                (collection) =>
-                  collection.permission === "owner" || collection.permission === "edit"
-              )
-            }
+            disabled={newNoteDisabled}
             onClick={() => setModalVisible(true)}
           >
             New Note
           </Button>
         </Space>
       </div>
+
+      <Drawer
+        title="Filters"
+        placement={screens.md ? "right" : "bottom"}
+        height="auto"
+        width={320}
+        open={!inlineFilters && filtersOpen}
+        onClose={() => setFiltersOpen(false)}
+        className="notes-filters-drawer"
+        extra={
+          activeFilterCount > 0 && (
+            <Button type="link" onClick={clearFilters}>
+              Clear
+            </Button>
+          )
+        }
+      >
+        <div className="notes-filters-stack">{filterControls}</div>
+      </Drawer>
 
       {(viewFilter === "trash" && filteredNotes.length > 0) ||
       (viewFilter !== "trash" && selectedIds.length > 0) ? (
@@ -1138,6 +1093,7 @@ const NotesPage = ({
                 <Text>{selectedIds.length} selected</Text>
                 <Select
                   placeholder="Collection"
+                  aria-label="Move to collection"
                   style={{ width: 180 }}
                   value={bulkCollection}
                   onChange={setBulkCollection}
@@ -1170,74 +1126,7 @@ const NotesPage = ({
         </div>
       ) : null}
 
-      {loading && notes.length === 0 ? (
-        <div className="notes-loading">
-          <Spin size="large" />
-        </div>
-      ) : (
-        <Spin spinning={loading} size="large">
-          {filteredNotes.length === 0 ? (
-            <Empty
-              description={
-                companyId && collections.length === 0
-                  ? "No notes yet. Notes show up here after a collection is shared with you."
-                  : "No notes found. Try adjusting your filters or create a new note!"
-              }
-              image={Empty.PRESENTED_IMAGE_SIMPLE}
-            />
-          ) : viewMode === "card" ? (
-            <Row gutter={[16, 16]}>
-              {filteredNotes.map((note) => (
-                <Col xs={24} sm={12} lg={4} xl={4} key={note.id}>
-                  <NoteCard
-                    note={note}
-                    trash={viewFilter === "trash"}
-                    selected={selectedIds.includes(note.id)}
-                    onView={handleView}
-                    onEdit={handleEdit}
-                    onShare={handleShare}
-                    onFavorite={(item) => toggleFavorite(item.id)}
-                    onDelete={(item) => handleDelete(item.id)}
-                    onRestore={(item) => handleRestore(item.id)}
-                    onToggleSelect={toggleSelected}
-                    onRemoveFromCollection={
-                      activeCollection &&
-                      (activeCollection.isOwner || isNoteOwner(note))
-                        ? (item) => handleRemoveFromCollection(item.id)
-                        : undefined
-                    }
-                  />
-                </Col>
-              ))}
-            </Row>
-          ) : (
-            <Table
-              className="notes-table"
-              dataSource={filteredNotes}
-              rowKey="id"
-              pagination={{ pageSize: 10, showSizeChanger: true }}
-              columns={getTableColumns()}
-              scroll={{ x: 1200 }}
-              rowSelection={
-                viewFilter === "trash"
-                  ? undefined
-                  : {
-                      selectedRowKeys: selectedIds,
-                      onChange: (keys) => setSelectedIds(keys as number[]),
-                      getCheckboxProps: (record: any) => ({
-                        disabled: !isNoteOwner(record),
-                      }),
-                    }
-              }
-              onRow={(record) => ({
-                onClick: () => handleView(record),
-                style: { cursor: "pointer" },
-              })}
-              size="middle"
-            />
-          )}
-        </Spin>
-      )}
+      <Spin spinning={loading && notes.length > 0}>{renderNotes()}</Spin>
       </>
       )}
 

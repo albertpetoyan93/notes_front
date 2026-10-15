@@ -17,3 +17,10 @@ export const isURL = (value: string): boolean => {
     return false;
   }
 };
+
+// Opens a saved URL in a new tab, adding http:// when it has no scheme.
+export const openURL = (value: unknown) => {
+  const text = String(value);
+  const url = /^https?:\/\//.test(text) ? text : `http://${text}`;
+  window.open(url, "_blank", "noopener,noreferrer");
+};

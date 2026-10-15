@@ -366,7 +366,7 @@ const CompanyPage = () => {
                         <div className="notes-page company-notes">
                           <Row gutter={[16, 16]}>
                             {companyCollections.map((collection) => (
-                                <Col xs={24} sm={12} lg={6} xl={4} key={collection.id}>
+                                <Col xs={24} sm={12} lg={8} xl={6} xxl={4} key={collection.id}>
                                   <Card
                                     className="note-card"
                                     actions={[
@@ -471,7 +471,7 @@ const CompanyPage = () => {
                                 ? "Invited"
                                 : "Removed";
                           return (
-                            <Col xs={24} sm={12} lg={6} xl={4} key={member.id}>
+                            <Col xs={24} sm={12} lg={8} xl={6} xxl={4} key={member.id}>
                               <Card
                                 className="note-card"
                                 actions={

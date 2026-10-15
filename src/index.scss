@@ -1,13 +1,10 @@
 @use "./components/header/header.scss" as header;
 
 :root {
-  font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
+  font-family: "Bricolage Grotesque", system-ui, -apple-system, "Segoe UI", sans-serif;
   line-height: 1.5;
   font-weight: 400;
-
-  // color-scheme: light dark;
-  color: #032649;
-  // background-color: #242424;
+  color: var(--colorText);
 
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -16,20 +13,18 @@
 }
 
 *::-webkit-scrollbar {
-  width: 6px; /* Make the vertical scrollbar thinner */
-  background: transparent;
   width: 6px;
   height: 6px;
+  background: transparent;
 }
 
 *::-webkit-scrollbar-thumb {
-  background: #bdbdbd; /* Scrollbar color */
+  background: var(--iconMuted);
   border-radius: 4px;
 }
 
 *::-webkit-scrollbar-track {
   background: transparent;
-  width: 6px;
 }
 
 body {
@@ -38,56 +33,27 @@ body {
   box-sizing: border-box;
   min-width: 320px;
   min-height: 100vh;
+  background: var(--colorBgLayout);
 }
+
+/* Keyboard focus is always visible on our own buttons. */
+button:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+/* Solid surfaces, matching the Keevo website: paper in light mode, indigo in dark. */
 .site-layout {
-  background:
-    radial-gradient(
-      90% 60% at 0% 0%,
-      rgba(124, 58, 237, 0.18),
-      transparent 55%
-    ),
-    radial-gradient(
-      80% 50% at 100% 100%,
-      rgba(37, 99, 235, 0.16),
-      transparent 50%
-    ),
-    #e7eef6 !important;
+  background: var(--colorBgLayout) !important;
 }
 
-.app-header-bar,
-.site-layout > .ant-layout-content {
-  background: rgba(255, 255, 255, 0.55) !important;
-  backdrop-filter: blur(18px) saturate(160%);
-  -webkit-backdrop-filter: blur(18px) saturate(160%);
-  border: 1px solid rgba(255, 255, 255, 0.55);
-  box-shadow:
-    0 10px 30px rgba(15, 23, 42, 0.08),
-    inset 0 1px 0 rgba(255, 255, 255, 0.65);
+.app-header-bar {
+  background: var(--surfaceCard) !important;
+  border: 1px solid var(--borderSubtle);
+  box-shadow: 0 1px 2px rgba(24, 25, 47, 0.04);
 }
 
-[data-theme="dark"] .site-layout {
-  background:
-    radial-gradient(
-      90% 60% at 0% 0%,
-      rgba(99, 102, 241, 0.28),
-      transparent 55%
-    ),
-    radial-gradient(
-      80% 50% at 100% 100%,
-      rgba(14, 165, 233, 0.16),
-      transparent 50%
-    ),
-    #0c1220 !important;
-}
-
-[data-theme="dark"] .app-header-bar,
-[data-theme="dark"] .site-layout > .ant-layout-content {
-  background: rgba(17, 24, 39, 0.55) !important;
-  border-color: rgba(255, 255, 255, 0.08);
-  box-shadow:
-    0 10px 30px rgba(0, 0, 0, 0.28),
-    inset 0 1px 0 rgba(255, 255, 255, 0.06);
-}
 .clickable {
   cursor: pointer;
 }
@@ -109,7 +75,7 @@ body {
   }
 }
 .ant-form-item-explain-error {
-  color: #ff4d4f;
+  color: var(--colorError);
 }
 
 .icon_custom {
@@ -148,7 +114,7 @@ button {
 .highlight-row {
   transition: background-color 0.3s ease;
   td {
-    background-color: #efefef !important;
+    background-color: var(--surfaceHover) !important;
   }
 }
 
@@ -174,18 +140,10 @@ button {
 [data-theme="dark"] {
   input::placeholder,
   textarea::placeholder,
-  .ant-input::placeholder,
-  .ant-input-affix-wrapper input::placeholder,
-  .ant-input-textarea textarea::placeholder {
-    color: #9ca3af !important;
-    opacity: 1;
-  }
-
   .ant-select-selection-placeholder,
-  .ant-select-selection-search-input::placeholder,
   .ant-picker-input input::placeholder,
   .ant-mentions textarea::placeholder {
-    color: #9ca3af !important;
+    color: var(--colorTextPlaceholder) !important;
     opacity: 1;
   }
 

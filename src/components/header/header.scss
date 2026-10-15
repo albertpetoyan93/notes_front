@@ -47,12 +47,12 @@
 
     &:hover {
       color: var(--colorText);
-      background: rgba(124, 58, 237, 0.12);
+      background: var(--surfaceHover);
     }
 
     &.active {
       color: #fff;
-      background: #7c3aed;
+      background: var(--primary);
     }
   }
 }
@@ -115,7 +115,7 @@
   max-width: 100%;
 
   .ant-input-affix-wrapper {
-    height: 36px;
+    height: 32px;
     border-radius: 10px;
     background: var(--surfaceMuted);
     border-color: var(--borderSubtle);
@@ -238,11 +238,6 @@
   }
 }
 
-[data-theme="dark"] .notes-search .ant-input-affix-wrapper,
-[data-theme="dark"] .company-switch {
-  background: rgba(15, 23, 42, 0.35);
-}
-
 [data-theme="dark"] .company-role {
   &.owner,
   &.invite,
@@ -338,7 +333,7 @@
 
     &:hover,
     &.active {
-      background: rgba(22, 119, 255, 0.12);
+      background: var(--surfaceHover);
     }
 
     span:nth-child(2) {
@@ -401,4 +396,55 @@
   align-items: center;
   justify-content: center;
   border-radius: 10px;
+}
+
+/* Header at medium and small widths ---------------------------------------- */
+
+// Tabs drop their labels before the header runs out of room (the title attribute still names them).
+@media (max-width: 1279px) {
+  .company-tabs .company-tab {
+    padding: 0 10px;
+
+    .tab-label {
+      display: none;
+    }
+  }
+
+  .company-switch {
+    max-width: 180px;
+  }
+}
+
+// On phones the tabs move to their own row under the logo and account controls.
+@media (max-width: 767px) {
+  .app-header {
+    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-areas:
+      "brand account"
+      "nav nav";
+    row-gap: 4px;
+    padding: 8px 0;
+
+    > :first-child {
+      grid-area: brand;
+    }
+
+    > .header-nav {
+      grid-area: nav;
+      justify-content: flex-start;
+      overflow-x: auto;
+    }
+
+    > :last-child {
+      grid-area: account;
+    }
+  }
+
+  .company-tabs .company-tab .tab-label {
+    display: inline;
+  }
+
+  .header-word {
+    display: none;
+  }
 }
