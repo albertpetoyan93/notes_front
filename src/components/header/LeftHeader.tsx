@@ -3,7 +3,7 @@ export const BrandLockup = ({ large = false }: { large?: boolean }) => (
     <span className="header-logo-plate">
       <img src="/logo.png" alt="" />
     </span>
-    <img src="/keevo-word.png" alt="keevo" className="header-word" />
+    <img src="/keevo-word.png" alt="2keevo" className="header-word" />
   </span>
 );
 

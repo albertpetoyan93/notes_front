@@ -1030,7 +1030,7 @@ const NotesPage = ({
                         </span>
                         <span className="backup-copy">
                           <strong>Import notes</strong>
-                          <small>Add notes from a Keevo .json file</small>
+                          <small>Add notes from a 2keevo .json file</small>
                         </span>
                       </span>
                     ),

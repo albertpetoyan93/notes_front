@@ -7,7 +7,7 @@
  * Available Variants:
  * - Ocean Blue: Professional & Trustworthy (blue/cyan tones)
  * - Forest Green: Natural & Calm (green/teal tones)
- * - Keevo Indigo: matches the Keevo website - DEFAULT
+ * - 2keevo Indigo: matches the 2keevo website - DEFAULT
  *
  * Each variant includes:
  * - Light and dark mode colors
@@ -51,10 +51,10 @@ export const colorVariants = {
     },
     gradient: "linear-gradient(135deg, #10B981 0%, #14B8A6 100%)",
   },
-  // Matches the Keevo website (notes_web): indigo and lilac.
+  // Matches the 2keevo website (notes_web): indigo and lilac.
   purple: {
-    name: "Keevo Indigo",
-    description: "Matches the Keevo website",
+    name: "2keevo Indigo",
+    description: "Matches the 2keevo website",
     light: {
       primary: "#5b4fc4",
       secondary_1: "#7d6fe0",

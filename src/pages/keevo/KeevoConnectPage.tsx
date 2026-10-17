@@ -45,7 +45,7 @@ const KeevoConnectPage = () => {
   useEffect(() => {
     if (!nonce) {
       setPhase("error");
-      setError("Open this page from the Keevo extension.");
+      setError("Open this page from the 2keevo extension.");
       return;
     }
 
@@ -90,14 +90,14 @@ const KeevoConnectPage = () => {
       const accepted = await waitForExtension();
       if (!accepted) {
         setPhase("error");
-        setError("Keevo did not accept the sign-in. Reload the extension and try again.");
+        setError("2keevo did not accept the sign-in. Reload the extension and try again.");
         return;
       }
       window.close();
       setPhase("done");
     } catch (err: any) {
       setPhase("error");
-      setError(err?.message || "Could not sign Keevo in.");
+      setError(err?.message || "Could not sign 2keevo in.");
     } finally {
       setBusy(false);
     }
@@ -127,10 +127,10 @@ const KeevoConnectPage = () => {
         {phase === "confirm" && (
           <>
             <h1 style={{ fontSize: 20, margin: "20px 0 8px" }}>
-              Sign in to Keevo?
+              Sign in to 2keevo?
             </h1>
             <p style={{ marginBottom: 20 }}>
-              Keevo will use {email || "your website account"} on this browser.
+              2keevo will use {email || "your website account"} on this browser.
             </p>
             <Button type="primary" loading={busy} onClick={allow} block>
               Continue
@@ -143,9 +143,9 @@ const KeevoConnectPage = () => {
         {phase === "done" && (
           <>
             <h1 style={{ fontSize: 20, margin: "20px 0 8px" }}>
-              Keevo is signed in
+              2keevo is signed in
             </h1>
-            <p>You can close this window and open Keevo.</p>
+            <p>You can close this window and open 2keevo.</p>
           </>
         )}
         {phase === "error" && (
