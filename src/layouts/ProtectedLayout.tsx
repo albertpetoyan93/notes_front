@@ -1,19 +1,28 @@
-import { Layout } from "antd";
-import React, { useEffect } from "react";
-import { Outlet, useNavigate } from "react-router-dom";
-import CompanyTabs from "../components/header/CompanyTabs";
-import PersonalTabs from "../components/header/PersonalTabs";
-import LeftHeader from "../components/header/LeftHeader";
-import RightHeader from "../components/header/RightHeader";
+import { Spin } from "antd";
+import React, { Suspense, useEffect, useState } from "react";
+import { Outlet, useLocation, useNavigate } from "react-router-dom";
+import CommandPalette from "../components/shell/CommandPalette";
+import TopBar from "../components/shell/TopBar";
+import VaultSidebar from "../components/shell/VaultSidebar";
 import useAuth from "../hooks/useAuth";
 import { useAuthStore } from "../store/authStore";
+import { useCompanyStore } from "../store/companyStore";
+import { useVaultStore } from "../store/vaultStore";
 
-const { Header, Content } = Layout;
-
+// The signed-in app: top bar, vault sidebar and the page. On phones the sidebar is a drawer.
 const ProtectedLayout: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { getMe } = useAuth();
   const { me } = useAuthStore();
+  const loadCompanies = useCompanyStore((state) => state.load);
+  const setScope = useVaultStore((state) => state.setScope);
+  const [navOpen, setNavOpen] = useState(false);
+  const [paletteOpen, setPaletteOpen] = useState(false);
+
+  const companyId = location.pathname.startsWith("/company/")
+    ? Number(location.pathname.split("/")[2]) || null
+    : null;
 
   useEffect(() => {
     if (me) return;
@@ -38,38 +47,67 @@ const ProtectedLayout: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  useEffect(() => {
+    loadCompanies();
+  }, [loadCompanies]);
+
+  useEffect(() => {
+    setScope(companyId);
+  }, [companyId, setScope]);
+
+  // Picking anything in the drawer closes it.
+  useEffect(() => {
+    setNavOpen(false);
+  }, [location.pathname, location.search]);
+
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        setPaletteOpen((open) => !open);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
   return (
-    <Layout className="site-layout" style={{ minHeight: "100vh" }}>
-      <Header
-        className="app-header-bar"
-        style={{
-          margin: "16px 16px 0 16px",
-          padding: "0 12px 0 16px",
-          borderRadius: 14,
-          height: "auto",
-          minHeight: 64,
-          lineHeight: "normal",
-        }}
-      >
-        <div className="app-header">
-          <LeftHeader />
-          <div className="header-nav">
-            <CompanyTabs />
-            <PersonalTabs />
-          </div>
-          <RightHeader />
-        </div>
-      </Header>
-      <Content
-        style={{
-          margin: "24px 16px 16px",
-          minHeight: 280,
-          position: "relative",
-        }}
-      >
-        <Outlet />
-      </Content>
-    </Layout>
+    <div className="app-shell">
+      <TopBar
+        companyId={companyId}
+        onMenu={() => setNavOpen(true)}
+        onSearch={() => setPaletteOpen(true)}
+      />
+      <div className="app-body">
+        <aside className={navOpen ? "sidebar is-open" : "sidebar"} aria-label="Vault navigation">
+          <VaultSidebar companyId={companyId} />
+        </aside>
+        {navOpen && (
+          <button
+            type="button"
+            className="sidebar-scrim"
+            aria-label="Close navigation"
+            onClick={() => setNavOpen(false)}
+          />
+        )}
+        <main className="app-main">
+          <Suspense
+            fallback={
+              <div className="page-loading">
+                <Spin />
+              </div>
+            }
+          >
+            <Outlet />
+          </Suspense>
+        </main>
+      </div>
+      <CommandPalette
+        open={paletteOpen}
+        onClose={() => setPaletteOpen(false)}
+        companyId={companyId}
+      />
+    </div>
   );
 };
 

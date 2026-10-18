@@ -1,57 +1,15 @@
 /**
- * Theme Configuration System
+ * Theme configuration.
  *
- * This file provides dynamic color theme variants for the application.
- * Users can switch between different color schemes using the ThemeSelector component.
+ * One brand (2keevo indigo) with a light and a dark mode. Every token below is also
+ * written to :root as a CSS variable (`--<name>`) by App.tsx, so SCSS reads the same
+ * values antd does.
  *
- * Available Variants:
- * - Ocean Blue: Professional & Trustworthy (blue/cyan tones)
- * - Forest Green: Natural & Calm (green/teal tones)
- * - 2keevo Indigo: matches the 2keevo website - DEFAULT
- *
- * Each variant includes:
- * - Light and dark mode colors
- * - Primary, secondary colors
- * - Gradient for UI elements
- *
- * The theme can be changed dynamically via:
- * 1. ThemeSelector component in the header
- * 2. Or programmatically using the useThemeVariant hook
+ * Surfaces: `colorBgLayout` is the page, `surfaceSide` the sidebar and top bar,
+ * `surfaceCard` panels and cards. Indigo is used only as the accent.
  */
 
-// Color variants configuration
 export const colorVariants = {
-  ocean: {
-    name: "Ocean Blue",
-    description: "Professional & Trustworthy",
-    light: {
-      primary: "#0EA5E9",
-      secondary_1: "#06B6D4",
-      secondary_2: "#14B8A6",
-    },
-    dark: {
-      primary: "#38BDF8",
-      secondary_1: "#22D3EE",
-      secondary_2: "#2DD4BF",
-    },
-    gradient: "linear-gradient(135deg, #0EA5E9 0%, #06B6D4 100%)",
-  },
-  forest: {
-    name: "Forest Green",
-    description: "Natural & Calm",
-    light: {
-      primary: "#10B981",
-      secondary_1: "#059669",
-      secondary_2: "#14B8A6",
-    },
-    dark: {
-      primary: "#34D399",
-      secondary_1: "#10B981",
-      secondary_2: "#2DD4BF",
-    },
-    gradient: "linear-gradient(135deg, #10B981 0%, #14B8A6 100%)",
-  },
-  // Matches the 2keevo website (notes_web): indigo and lilac.
   purple: {
     name: "2keevo Indigo",
     description: "Matches the 2keevo website",
@@ -61,7 +19,7 @@ export const colorVariants = {
       secondary_2: "#b9a8ff",
     },
     dark: {
-      primary: "#7d6ce6",
+      primary: "#6a5dd8",
       secondary_1: "#b9a8ff",
       secondary_2: "#d9cfff",
     },
@@ -69,26 +27,40 @@ export const colorVariants = {
   },
 };
 
-// Get theme config based on variant
-export const getThemeConfig = (
-  variant: keyof typeof colorVariants = "purple"
-) => {
-  const colors = colorVariants[variant];
+export type ThemeVariant = keyof typeof colorVariants;
+
+const fontFamily = "'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif";
+
+export const getThemeConfig = (variant: ThemeVariant = "purple") => {
+  const colors = colorVariants[variant] || colorVariants.purple;
 
   const components = {
     Button: {
       borderRadius: 10,
-      borderRadiusLG: 10,
-      borderRadiusSM: 10,
+      borderRadiusLG: 12,
+      borderRadiusSM: 8,
+      controlHeight: 36,
+      fontWeight: 500,
+      primaryShadow: "none",
+      defaultShadow: "none",
+      dangerShadow: "none",
     },
+    Input: { borderRadius: 10, controlHeight: 36 },
+    InputNumber: { borderRadius: 10, controlHeight: 36 },
+    Select: { borderRadius: 10, controlHeight: 36 },
+    Modal: { borderRadiusLG: 16 },
+    Dropdown: { borderRadiusLG: 12 },
+    Tooltip: { borderRadius: 8 },
   };
 
   // Shared by light and dark. Same key-tag colours as the website.
   const shared = {
-    fontFamily: "'Bricolage Grotesque', system-ui, -apple-system, 'Segoe UI', sans-serif",
+    fontFamily,
+    fontFamilyDisplay: "'Bricolage Grotesque', 'Geist', system-ui, sans-serif",
     fontFamilyCode: "'JetBrains Mono', ui-monospace, monospace",
-    borderRadius: 12,
+    borderRadius: 10,
     fontSize: 14,
+    controlHeight: 36,
     catLogin: "#b9a8ff",
     catNote: "#f3d36b",
     catCommand: "#72d6e0",
@@ -111,32 +83,46 @@ export const getThemeConfig = (
         secondary_1: colors.light.secondary_1,
         secondary_2: colors.light.secondary_2,
         colorPrimary: colors.light.primary,
+        colorLink: colors.light.primary,
         colorSuccess: "#2f9e6e",
         colorWarning: "#e8a33c",
-        colorError: "#d64562",
+        colorError: "#c23a55",
         colorInfo: "#3d6fd6",
-        colorBgLayout: "#eeecf6",
-        colorBgContainer: "#fbfaff",
+        colorBgLayout: "#f7f6f3",
+        colorBgContainer: "#ffffff",
         colorBgElevated: "#ffffff",
         colorText: "#18192f",
-        colorTextSecondary: "#565876",
+        colorTextSecondary: "#55577a",
         colorTextPlaceholder: "#8a8ca8",
-        colorBorder: "#d9d7e8",
-        colorBorderSecondary: "#e6e4f0",
-        boxShadow: "0 1px 3px rgba(24, 25, 47, 0.08), 0 1px 2px -1px rgba(24, 25, 47, 0.08)",
-        colorBgMenu: "#fbfaff",
+        colorBorder: "#dcdae3",
+        colorBorderSecondary: "#ebe9ef",
+        boxShadow: "0 1px 2px rgba(24, 25, 47, 0.06), 0 12px 32px -14px rgba(24, 25, 47, 0.25)",
+        colorBgMenu: "#ffffff",
         colorTextMenu: "#18192f",
-        colorBgMenuItem: "#f4f2fb",
-        colorPrimaryBg: "#ece9f9",
+        colorBgMenuItem: "#f4f3ef",
+        colorPrimaryBg: "#eceaf9",
         colorPrimaryBgHover: "#e0dcf6",
-        surfaceCard: "#fbfaff",
-        surfaceMuted: "#f4f2fb",
-        surfaceHover: "#ece9f9",
-        textMuted: "#5f6182",
+        surfaceCard: "#ffffff",
+        surfaceSide: "#f1efea",
+        surfaceMuted: "#f4f3ef",
+        surfaceHover: "rgba(24, 25, 47, 0.05)",
+        primarySoft: "rgba(91, 79, 196, 0.11)",
+        primaryText: "#4a3fb0",
+        textMuted: "#55577a",
+        textFaint: "#6e7092",
         iconMuted: "#8a8ca8",
-        borderSubtle: "rgba(24, 25, 47, 0.1)",
-        customFieldBg: "#f4f2fb",
-        customFieldRowBg: "#f4f2fb",
+        borderSubtle: "rgba(24, 25, 47, 0.09)",
+        borderStrong: "rgba(24, 25, 47, 0.15)",
+        warnText: "#9a5a0c",
+        warnSoft: "#fbf0dd",
+        dangerText: "#b93450",
+        dangerSoft: "#fbe8ec",
+        staleText: "#4f5590",
+        staleSoft: "#eceef8",
+        toastBg: "#18192f",
+        toastText: "#f4f2ea",
+        customFieldBg: "#f4f3ef",
+        customFieldRowBg: "#f4f3ef",
       },
     },
     dark: {
@@ -147,39 +133,52 @@ export const getThemeConfig = (
         secondary_1: colors.dark.secondary_1,
         secondary_2: colors.dark.secondary_2,
         colorPrimary: colors.dark.primary,
+        colorLink: "#b3a9ff",
         colorSuccess: "#5fc99a",
         colorWarning: "#f0b65c",
         colorError: "#f07a92",
         colorInfo: "#8cb4ff",
-        colorBgLayout: "#161834",
-        colorBgContainer: "#1e2147",
-        colorBgElevated: "#292d5c",
-        colorText: "#f4f2ea",
-        colorTextSecondary: "#b3b4d4",
+        colorBgLayout: "#0e0f1d",
+        colorBgContainer: "#16182c",
+        colorBgElevated: "#1d2036",
+        colorText: "#f2f1ec",
+        colorTextSecondary: "#a9abc8",
         colorTextTertiary: "#c9c9e2",
         colorTextQuaternary: "#9a9cc4",
-        colorTextPlaceholder: "#9a9cc4",
+        colorTextPlaceholder: "#8e90b2",
         colorIcon: "#d6d5ea",
-        colorBorder: "#3a3e72",
-        colorBorderSecondary: "#2f3364",
-        boxShadow: "0 4px 12px rgba(6, 7, 26, 0.45)",
-        colorBgMenu: "#1e2147",
-        colorTextMenu: "#f4f2ea",
-        colorBgMenuItem: "#161834",
-        colorPrimaryBg: "#2f2a6b",
-        colorPrimaryBgHover: "#3a3482",
-        surfaceCard: "#1e2147",
-        surfaceMuted: "rgba(232, 229, 255, 0.06)",
-        surfaceHover: "rgba(232, 229, 255, 0.1)",
-        textMuted: "#b3b4d4",
-        iconMuted: "#9a9cc4",
-        borderSubtle: "rgba(232, 229, 255, 0.12)",
-        customFieldBg: "rgba(232, 229, 255, 0.06)",
-        customFieldRowBg: "#1e2147",
+        colorBorder: "#2e3150",
+        colorBorderSecondary: "#24273f",
+        boxShadow: "0 16px 40px -14px rgba(0, 0, 0, 0.65)",
+        colorBgMenu: "#16182c",
+        colorTextMenu: "#f2f1ec",
+        colorBgMenuItem: "#111226",
+        colorPrimaryBg: "#29265a",
+        colorPrimaryBgHover: "#332f6e",
+        surfaceCard: "#16182c",
+        surfaceSide: "#111226",
+        surfaceMuted: "rgba(232, 229, 255, 0.05)",
+        surfaceHover: "rgba(232, 229, 255, 0.06)",
+        primarySoft: "rgba(106, 93, 216, 0.22)",
+        primaryText: "#c3bbff",
+        textMuted: "#a9abc8",
+        textFaint: "#8e90b2",
+        iconMuted: "#8e90b2",
+        borderSubtle: "rgba(232, 229, 255, 0.08)",
+        borderStrong: "rgba(232, 229, 255, 0.15)",
+        warnText: "#f0b65c",
+        warnSoft: "rgba(240, 182, 92, 0.12)",
+        dangerText: "#f28aa0",
+        dangerSoft: "rgba(242, 138, 160, 0.12)",
+        staleText: "#b3b9ee",
+        staleSoft: "rgba(179, 185, 238, 0.12)",
+        toastBg: "#f2f1ec",
+        toastText: "#18192f",
+        customFieldBg: "rgba(232, 229, 255, 0.05)",
+        customFieldRowBg: "#16182c",
       },
     },
   };
 };
 
-// Default theme configs (purple variant)
 export const themesConfigs = getThemeConfig("purple");

@@ -1,18 +1,12 @@
-import {
-  BellOutlined,
-  MoonOutlined,
-  SunOutlined,
-} from "@ant-design/icons";
-import { Avatar, Badge, Button, Dropdown, Empty, theme } from "antd";
+import { BellOutlined, LogoutOutlined, MoonOutlined, SunOutlined } from "@ant-design/icons";
+import { Badge, Button, Dropdown, Empty, Tooltip } from "antd";
 import { useCallback, useEffect, useState } from "react";
-import { FaPowerOff } from "react-icons/fa6";
 import CompanyRequests from "../company/CompanyRequests";
 import axios from "../../configs/axios";
 import { useTheme } from "../../contexts/ThemeContext";
 import useAuth from "../../hooks/useAuth";
 import { useAuthStore } from "../../store/authStore";
 import { useCompanyStore } from "../../store/companyStore";
-import CompanyMenu from "./CompanyMenu";
 
 interface AppNotification {
   id: number;
@@ -22,15 +16,16 @@ interface AppNotification {
   createdAt: string;
 }
 
+// Theme switch, notifications and the account menu, at the end of the top bar.
 const RightHeader = () => {
   const { mode, handleThemeChange } = useTheme();
   const { logOut } = useAuth();
   const { me } = useAuthStore();
-  const { token } = theme.useToken();
   const [items, setItems] = useState<AppNotification[]>([]);
   const [unread, setUnread] = useState(0);
   const companies = useCompanyStore((state) => state.companies);
   const inviteCount = companies.filter((company) => company.memberStatus === "invited").length;
+  const nextTheme = mode === "light" ? "dark" : "light";
 
   const loadNotifications = useCallback(async () => {
     try {
@@ -59,45 +54,29 @@ const RightHeader = () => {
     await loadNotifications();
   };
 
+  const name = me?.fullName || me?.username || "";
+
   return (
-    <div
-      className="header_child"
-      style={{
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "flex-end",
-        gap: "8px",
-        marginLeft: "auto",
-      }}
-    >
-      <CompanyMenu />
-      <div className="header-account">
+    <div className="header-account">
+      <Tooltip title={`Switch to ${nextTheme} mode`}>
+        <Button
+          type="text"
+          className="icon-btn"
+          aria-label={`Switch to ${nextTheme} mode`}
+          icon={mode === "light" ? <MoonOutlined /> : <SunOutlined />}
+          onClick={() => handleThemeChange(nextTheme)}
+        />
+      </Tooltip>
       <Dropdown
         trigger={["click"]}
+        placement="bottomRight"
         onOpenChange={(open) => {
           if (open) loadNotifications();
         }}
         dropdownRender={() => (
-          <div
-            style={{
-              width: 340,
-              maxHeight: 420,
-              overflow: "auto",
-              background: token.colorBgElevated,
-              borderRadius: token.borderRadiusLG,
-              boxShadow: token.boxShadowSecondary,
-              padding: 12,
-            }}
-          >
+          <div className="notifications-panel">
             <CompanyRequests compact />
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                marginBottom: 8,
-              }}
-            >
+            <div className="notifications-head">
               <strong>Notifications</strong>
               {unread > 0 && (
                 <Button type="link" size="small" onClick={markAllRead}>
@@ -106,58 +85,34 @@ const RightHeader = () => {
               )}
             </div>
             {items.length === 0 ? (
-              <Empty
-                image={Empty.PRESENTED_IMAGE_SIMPLE}
-                description="No notifications"
-              />
+              <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="No notifications" />
             ) : (
               items.map((item) => (
                 <button
                   key={item.id}
                   type="button"
+                  className={item.readAt ? "notification" : "notification is-unread"}
                   onClick={() => markRead(item.id)}
-                  style={{
-                    display: "block",
-                    width: "100%",
-                    textAlign: "left",
-                    border: "none",
-                    background: item.readAt
-                      ? "transparent"
-                      : token.colorFillAlter,
-                    borderRadius: token.borderRadius,
-                    padding: "8px 10px",
-                    marginBottom: 6,
-                    cursor: "pointer",
-                    color: token.colorText,
-                  }}
                 >
-                  <div>{item.message}</div>
-                  <div style={{ fontSize: 12, opacity: 0.65, marginTop: 4 }}>
-                    {new Date(item.createdAt).toLocaleString()}
-                  </div>
+                  <span>{item.message}</span>
+                  <time>{new Date(item.createdAt).toLocaleString()}</time>
                 </button>
               ))
             )}
           </div>
         )}
       >
-        <Badge count={unread + inviteCount} size="small" offset={[-2, 2]}>
-          <Button
-            type="text"
-            aria-label="Notifications"
-            icon={<BellOutlined style={{ fontSize: 18 }} />}
-            className="header-icon-button"
-          />
+        <Badge count={unread + inviteCount} size="small" offset={[-4, 4]}>
+          <Button type="text" className="icon-btn" aria-label="Notifications" icon={<BellOutlined />} />
         </Badge>
       </Dropdown>
       <Dropdown
         trigger={["click"]}
+        placement="bottomRight"
         dropdownRender={(menu) => (
           <div className="avatar-menu">
             <div className="avatar-menu-id">
-              <div className="avatar-menu-name">
-                {me?.fullName || me?.username}
-              </div>
+              <div className="avatar-menu-name">{name}</div>
               {me?.email && <div className="avatar-menu-meta">{me.email}</div>}
             </div>
             {menu}
@@ -166,43 +121,19 @@ const RightHeader = () => {
         menu={{
           items: [
             {
-              label: `Switch to ${mode === "light" ? "Dark" : "Light"} `,
-              key: "1",
-              icon:
-                mode === "light" ? (
-                  <MoonOutlined size={16} />
-                ) : (
-                  <SunOutlined size={16} />
-                ),
-              onClick: () => {
-                handleThemeChange(mode === "light" ? "dark" : "light");
-              },
-            },
-            {
-              label: "Log Out",
-              key: "2",
+              label: "Log out",
+              key: "logout",
               danger: true,
-              icon: <FaPowerOff />,
-              onClick: () => {
-                logOut();
-              },
+              icon: <LogoutOutlined />,
+              onClick: () => logOut(),
             },
           ],
         }}
       >
-        <Avatar
-          className="header-avatar"
-          size={36}
-          style={{
-            background: token.colorPrimary,
-            cursor: "pointer",
-            flexShrink: 0,
-          }}
-        >
-          {(me?.fullName || me?.username || "U").trim().charAt(0).toUpperCase()}
-        </Avatar>
+        <button type="button" className="avatar-btn" aria-label={`Account: ${name || "you"}`}>
+          {(name || "U").trim().charAt(0).toUpperCase()}
+        </button>
       </Dropdown>
-      </div>
     </div>
   );
 };

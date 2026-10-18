@@ -1,4 +1,4 @@
-import { ConfigProvider } from "antd";
+import { ConfigProvider, theme as antdTheme } from "antd";
 import { useEffect } from "react";
 import { BrowserRouter } from "react-router-dom";
 import { ThemeProvider, useTheme } from "./contexts/ThemeContext";
@@ -25,7 +25,13 @@ function AppContent() {
   }, [theme, mode]);
 
   return (
-    <ConfigProvider theme={theme}>
+    <ConfigProvider
+      theme={{
+        ...theme,
+        algorithm:
+          mode === "dark" ? antdTheme.darkAlgorithm : antdTheme.defaultAlgorithm,
+      }}
+    >
       <BrowserRouter basename={import.meta.env.VITE_APP_BASE_NAME}>
         <AppRoutes />
       </BrowserRouter>

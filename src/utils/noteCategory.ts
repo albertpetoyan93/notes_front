@@ -15,9 +15,37 @@ const labels: Record<string, string> = {
   other: "Other",
 };
 
+const plurals: Record<string, string> = {
+  note: "Notes",
+  password: "Logins",
+  command: "Commands",
+  ssh: "SSH",
+  db: "Databases",
+  address: "Addresses",
+  card: "Cards",
+  other: "Other",
+};
+
+// Sidebar and "New item" order: the most used kinds first.
+export const CATEGORY_ORDER = [
+  "password",
+  "card",
+  "address",
+  "note",
+  "ssh",
+  "db",
+  "command",
+  "other",
+] as const;
+
 export const categoryLabel = (category: string) => {
   const key = categoryKey(category);
   return labels[key] || key.charAt(0).toUpperCase() + key.slice(1);
+};
+
+export const categoryPlural = (category: string) => {
+  const key = categoryKey(category);
+  return plurals[key] || categoryLabel(key);
 };
 
 export const categoryClass = (category: string) => `cat-${categoryKey(category)}`;

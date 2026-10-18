@@ -49,10 +49,6 @@
   .brand-lockup {
     margin-bottom: 28px;
   }
-
-  .header-word {
-    filter: none;
-  }
 }
 
 .auth-card {
@@ -201,10 +197,6 @@
       transparent 60%
     ),
     #0b1020;
-}
-
-[data-theme="dark"] .auth-panel .header-word {
-  filter: brightness(0) invert(1);
 }
 
 [data-theme="dark"] .auth-card {

@@ -1,7 +1,5 @@
 import React, { createContext, useContext, useState, ReactNode } from "react";
-import { colorVariants } from "../configs/theme";
-
-type ThemeVariant = keyof typeof colorVariants;
+import { colorVariants, type ThemeVariant } from "../configs/theme";
 
 interface ThemeVariantContextType {
   variant: ThemeVariant;
@@ -13,13 +11,16 @@ const ThemeVariantContext = createContext<ThemeVariantContextType | undefined>(
   undefined
 );
 
+// Older builds offered other colour variants; anything no longer listed falls back to the brand one.
+const savedVariant = (): ThemeVariant => {
+  const saved = localStorage.getItem("themeVariant");
+  return saved && saved in colorVariants ? (saved as ThemeVariant) : "purple";
+};
+
 export const ThemeVariantProvider: React.FC<{ children: ReactNode }> = ({
   children,
 }) => {
-  const [variant, setVariantState] = useState<ThemeVariant>(() => {
-    const saved = localStorage.getItem("themeVariant");
-    return (saved as ThemeVariant) || "purple";
-  });
+  const [variant, setVariantState] = useState<ThemeVariant>(savedVariant);
 
   const setVariant = (newVariant: ThemeVariant) => {
     setVariantState(newVariant);

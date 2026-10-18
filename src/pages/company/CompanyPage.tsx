@@ -1,11 +1,21 @@
-import { DeleteOutlined, DownOutlined, FileTextOutlined, ShareAltOutlined, TeamOutlined } from "@ant-design/icons";
-import { Button, Card, Col, Drawer, Dropdown, Empty, Input, Modal, Row, Select, Space, Spin, Tabs, Tooltip, Typography, message } from "antd";
+import {
+  DeleteOutlined,
+  DownOutlined,
+  FolderOutlined,
+  PlusOutlined,
+  ShareAltOutlined,
+  TeamOutlined,
+  UserAddOutlined,
+} from "@ant-design/icons";
+import { Button, Drawer, Dropdown, Empty, Input, Modal, Select, Space, Spin, Tooltip, Typography, message } from "antd";
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import axios from "../../configs/axios";
 import NotesPage from "../notes/NotesPage";
 import { useNoteStore } from "../../store/noteStore";
 import { useCompanyStore } from "../../store/companyStore";
+import { useVaultStore } from "../../store/vaultStore";
+import "./CompanyPage.scss";
 
 interface MemberRow {
   id: number;
@@ -74,6 +84,7 @@ const CompanyPage = () => {
     { value: string; label: string; name: string; email: string }[]
   >([]);
   const searchUsers = useNoteStore((state) => state.searchUsers);
+  const refreshVault = useVaultStore((state) => state.refresh);
   const searchTimer = useRef<number>();
   const requestedTab = searchParams.get("tab") || "notes";
   const companyTab =
@@ -145,6 +156,7 @@ const CompanyPage = () => {
       setCollectionOpen(false);
       message.success("Collection created");
       await loadWorkspace();
+      refreshVault();
     } catch (error: any) {
       message.error(error?.message || "Could not create the collection");
     } finally {
@@ -207,6 +219,7 @@ const CompanyPage = () => {
         message.warning(failed.map((item: { message: string }) => item.message).join("\n"));
       }
       await loadWorkspace();
+      refreshVault();
       if (shareAudience === "all" || shared.length) setSharingCollection(null);
       setShareEmails([]);
       setUserOptions([]);
@@ -225,6 +238,7 @@ const CompanyPage = () => {
     );
     message.success(target.all ? "Stopped sharing with everyone" : "Access removed");
     const rows = await loadWorkspace();
+    refreshVault();
     setSharingCollection((current) => rows.find((item) => item.id === current?.id) || null);
   };
 
@@ -324,258 +338,221 @@ const CompanyPage = () => {
 
   if (!company) {
     return (
-      <Empty description="You do not have access to this company">
-        <Button onClick={() => navigate("/notes")}>Back to notes</Button>
-      </Empty>
+      <div className="manage-page">
+        <Empty description="You do not have access to this company">
+          <Button onClick={() => navigate("/notes")}>Back to your vault</Button>
+        </Empty>
+      </div>
     );
   }
 
   if (company.memberStatus === "invited") return null;
 
-  return (
-    <Space direction="vertical" size={16} style={{ width: "100%" }}>
-      <Tabs
-        activeKey={companyTab}
-        tabBarStyle={{ display: "none" }}
-        items={[
-          {
-            key: "notes",
-            label: "Notes",
-            children: (
-              <NotesPage
-                companyId={companyId}
-                collectionKey={companyCollections
-                  .map((collection) => `${collection.id}:${collection.permission}:${collection.name}`)
-                  .join("|")}
-              />
-            ),
-          },
-          ...(canManage
-            ? [
-                {
-                  key: "collections",
-                  label: "Collections",
-                  children: (
-                    <Space direction="vertical" size={12} style={{ width: "100%" }}>
-                      <div style={{ display: "flex", justifyContent: "flex-end" }}>
-                        <Button onClick={() => setCollectionOpen(true)}>New collection</Button>
-                      </div>
-                      {companyCollections.length === 0 ? (
-                        <Empty description="No collections yet." />
-                      ) : (
-                        <div className="notes-page company-notes">
-                          <Row gutter={[16, 16]}>
-                            {companyCollections.map((collection) => (
-                                <Col xs={24} sm={12} lg={8} xl={6} xxl={4} key={collection.id}>
-                                  <Card
-                                    className="note-card"
-                                    actions={[
-                                      <Tooltip key="notes" title="Notes">
-                                        <Button
-                                          type="text"
-                                          icon={<FileTextOutlined />}
-                                          aria-label="Notes"
-                                          onClick={() => {
-                                            setSearchParams(
-                                              (prev) => {
-                                                const next = new URLSearchParams(prev);
-                                                next.set("collection", String(collection.id));
-                                                next.delete("tab");
-                                                return next;
-                                              },
-                                              { replace: true }
-                                            );
-                                          }}
-                                        />
-                                      </Tooltip>,
-                                      <Tooltip key="viewers" title="Viewers">
-                                        <Button
-                                          type="text"
-                                          icon={<TeamOutlined />}
-                                          aria-label="Viewers"
-                                          onClick={() => setAccessCollection(collection)}
-                                        />
-                                      </Tooltip>,
-                                      <Tooltip key="share" title="Share">
-                                        <Button
-                                          type="text"
-                                          icon={<ShareAltOutlined />}
-                                          aria-label="Share"
-                                          onClick={() => {
-                                            setSharingCollection(collection);
-                                            setShareAudience(collection.companyShare ? "all" : "members");
-                                            setSharePermission(collection.companyShare || "view");
-                                            setShareEmails([]);
-                                            setUserOptions([]);
-                                          }}
-                                        />
-                                      </Tooltip>,
-                                    ]}
-                                  >
-                                    <div className="note-title-row">
-                                      <Typography.Title level={5} ellipsis className="note-title">
-                                        {collection.name}
-                                      </Typography.Title>
-                                    </div>
-                                    <Typography.Paragraph className="note-content" style={{ marginBottom: 4 }}>
-                                      {collection.noteCount}{" "}
-                                      {collection.noteCount === 1 ? "note" : "notes"}
-                                    </Typography.Paragraph>
-                                    <Typography.Text type="secondary" className="note-date">
-                                      {viewerLabel(collection)}
-                                    </Typography.Text>
-                                  </Card>
-                                </Col>
-                            ))}
-                          </Row>
-                        </div>
-                      )}
-                    </Space>
-                  ),
-                },
-                {
-                  key: "members",
-                  label: "Members",
-                  children: (
-                    <Space direction="vertical" size={12} style={{ width: "100%" }}>
-                      <div style={{ display: "flex", justifyContent: "flex-end" }}>
-                        <Button type="primary" onClick={() => setInviteOpen(true)}>
-                          Invite
-                        </Button>
-                      </div>
-                      {membersLoading ? (
-                    <div className="notes-page company-notes">
-                      <div className="notes-loading">
-                        <Spin size="large" />
-                      </div>
-                    </div>
-                  ) : members.length === 0 ? (
-                    <Empty description="No members yet." />
+  const openCollectionNotes = (collection: CompanyCollection) =>
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.set("collection", String(collection.id));
+        next.delete("tab");
+        return next;
+      },
+      { replace: true }
+    );
+
+  const activeMembers = members.filter((member) => member.status === "active").length;
+  const invitedMembers = members.filter((member) => member.status === "invited").length;
+
+  const collectionsPanel = (
+    <>
+      <div className="manage-head">
+        <div>
+          <h1 className="display-font">Collections</h1>
+          <p>Every item in {company.name} lives in a collection. Share a collection to give people access to it.</p>
+        </div>
+        <Button type="primary" icon={<PlusOutlined />} onClick={() => setCollectionOpen(true)}>
+          New collection
+        </Button>
+      </div>
+      {companyCollections.length === 0 ? (
+        <div className="manage-empty">No collections yet.</div>
+      ) : (
+        <ul className="manage-list">
+          {companyCollections.map((collection) => (
+            <li key={collection.id} className="manage-row">
+              <span className="manage-icon">
+                <FolderOutlined />
+              </span>
+              <div className="manage-main">
+                <strong>{collection.name}</strong>
+                <span>
+                  {collection.noteCount} {collection.noteCount === 1 ? "item" : "items"} · {viewerLabel(collection)}
+                </span>
+              </div>
+              <div className="manage-actions">
+                <Tooltip title="Who has access">
+                  <Button
+                    type="text"
+                    className="icon-btn"
+                    icon={<TeamOutlined />}
+                    aria-label={`Who has access to ${collection.name}`}
+                    onClick={() => setAccessCollection(collection)}
+                  />
+                </Tooltip>
+                <Button
+                  size="small"
+                  icon={<ShareAltOutlined />}
+                  onClick={() => {
+                    setSharingCollection(collection);
+                    setShareAudience(collection.companyShare ? "all" : "members");
+                    setSharePermission(collection.companyShare || "view");
+                    setShareEmails([]);
+                    setUserOptions([]);
+                  }}
+                >
+                  Share
+                </Button>
+                <Button size="small" onClick={() => openCollectionNotes(collection)}>
+                  Open
+                </Button>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+    </>
+  );
+
+  const membersPanel = (
+    <>
+      <div className="manage-head">
+        <div>
+          <h1 className="display-font">Members</h1>
+          <p>
+            {activeMembers} active{invitedMembers ? ` · ${invitedMembers} invited` : ""}
+          </p>
+        </div>
+        <Button type="primary" icon={<UserAddOutlined />} onClick={() => setInviteOpen(true)}>
+          Invite
+        </Button>
+      </div>
+      {membersLoading ? (
+        <div className="manage-empty">
+          <Spin />
+        </div>
+      ) : members.length === 0 ? (
+        <div className="manage-empty">No members yet.</div>
+      ) : (
+        <ul className="manage-list">
+          {members.map((member) => {
+            const canChangeRole =
+              company.role === "owner" && member.role !== "owner" && member.status !== "removed";
+            const canManageMember =
+              member.role !== "owner" && (company.role === "owner" || member.role === "member");
+            const canRemove = canManageMember && member.status !== "removed";
+            const canDelete = canManageMember && member.status === "removed";
+            const removeLabel = canDelete
+              ? "Delete"
+              : member.status === "invited"
+                ? "Cancel invite"
+                : "Remove";
+            return (
+              <li key={member.id} className={`manage-row${member.status === "removed" ? " is-muted" : ""}`}>
+                <span className="manage-icon is-person">{member.email.charAt(0).toUpperCase()}</span>
+                <div className="manage-main">
+                  <strong>{member.email}</strong>
+                  <span>
+                    {member.status === "active"
+                      ? "Active"
+                      : member.status === "invited"
+                        ? "Invite sent"
+                        : "Removed"}
+                  </span>
+                </div>
+                <div className="manage-actions">
+                  {canChangeRole ? (
+                    <Dropdown
+                      trigger={["click"]}
+                      disabled={roleSavingId === member.id}
+                      menu={{
+                        selectedKeys: [member.role],
+                        onClick: ({ key }) => changeRole(member, key as "admin" | "member"),
+                        items: [
+                          { key: "member", label: "Member" },
+                          { key: "admin", label: "Admin" },
+                        ],
+                      }}
+                    >
+                      <button
+                        type="button"
+                        className={`company-role member-role-trigger ${member.role}`}
+                        disabled={roleSavingId === member.id}
+                        aria-label={`Role: ${roleLabel[member.role]}. Change role`}
+                      >
+                        {roleLabel[member.role]}
+                        <DownOutlined />
+                      </button>
+                    </Dropdown>
                   ) : (
-                    <div className="notes-page company-notes">
-                      <Row gutter={[16, 16]}>
-                        {members.map((member) => {
-                          const canChangeRole =
-                            company.role === "owner" &&
-                            member.role !== "owner" &&
-                            member.status !== "removed";
-                          const canManageMember =
-                            member.role !== "owner" &&
-                            (company.role === "owner" || member.role === "member");
-                          const canRemove = canManageMember && member.status !== "removed";
-                          const canDelete = canManageMember && member.status === "removed";
-                          const statusLabel =
-                            member.status === "active"
-                              ? "Active"
-                              : member.status === "invited"
-                                ? "Invited"
-                                : "Removed";
-                          return (
-                            <Col xs={24} sm={12} lg={8} xl={6} xxl={4} key={member.id}>
-                              <Card
-                                className="note-card"
-                                actions={
-                                  canRemove || canDelete
-                                    ? [
-                                        <Tooltip
-                                          key="remove"
-                                          title={
-                                            canDelete
-                                              ? "Delete"
-                                              : member.status === "invited"
-                                                ? "Cancel invite"
-                                                : "Remove"
-                                          }
-                                        >
-                                          <Button
-                                            type="text"
-                                            danger
-                                            icon={<DeleteOutlined />}
-                                            aria-label={
-                                              canDelete
-                                                ? "Delete"
-                                                : member.status === "invited"
-                                                  ? "Cancel invite"
-                                                  : "Remove"
-                                            }
-                                            onClick={() => removeMember(member)}
-                                          />
-                                        </Tooltip>,
-                                      ]
-                                    : undefined
-                                }
-                              >
-                                <div className="member-card-top">
-                                  <div className="note-title-row">
-                                    <Typography.Title level={5} ellipsis className="note-title">
-                                      {member.email}
-                                    </Typography.Title>
-                                  </div>
-                                  <span className={`company-role member-status ${member.status}`}>
-                                    {statusLabel}
-                                  </span>
-                                </div>
-                                <div className="member-meta">
-                                  {canChangeRole ? (
-                                    <Dropdown
-                                      trigger={["click"]}
-                                      disabled={roleSavingId === member.id}
-                                      menu={{
-                                        selectedKeys: [member.role],
-                                        onClick: ({ key }) =>
-                                          changeRole(member, key as "admin" | "member"),
-                                        items: [
-                                          { key: "member", label: "Member" },
-                                          { key: "admin", label: "Admin" },
-                                        ],
-                                      }}
-                                    >
-                                      <button
-                                        type="button"
-                                        className={`company-role member-role-trigger ${member.role}`}
-                                        disabled={roleSavingId === member.id}
-                                      >
-                                        {roleLabel[member.role]}
-                                        <DownOutlined />
-                                      </button>
-                                    </Dropdown>
-                                  ) : (
-                                    <span className={`company-role ${member.role}`}>
-                                      {roleLabel[member.role]}
-                                    </span>
-                                  )}
-                                </div>
-                              </Card>
-                            </Col>
-                          );
-                        })}
-                      </Row>
-                    </div>
-                      )}
-                    </Space>
-                  ),
-                },
-                {
-                  key: "settings",
-                  label: "Settings",
-                  children: (
-                    <Space direction="vertical" size={8} style={{ maxWidth: 360, width: "100%" }}>
-                      <Typography.Text>Company name</Typography.Text>
-                      <Input
-                        maxLength={100}
-                        value={companyName}
-                        onChange={(event) => setCompanyName(event.target.value)}
+                    <span className={`company-role ${member.role}`}>{roleLabel[member.role]}</span>
+                  )}
+                  {(canRemove || canDelete) && (
+                    <Tooltip title={removeLabel}>
+                      <Button
+                        type="text"
+                        className="icon-btn is-danger"
+                        icon={<DeleteOutlined />}
+                        aria-label={`${removeLabel}: ${member.email}`}
+                        onClick={() => removeMember(member)}
                       />
-                      <Button type="primary" loading={saving} onClick={saveName}>
-                        Save
-                      </Button>
-                    </Space>
-                  ),
-                },
-              ]
-            : []),
-        ]}
-      />
+                    </Tooltip>
+                  )}
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </>
+  );
+
+  const settingsPanel = (
+    <>
+      <div className="manage-head">
+        <div>
+          <h1 className="display-font">Settings</h1>
+          <p>How {company.name} appears to its members.</p>
+        </div>
+      </div>
+      <section className="manage-card">
+        <label htmlFor="company-name">Company name</label>
+        <div className="manage-inline">
+          <Input
+            id="company-name"
+            maxLength={100}
+            value={companyName}
+            onChange={(event) => setCompanyName(event.target.value)}
+            onPressEnter={saveName}
+          />
+          <Button type="primary" loading={saving} onClick={saveName}>
+            Save
+          </Button>
+        </div>
+      </section>
+    </>
+  );
+
+  const panel =
+    companyTab === "collections"
+      ? collectionsPanel
+      : companyTab === "members"
+        ? membersPanel
+        : companyTab === "settings"
+          ? settingsPanel
+          : null;
+
+  return (
+    <>
+      {panel ? <div className="manage-page">{panel}</div> : <NotesPage companyId={companyId} />}
       <Modal
         title={`Invite to ${company.name}`}
         open={inviteOpen}
@@ -722,7 +699,7 @@ const CompanyPage = () => {
           ))}
         </Space>
       </Modal>
-    </Space>
+    </>
   );
 };
 

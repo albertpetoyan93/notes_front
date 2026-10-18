@@ -1,0 +1,163 @@
+// Team pages (collections, members, settings): one readable column of rows.
+
+.manage-page {
+  max-width: 880px;
+  margin: 0 auto;
+  padding: 28px 32px 56px;
+}
+
+.manage-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 20px;
+
+  h1 {
+    margin: 0 0 4px;
+    font-size: 26px;
+    font-weight: 600;
+  }
+
+  p {
+    margin: 0;
+    max-width: 52ch;
+    color: var(--textMuted);
+  }
+}
+
+.manage-empty {
+  padding: 48px 16px;
+  border: 1px dashed var(--borderStrong);
+  border-radius: 14px;
+  text-align: center;
+  color: var(--textMuted);
+}
+
+.manage-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  overflow: hidden;
+  border: 1px solid var(--borderSubtle);
+  border-radius: 14px;
+  background: var(--surfaceCard);
+}
+
+.manage-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 64px;
+  padding: 10px 12px 10px 16px;
+
+  & + & {
+    border-top: 1px solid var(--borderSubtle);
+  }
+
+  &.is-muted {
+    opacity: 0.65;
+  }
+}
+
+.manage-icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: var(--primarySoft);
+  color: var(--primaryText);
+  font-size: 16px;
+
+  &.is-person {
+    border-radius: 50%;
+    font-size: 14px;
+    font-weight: 650;
+  }
+}
+
+.manage-main {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+
+  strong {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-weight: 550;
+  }
+
+  span {
+    font-size: 12.5px;
+    color: var(--textMuted);
+  }
+}
+
+.manage-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+
+  .icon-btn.is-danger:hover {
+    color: var(--colorError);
+  }
+}
+
+.member-role-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 24px;
+  border: 0;
+  cursor: pointer;
+  font-family: inherit;
+
+  .anticon {
+    font-size: 8px;
+  }
+
+  &:disabled {
+    cursor: default;
+    opacity: 0.7;
+  }
+}
+
+.manage-card {
+  padding: 16px;
+  border: 1px solid var(--borderSubtle);
+  border-radius: 14px;
+  background: var(--surfaceCard);
+
+  label {
+    display: block;
+    margin-bottom: 8px;
+    font-size: 12.5px;
+    color: var(--textMuted);
+  }
+}
+
+.manage-inline {
+  display: flex;
+  gap: 8px;
+  max-width: 440px;
+}
+
+@media (max-width: 820px) {
+  .manage-page {
+    padding: 16px 16px 48px;
+  }
+
+  .manage-row {
+    flex-wrap: wrap;
+  }
+
+  .manage-actions {
+    margin-left: 48px;
+  }
+}

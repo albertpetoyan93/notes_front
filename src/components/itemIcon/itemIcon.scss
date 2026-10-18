@@ -1,0 +1,49 @@
+.item-icon {
+  --cat: var(--catOther);
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: var(--cat);
+  color: #18192f;
+  font-family: var(--fontFamilyDisplay);
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1;
+
+  &.is-brand {
+    background: #fff;
+    box-shadow: inset 0 0 0 1px var(--borderSubtle);
+
+    svg {
+      width: 56%;
+      height: 56%;
+    }
+  }
+
+  &.sm {
+    width: 26px;
+    height: 26px;
+    border-radius: 7px;
+    font-size: 12px;
+  }
+
+  &.lg {
+    width: 56px;
+    height: 56px;
+    border-radius: 16px;
+    font-size: 24px;
+  }
+
+  &.cat-note { --cat: var(--catNote); }
+  &.cat-password,
+  &.cat-login { --cat: var(--catLogin); }
+  &.cat-command { --cat: var(--catCommand); }
+  &.cat-ssh { --cat: var(--catSsh); }
+  &.cat-db { --cat: var(--catDb); }
+  &.cat-address { --cat: var(--catAddress); }
+  &.cat-card { --cat: var(--catCard); }
+  &.cat-other { --cat: var(--catOther); }
+}
