@@ -34,14 +34,12 @@ jobs:
       - name: Build
         run: npm run build
         env:
-          VITE_APP_API_URL: ${{ vars.VITE_APP_API_URL || 'https://2keevo.com' }}
+          # The vault and its API share https://app.2keevo.com.
+          VITE_APP_API_URL: ${{ vars.VITE_APP_API_URL || 'https://app.2keevo.com' }}
 
-      # Only what `vite preview` needs to serve the build.
+      # nginx serves dist/ as static files, so the build is all the server needs.
       - name: Package
-        run: |
-          mkdir -p release
-          cp -r dist package.json package-lock.json vite.config.ts ecosystem.config.cjs release/
-          tar -czf frontend-release.tgz -C release .
+        run: tar -czf frontend-release.tgz dist
 
       - name: Upload release
         uses: appleboy/scp-action@v1
@@ -71,23 +69,11 @@ jobs:
             rm -rf "$NEW" && mkdir -p "$NEW"
             tar -xzf .deploy/frontend-release.tgz -C "$NEW"
 
-            # Install packages only when package-lock.json changed since the last good install.
-            LOCK_HASH=$(sha256sum "$NEW/package-lock.json" | cut -d' ' -f1)
-            if [ "$(cat node_modules/.lock-hash 2>/dev/null)" != "$LOCK_HASH" ]; then
-              echo "Dependencies changed, running npm ci"
-              cp "$NEW/package.json" "$NEW/package-lock.json" .
-              npm ci --no-audit --no-fund
-              echo "$LOCK_HASH" > node_modules/.lock-hash
-            else
-              echo "Dependencies unchanged, skipping install"
-            fi
-
-            cp "$NEW/package.json" "$NEW/vite.config.ts" "$NEW/ecosystem.config.cjs" .
+            # nginx serves dist/ directly (app.2keevo.com), so swapping the folder is the deploy.
+            # The previous build stays as dist.previous for a quick manual rollback.
             rm -rf dist.previous
             if [ -d dist ]; then mv dist dist.previous; fi
             mv "$NEW/dist" dist
 
-            pm2 reload ecosystem.config.cjs --update-env || pm2 start ecosystem.config.cjs
-            pm2 save
             rm -rf "$NEW" .deploy/frontend-release.tgz
-            pm2 status notes-frontend
+            echo "Deployed $(ls dist/assets | wc -l) asset files"
