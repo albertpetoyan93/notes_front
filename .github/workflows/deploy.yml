@@ -6,50 +6,88 @@ on:
       - main
   workflow_dispatch:
 
+# A newer push replaces a deploy that is still running.
+concurrency:
+  group: deploy-frontend
+  cancel-in-progress: true
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 15
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Deploy files to server
+      # Build on GitHub's runner, not on the server: faster, and a broken build
+      # fails here before anything on the server changes.
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install
+        run: npm ci --no-audit --no-fund
+
+      - name: Build
+        run: npm run build
+        env:
+          VITE_APP_API_URL: ${{ vars.VITE_APP_API_URL || 'https://2keevo.com' }}
+
+      # Only what `vite preview` needs to serve the build.
+      - name: Package
+        run: |
+          mkdir -p release
+          cp -r dist package.json package-lock.json vite.config.ts ecosystem.config.cjs release/
+          tar -czf frontend-release.tgz -C release .
+
+      - name: Upload release
         uses: appleboy/scp-action@v1
         with:
           host: ${{ secrets.DEPLOY_HOST }}
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
           port: ${{ secrets.DEPLOY_PORT || 9999 }}
-          source: ".,!node_modules,!dist,!.git,!.env,!server"
-          target: ${{ secrets.DEPLOY_PATH_FRONT }}
+          source: frontend-release.tgz
+          target: ${{ secrets.DEPLOY_PATH_FRONT }}/.deploy
           overwrite: true
-          rm: false
           timeout: 120s
 
-      - name: Install, build, restart
+      - name: Switch to the new build
         uses: appleboy/ssh-action@v1.2.0
         with:
           host: ${{ secrets.DEPLOY_HOST }}
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
           port: ${{ secrets.DEPLOY_PORT || 9999 }}
+          command_timeout: 10m
           script: |
             set -e
             APP_DIR="${{ secrets.DEPLOY_PATH_FRONT }}"
             cd "$APP_DIR"
+            NEW=.deploy/new
+            rm -rf "$NEW" && mkdir -p "$NEW"
+            tar -xzf .deploy/frontend-release.tgz -C "$NEW"
 
-            if [ ! -f .env ]; then
-              if [ -z "https://2keevo.com" ]; then
-                echo "Missing .env and VITE_APP_API_URL secret"
-                exit 1
-              fi
-              echo "VITE_APP_API_URL=https://2keevo.com" > .env
+            # Install packages only when package-lock.json changed since the last good install.
+            LOCK_HASH=$(sha256sum "$NEW/package-lock.json" | cut -d' ' -f1)
+            if [ "$(cat node_modules/.lock-hash 2>/dev/null)" != "$LOCK_HASH" ]; then
+              echo "Dependencies changed, running npm ci"
+              cp "$NEW/package.json" "$NEW/package-lock.json" .
+              npm ci --no-audit --no-fund
+              echo "$LOCK_HASH" > node_modules/.lock-hash
+            else
+              echo "Dependencies unchanged, skipping install"
             fi
 
-            npm install
-            npm run build
+            cp "$NEW/package.json" "$NEW/vite.config.ts" "$NEW/ecosystem.config.cjs" .
+            rm -rf dist.previous
+            if [ -d dist ]; then mv dist dist.previous; fi
+            mv "$NEW/dist" dist
+
             pm2 reload ecosystem.config.cjs --update-env || pm2 start ecosystem.config.cjs
             pm2 save
+            rm -rf "$NEW" .deploy/frontend-release.tgz
             pm2 status notes-frontend
