@@ -1,11 +1,12 @@
 import { MoonOutlined, SunOutlined } from "@ant-design/icons";
 import { Button, Form, Input } from "antd";
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 import { BrandLockup } from "../../components/header/LeftHeader";
 import { useTheme } from "../../contexts/ThemeContext";
 import useAuth from "../../hooks/useAuth";
 import { useAuthStore } from "../../store/authStore";
+import TwoFactorStep from "./TwoFactorStep";
 import "./AuthPanel.scss";
 
 type AuthMode = "login" | "register";
@@ -37,9 +38,15 @@ const AuthPanel = ({ mode }: { mode: AuthMode }) => {
   const { loading } = useAuthStore();
   const location = useLocation();
   const [form] = Form.useForm();
+  const [challengeToken, setChallengeToken] = useState<string | null>(null);
 
-  const onLogin = (values: { email: string; password: string }) => {
-    login(values);
+  const onLogin = async (values: { email: string; password: string }) => {
+    try {
+      const challenge = await login(values);
+      if (challenge) setChallengeToken(challenge.challengeToken);
+    } catch {
+      // useAuth already shows the error.
+    }
   };
 
   const onRegister = (values: {
@@ -55,6 +62,17 @@ const AuthPanel = ({ mode }: { mode: AuthMode }) => {
       password: values.password,
     });
   };
+
+  if (mode === "login" && challengeToken) {
+    return (
+      <AuthFrame>
+        <TwoFactorStep
+          challengeToken={challengeToken}
+          onBack={() => setChallengeToken(null)}
+        />
+      </AuthFrame>
+    );
+  }
 
   return (
     <AuthFrame>

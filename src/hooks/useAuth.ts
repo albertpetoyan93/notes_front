@@ -8,7 +8,11 @@ export const endpoints = {
   login: "/api/auth/login",
   register: "/api/auth/register",
   getMe: "/api/auth/me",
+  verifyTwoFactor: "/api/auth/2fa/verify",
 };
+
+/** Set when the password was right and the account has 2FA on. */
+export type LoginChallenge = { challengeToken: string };
 
 const useAuth = () => {
   const navigate = useNavigate();
@@ -25,15 +29,36 @@ const useAuth = () => {
     }
   };
 
-  const login = async (newData: any) => {
+  const finishSignIn = async () => {
+    await getMe();
+    navigate(keevoReturnPath() || "/");
+  };
+
+  const login = async (newData: any): Promise<LoginChallenge | null> => {
     setStore({ loading: true });
     try {
-      await fetcherPost(endpoints.login, newData);
-      await getMe();
-      navigate(keevoReturnPath() || "/");
+      const data = await fetcherPost(endpoints.login, newData);
+      if (data?.twoFactorRequired) {
+        return { challengeToken: data.challengeToken };
+      }
+      await finishSignIn();
+      return null;
     } catch (err: any) {
       message.error(err.message || "Login failed");
       console.log(err);
+      throw err;
+    } finally {
+      setStore({ loading: false });
+    }
+  };
+
+  const verifyTwoFactor = async (challengeToken: string, code: string) => {
+    setStore({ loading: true });
+    try {
+      await fetcherPost(endpoints.verifyTwoFactor, { challengeToken, code });
+      await finishSignIn();
+    } catch (err: any) {
+      message.error(err.message || "That code is not valid.");
       throw err;
     } finally {
       setStore({ loading: false });
@@ -97,6 +122,7 @@ const useAuth = () => {
   return {
     logOut,
     login,
+    verifyTwoFactor,
     register,
     requestPasswordReset,
     resetPassword,

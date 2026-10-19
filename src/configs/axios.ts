@@ -36,6 +36,7 @@ axiosServices.interceptors.response.use(
     const url = String(original?.url || "");
     const skipRefresh =
       url.includes("/api/auth/login") ||
+      url.includes("/api/auth/2fa/verify") ||
       url.includes("/api/auth/register") ||
       url.includes("/api/auth/forgot-password") ||
       url.includes("/api/auth/reset-password") ||

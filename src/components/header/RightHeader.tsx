@@ -1,6 +1,7 @@
-import { BellOutlined, LogoutOutlined, MoonOutlined, SunOutlined } from "@ant-design/icons";
+import { BellOutlined, LogoutOutlined, MoonOutlined, SafetyOutlined, SunOutlined } from "@ant-design/icons";
 import { Badge, Button, Dropdown, Empty, Tooltip } from "antd";
 import { useCallback, useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import CompanyRequests from "../company/CompanyRequests";
 import axios from "../../configs/axios";
 import { useTheme } from "../../contexts/ThemeContext";
@@ -20,6 +21,7 @@ interface AppNotification {
 const RightHeader = () => {
   const { mode, handleThemeChange } = useTheme();
   const { logOut } = useAuth();
+  const navigate = useNavigate();
   const { me } = useAuthStore();
   const [items, setItems] = useState<AppNotification[]>([]);
   const [unread, setUnread] = useState(0);
@@ -120,6 +122,13 @@ const RightHeader = () => {
         )}
         menu={{
           items: [
+            {
+              label: "Security",
+              key: "security",
+              icon: <SafetyOutlined />,
+              onClick: () => navigate("/settings/security"),
+            },
+            { type: "divider" },
             {
               label: "Log out",
               key: "logout",

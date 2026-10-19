@@ -2,6 +2,7 @@ import React, { lazy } from "react";
 
 const NotesPage = lazy(() => import("../pages/notes/NotesPage"));
 const CompanyPage = lazy(() => import("../pages/company/CompanyPage"));
+const SecurityPage = lazy(() => import("../pages/settings/SecurityPage"));
 
 interface RouteConfig {
   path?: string;
@@ -24,6 +25,10 @@ const ProtectedRoutes: RouteConfig[] = [
   {
     path: "/company/:id",
     element: <CompanyPage />,
+  },
+  {
+    path: "/settings/security",
+    element: <SecurityPage />,
   },
 ];
 
