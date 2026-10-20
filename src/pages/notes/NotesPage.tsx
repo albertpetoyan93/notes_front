@@ -1,11 +1,13 @@
 import {
+  CheckOutlined,
   CheckSquareOutlined,
+  DeleteOutlined,
   InboxOutlined,
   KeyOutlined,
   LogoutOutlined,
   ShareAltOutlined,
 } from "@ant-design/icons";
-import { Button, Modal, Select, message } from "antd";
+import { Button, Modal, Select, Tooltip, message } from "antd";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { fetcherPost } from "../../configs/axios";
 import useVaultNav from "../../hooks/useVaultNav";
@@ -359,24 +361,26 @@ const NotesPage = ({ companyId }: { companyId?: number }) => {
   const canShareCollection =
     !isTrash && !isHealth && !!activeCollection?.isOwner;
   const shareCollectionButton = canShareCollection ? (
-    <Button
-      size="small"
-      icon={<ShareAltOutlined />}
-      onClick={() => {
-        if (companyId && activeCollection) {
-          nav.update({
-            tab: "collections",
-            share: String(activeCollection.id),
-            item: null,
-            new: null,
-          });
-        } else {
-          setCollectionShareOpen(true);
-        }
-      }}
-    >
-      Share
-    </Button>
+    <Tooltip title="Share collection">
+      <Button
+        size="small"
+        type="primary"
+        aria-label="Share collection"
+        icon={<ShareAltOutlined />}
+        onClick={() => {
+          if (companyId && activeCollection) {
+            nav.update({
+              tab: "collections",
+              share: String(activeCollection.id),
+              item: null,
+              new: null,
+            });
+          } else {
+            setCollectionShareOpen(true);
+          }
+        }}
+      />
+    </Tooltip>
   ) : null;
 
   // A personal collection someone shared with you: leave it, with all its items.
@@ -408,29 +412,42 @@ const NotesPage = ({ companyId }: { companyId?: number }) => {
     });
   };
   const leaveCollectionButton = canLeaveCollection ? (
-    <Button size="small" icon={<LogoutOutlined />} onClick={leaveCollection}>
-      Leave
-    </Button>
+    <Tooltip title="Leave collection">
+      <Button
+        size="small"
+        aria-label="Leave collection"
+        icon={<LogoutOutlined />}
+        onClick={leaveCollection}
+      />
+    </Tooltip>
   ) : null;
 
   const selectionToolbar = isTrash ? (
     list.length > 0 && (
-      <Button size="small" danger onClick={handleEmptyTrash}>
-        Empty Trash
-      </Button>
+      <Tooltip title="Empty Trash">
+        <Button
+          size="small"
+          danger
+          aria-label="Empty Trash"
+          icon={<DeleteOutlined />}
+          onClick={handleEmptyTrash}
+        />
+      </Tooltip>
     )
   ) : canSelect ? (
-    <Button
-      size="small"
-      type={selecting ? "primary" : "default"}
-      icon={selecting ? undefined : <CheckSquareOutlined />}
-      onClick={() => {
-        setSelecting((value) => !value);
-        setCheckedIds([]);
-      }}
-    >
-      {selecting ? "Done" : "Select"}
-    </Button>
+    <Tooltip title={selecting ? "Done selecting" : "Select items"}>
+      <Button
+        size="small"
+        type={selecting ? "primary" : "default"}
+        aria-label={selecting ? "Done selecting" : "Select items"}
+        aria-pressed={selecting}
+        icon={selecting ? <CheckOutlined /> : <CheckSquareOutlined />}
+        onClick={() => {
+          setSelecting((value) => !value);
+          setCheckedIds([]);
+        }}
+      />
+    </Tooltip>
   ) : null;
 
   const toolbar =
