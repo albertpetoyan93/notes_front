@@ -17,9 +17,11 @@ import {
   message,
 } from "antd";
 import { useCallback, useEffect, useState } from "react";
+import ActivityList from "../../components/activity/ActivityList";
 import { fetcherDelete, fetcherGet, fetcherPost } from "../../configs/axios";
 import { useAuthStore } from "../../store/authStore";
 import dayjsExtra from "../../utils/dayjs";
+import { browserAndOs, isPhoneAgent } from "../../utils/device";
 import "../company/CompanyPage.scss";
 import "./SecurityPage.scss";
 
@@ -39,36 +41,13 @@ interface SessionRow {
 }
 
 const deviceLabel = (session: SessionRow) => {
-  const ua = session.userAgent || "";
-  const browser = /Edg\//.test(ua)
-    ? "Edge"
-    : /OPR\//.test(ua)
-      ? "Opera"
-      : /Firefox\//.test(ua)
-        ? "Firefox"
-        : /Chrome\//.test(ua)
-          ? "Chrome"
-          : /Safari\//.test(ua)
-            ? "Safari"
-            : "Browser";
-  const os = /iPhone|iPad/.test(ua)
-    ? "iOS"
-    : /Android/.test(ua)
-      ? "Android"
-      : /Mac OS X/.test(ua)
-        ? "macOS"
-        : /Windows/.test(ua)
-          ? "Windows"
-          : /Linux/.test(ua)
-            ? "Linux"
-            : "";
-  const name = os ? `${browser} on ${os}` : browser;
+  const name = browserAndOs(session.userAgent) || "Browser";
   return session.kind === "extension" ? `Browser extension · ${name}` : name;
 };
 
 const deviceIcon = (session: SessionRow) => {
   if (session.kind === "extension") return <ChromeOutlined />;
-  if (/iPhone|iPad|Android/.test(session.userAgent || "")) return <MobileOutlined />;
+  if (isPhoneAgent(session.userAgent)) return <MobileOutlined />;
   return <DesktopOutlined />;
 };
 
@@ -465,6 +444,17 @@ const SecurityPage = () => {
             ))}
           </ul>
         )}
+      </section>
+
+      <section className="security-section">
+        <h2>Recent account activity</h2>
+        <p className="security-section-note">
+          Sign-ins, wrong passwords or codes, and security changes. If you don't recognise
+          something, change your password and sign out other devices.
+        </p>
+        <div className="manage-card">
+          <ActivityList url="/api/auth/activity" emptyText="No activity yet." />
+        </div>
       </section>
 
       <EnableModal

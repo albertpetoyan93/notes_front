@@ -8,19 +8,29 @@ import {
   EyeInvisibleOutlined,
   EyeOutlined,
   FolderOutlined,
+  HistoryOutlined,
   LeftOutlined,
+  LogoutOutlined,
   MinusCircleOutlined,
   SafetyCertificateOutlined,
   ShareAltOutlined,
   StarFilled,
+  TeamOutlined,
   StarOutlined,
   UndoOutlined,
 } from "@ant-design/icons";
-import { Button, Tooltip } from "antd";
-import type { ReactNode } from "react";
+import { Button, Drawer, Modal, Tooltip, message } from "antd";
+import { useState, type ReactNode } from "react";
+import ActivityList from "../../components/activity/ActivityList";
 import ItemIcon from "../../components/itemIcon/ItemIcon";
+import { fetcherPost } from "../../configs/axios";
 import useFieldClipboard from "../../hooks/useFieldClipboard";
+import useVaultNav from "../../hooks/useVaultNav";
+import { useCompanyStore } from "../../store/companyStore";
 import type { Note } from "../../store/noteStore";
+import { useVaultStore } from "../../store/vaultStore";
+import { reportSecretUse } from "../../utils/activity";
+import "./ItemDetail.scss";
 import dayjsExtra from "../../utils/dayjs";
 import { openURL } from "../../utils/isUrl";
 import { categoryClass, categoryLabel } from "../../utils/noteCategory";
@@ -89,6 +99,11 @@ const ItemDetail = ({
   onRemoveFromCollection,
 }: ItemDetailProps) => {
   const clipboard = useFieldClipboard();
+  const nav = useVaultNav();
+  const companies = useCompanyStore((state) => state.companies);
+  const refreshVault = useVaultStore((state) => state.refresh);
+  const bumpList = useVaultStore((state) => state.bumpList);
+  const [activityOpen, setActivityOpen] = useState(false);
   const owner = isNoteOwner(note);
   const editable = canEditNote(note) && !trash;
   const fields = noteFields(note).filter((field) => field.value.trim());
@@ -99,6 +114,76 @@ const ItemDetail = ({
     : note.collection
       ? [note.collection]
       : [];
+  const companyId = collections.find((collection) => collection.companyId)?.companyId ?? null;
+  const companyRole = companyId
+    ? companies.find((company) => company.id === companyId)?.role
+    : undefined;
+  // The API shows an item's history to its owner, and to company owners/admins.
+  const canSeeActivity = companyId
+    ? companyRole === "owner" || companyRole === "admin"
+    : owner;
+  // Shared with you outside a company: you can drop it from your list.
+  const canLeave = !owner && !!note.isShared && !companyId && !trash;
+  const shareCount = (note as Note & { shareCount?: number }).shareCount || 0;
+
+  const afterLeaving = () => {
+    nav.selectItem(null);
+    bumpList();
+    refreshVault();
+  };
+
+  const leaveCollection = (collection: { id: number; name: string }) =>
+    Modal.confirm({
+      title: `Leave "${collection.name}"?`,
+      content:
+        "You stop seeing every item in this collection. The owner can share it with you again.",
+      okText: "Leave collection",
+      okButtonProps: { danger: true },
+      onOk: async () => {
+        try {
+          await fetcherPost(`/api/collections/${collection.id}/leave`, {});
+          message.success(`You left "${collection.name}"`);
+          afterLeaving();
+        } catch (err: any) {
+          message.error(err?.message || "Could not leave the collection");
+        }
+      },
+    });
+
+  const leave = () =>
+    Modal.confirm({
+      title: "Remove from your list?",
+      content: `${note.sharedByName || "The owner"} keeps "${note.title}". You stop seeing it, and they can share it with you again.`,
+      okText: "Remove",
+      okButtonProps: { danger: true },
+      onOk: async () => {
+        try {
+          const result = await fetcherPost(`/api/notes/${note.id}/leave`, {});
+          const via: { id: number; name: string }[] = result?.collections || [];
+          if (via.length) {
+            // Still visible through a shared collection: offer to leave that too.
+            if (result.removed) bumpList();
+            leaveCollection(via[0]);
+            return;
+          }
+          message.success("Removed from your list");
+          afterLeaving();
+        } catch (err: any) {
+          message.error(err?.message || "Could not remove the item");
+        }
+      },
+    });
+
+  const toggleSecret = (key: string, label: string) => {
+    if (!clipboard.isVisible(key)) reportSecretUse(note.id, "field_revealed", label);
+    clipboard.toggleVisible(key);
+  };
+
+  const copyField = (value: string, key: string, label: string, secret: boolean) => {
+    if (secret) reportSecretUse(note.id, "field_copied", label);
+    clipboard.copy(value, key, label);
+  };
+
   const edited = dayjsExtra(note.updatedAt);
   const created = dayjsExtra(note.createdAt);
 
@@ -126,6 +211,12 @@ const ItemDetail = ({
             {note.isShared && !note.collection?.companyId && (
               <span className="chip is-accent">Shared by {note.sharedByName || "someone"}</span>
             )}
+            {owner && shareCount > 0 && !trash && (
+              <button type="button" className="chip is-accent chip-button" onClick={onShare}>
+                <TeamOutlined />
+                Shared with {shareCount} {shareCount === 1 ? "person" : "people"}
+              </button>
+            )}
             {(note.tags || []).map((tag) => (
               <span key={tag} className="chip">
                 #{tag}
@@ -135,11 +226,20 @@ const ItemDetail = ({
         </div>
         <div className="detail-actions">
           {trash ? (
-            owner && (
-              <Button icon={<UndoOutlined />} onClick={onRestore}>
-                Restore
-              </Button>
-            )
+            <>
+              {canSeeActivity && (
+                <IconAction
+                  title="Activity"
+                  icon={<HistoryOutlined />}
+                  onClick={() => setActivityOpen(true)}
+                />
+              )}
+              {owner && (
+                <Button icon={<UndoOutlined />} onClick={onRestore}>
+                  Restore
+                </Button>
+              )}
+            </>
           ) : (
             <>
               <IconAction
@@ -149,6 +249,20 @@ const ItemDetail = ({
                 onClick={onFavorite}
               />
               {owner && <IconAction title="Share" icon={<ShareAltOutlined />} onClick={onShare} />}
+              {canSeeActivity && (
+                <IconAction
+                  title="Activity"
+                  icon={<HistoryOutlined />}
+                  onClick={() => setActivityOpen(true)}
+                />
+              )}
+              {canLeave && (
+                <IconAction
+                  title="Remove from my list"
+                  icon={<LogoutOutlined />}
+                  onClick={leave}
+                />
+              )}
               {onRemoveFromCollection && (
                 <IconAction
                   title="Remove from this collection"
@@ -215,7 +329,7 @@ const ItemDetail = ({
                       title={hidden ? `Show ${field.label}` : `Hide ${field.label}`}
                       icon={hidden ? <EyeOutlined /> : <EyeInvisibleOutlined />}
                       pressed={!hidden}
-                      onClick={() => clipboard.toggleVisible(key)}
+                      onClick={() => toggleSecret(key, field.label)}
                     />
                   )}
                   {url && (
@@ -228,7 +342,7 @@ const ItemDetail = ({
                   <IconAction
                     title={copied ? "Copied" : `Copy ${field.label}`}
                     icon={copied ? <CheckOutlined className="field-copied" /> : <CopyOutlined />}
-                    onClick={() => clipboard.copy(shown, key, field.label)}
+                    onClick={() => copyField(shown, key, field.label, secret)}
                   />
                 </div>
               </div>
@@ -272,6 +386,16 @@ const ItemDetail = ({
         <time dateTime={created.toISOString()}>Created {created.format("D MMM YYYY")}</time>
         {note.isEncrypted && " · Encrypted"}
       </p>
+
+      <Drawer
+        title={`Activity · ${note.title}`}
+        open={activityOpen}
+        onClose={() => setActivityOpen(false)}
+        width={440}
+        destroyOnClose
+      >
+        <ActivityList url={`/api/notes/${note.id}/activity`} withTitle={false} />
+      </Drawer>
     </div>
   );
 };

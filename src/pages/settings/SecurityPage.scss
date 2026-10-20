@@ -25,6 +25,13 @@
   }
 }
 
+.security-section-note {
+  margin: -6px 0 12px;
+  max-width: 60ch;
+  font-size: 13px;
+  color: var(--textMuted);
+}
+
 .security-section-head {
   display: flex;
   flex-wrap: wrap;

@@ -161,3 +161,27 @@
     margin-left: 48px;
   }
 }
+
+// Remove-member dialog: what the person could open.
+.member-access {
+  p {
+    margin: 0 0 10px;
+  }
+
+  strong {
+    display: block;
+    margin-top: 8px;
+    font-size: 13px;
+  }
+
+  ul {
+    margin: 4px 0 8px;
+    padding-left: 18px;
+  }
+
+  li span,
+  .member-access-hint {
+    color: var(--textMuted);
+    font-size: 12.5px;
+  }
+}

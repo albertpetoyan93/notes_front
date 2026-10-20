@@ -1,0 +1,14 @@
+// "Shared with 2 people" opens the share dialog, so the chip is a button.
+.chip.chip-button {
+  cursor: pointer;
+  font-family: inherit;
+
+  &:hover {
+    filter: brightness(0.96);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--primary);
+    outline-offset: 2px;
+  }
+}

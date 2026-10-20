@@ -2,6 +2,7 @@ import {
   DeleteOutlined,
   DownOutlined,
   FolderOutlined,
+  HistoryOutlined,
   PlusOutlined,
   ShareAltOutlined,
   TeamOutlined,
@@ -10,6 +11,7 @@ import {
 import { Button, Drawer, Dropdown, Empty, Input, Modal, Select, Space, Spin, Tooltip, Typography, message } from "antd";
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import ActivityList from "../../components/activity/ActivityList";
 import axios from "../../configs/axios";
 import NotesPage from "../notes/NotesPage";
 import { useNoteStore } from "../../store/noteStore";
@@ -19,11 +21,60 @@ import "./CompanyPage.scss";
 
 interface MemberRow {
   id: number;
+  userId?: number | null;
   email: string;
   role: "owner" | "admin" | "member";
   status: "invited" | "active" | "removed";
   expiresAt?: string | null;
 }
+
+interface MemberAccess {
+  collections: { id: number; name: string; permission: string }[];
+  secretsAccessed: { noteId: number; title: string; count: number; lastAt: string }[];
+}
+
+// Shown before removing someone: what they could open, so it can be rotated.
+const MemberAccessSummary = ({ access }: { access: MemberAccess | null }) => {
+  if (!access) {
+    return <p>They disappear from the list. Their personal notes stay theirs.</p>;
+  }
+  const { collections, secretsAccessed } = access;
+  return (
+    <div className="member-access">
+      <p>They lose access to the company at once. Their personal notes stay theirs.</p>
+      {collections.length > 0 && (
+        <>
+          <strong>Collections they could open</strong>
+          <ul>
+            {collections.map((collection) => (
+              <li key={collection.id}>
+                {collection.name}{" "}
+                <span>({collection.permission === "edit" ? "can edit" : "can view"})</span>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+      {secretsAccessed.length > 0 ? (
+        <>
+          <strong>Secrets they revealed or copied</strong>
+          <ul>
+            {secretsAccessed.slice(0, 10).map((item) => (
+              <li key={item.noteId}>
+                {item.title} <span>({item.count}×)</span>
+              </li>
+            ))}
+          </ul>
+          <p className="member-access-hint">
+            Consider changing these passwords after removing them.
+          </p>
+        </>
+      ) : (
+        <p className="member-access-hint">No revealed or copied secrets are on record.</p>
+      )}
+    </div>
+  );
+};
 
 interface CollectionShareRow {
   userId: number;
@@ -86,9 +137,10 @@ const CompanyPage = () => {
   const searchUsers = useNoteStore((state) => state.searchUsers);
   const refreshVault = useVaultStore((state) => state.refresh);
   const searchTimer = useRef<number>();
+  const [activityActor, setActivityActor] = useState<number | null>(null);
   const requestedTab = searchParams.get("tab") || "notes";
   const companyTab =
-    canManage && ["collections", "members", "settings"].includes(requestedTab)
+    canManage && ["collections", "members", "settings", "activity"].includes(requestedTab)
       ? requestedTab
       : "notes";
 
@@ -288,18 +340,31 @@ const CompanyPage = () => {
     }
   };
 
-  const removeMember = (member: MemberRow) => {
+  const removeMember = async (member: MemberRow) => {
     const deleting = member.status === "removed";
+    let access: MemberAccess | null = null;
+    if (member.status === "active") {
+      try {
+        access = (await axios.get(`/api/companies/${companyId}/members/${member.id}/access`)).data;
+      } catch {
+        access = null;
+      }
+    }
     Modal.confirm({
+      width: member.status === "active" ? 480 : undefined,
       title: deleting
         ? "Delete this person?"
         : member.status === "invited"
           ? "Cancel this invite?"
           : `Remove ${member.email}?`,
       content:
-        member.status === "invited"
-          ? "They will not be able to join unless you invite them again."
-          : "They disappear from the list. You can invite them again later. Their personal notes stay theirs.",
+        member.status === "invited" ? (
+          "They will not be able to join unless you invite them again."
+        ) : member.status === "active" ? (
+          <MemberAccessSummary access={access} />
+        ) : (
+          "They disappear from the list. You can invite them again later. Their personal notes stay theirs."
+        ),
       okText: deleting ? "Delete" : member.status === "invited" ? "Cancel invite" : "Remove",
       okButtonProps: { danger: true },
       onOk: async () => {
@@ -358,6 +423,20 @@ const CompanyPage = () => {
       },
       { replace: true }
     );
+
+  const openTab = (tab: string) =>
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.set("tab", tab);
+        return next;
+      },
+      { replace: true }
+    );
+
+  const activityUrl = activityActor
+    ? `/api/companies/${companyId}/activity?actorId=${activityActor}`
+    : `/api/companies/${companyId}/activity`;
 
   const activeMembers = members.filter((member) => member.status === "active").length;
   const invitedMembers = members.filter((member) => member.status === "invited").length;
@@ -431,9 +510,14 @@ const CompanyPage = () => {
             {activeMembers} active{invitedMembers ? ` · ${invitedMembers} invited` : ""}
           </p>
         </div>
-        <Button type="primary" icon={<UserAddOutlined />} onClick={() => setInviteOpen(true)}>
-          Invite
-        </Button>
+        <Space wrap>
+          <Button icon={<HistoryOutlined />} onClick={() => openTab("activity")}>
+            Activity log
+          </Button>
+          <Button type="primary" icon={<UserAddOutlined />} onClick={() => setInviteOpen(true)}>
+            Invite
+          </Button>
+        </Space>
       </div>
       {membersLoading ? (
         <div className="manage-empty">
@@ -515,6 +599,33 @@ const CompanyPage = () => {
     </>
   );
 
+  const activityPanel = (
+    <>
+      <div className="manage-head">
+        <div>
+          <h1 className="display-font">Activity log</h1>
+          <p>
+            Everything that happened in {company.name}: changes to items, who revealed or copied a
+            secret, shares and members. Only owners and admins see this.
+          </p>
+        </div>
+        <Select
+          allowClear
+          placeholder="Everyone"
+          style={{ minWidth: 220 }}
+          value={activityActor ?? undefined}
+          onChange={(value) => setActivityActor(value ?? null)}
+          options={members
+            .filter((member) => member.userId)
+            .map((member) => ({ value: member.userId as number, label: member.email }))}
+        />
+      </div>
+      <section className="manage-card">
+        <ActivityList key={activityUrl} url={activityUrl} emptyText="No activity yet." />
+      </section>
+    </>
+  );
+
   const settingsPanel = (
     <>
       <div className="manage-head">
@@ -548,7 +659,9 @@ const CompanyPage = () => {
         ? membersPanel
         : companyTab === "settings"
           ? settingsPanel
-          : null;
+          : companyTab === "activity"
+            ? activityPanel
+            : null;
 
   return (
     <>
