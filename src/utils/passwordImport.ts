@@ -5,6 +5,7 @@
 import type { ImportedNote, Note } from "../store/noteStore";
 import { categoryKey } from "./noteCategory";
 import { noteFields } from "./noteFields";
+import { TOTP_FIELD_LABEL } from "./totp";
 
 export type ImportSource =
   | "google"
@@ -283,7 +284,7 @@ export const toNotePayload = (item: ImportItem, collection: string): ImportedNot
         { label: "Username", value: item.username },
         { label: "Password", value: item.password },
         { label: "URL", value: item.url },
-        { label: "2FA", value: item.totp },
+        { label: TOTP_FIELD_LABEL, value: item.totp },
       ].filter((field) => field.value);
 
   return {

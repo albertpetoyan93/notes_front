@@ -24,7 +24,9 @@ import { useState, type ReactNode } from "react";
 import ActivityList from "../../components/activity/ActivityList";
 import ItemIcon from "../../components/itemIcon/ItemIcon";
 import { fetcherPost } from "../../configs/axios";
-import useFieldClipboard from "../../hooks/useFieldClipboard";
+import TotpCode from "../../components/totp/TotpCode";
+import useFieldClipboard, { type FieldClipboard } from "../../hooks/useFieldClipboard";
+import useTotp from "../../hooks/useTotp";
 import useVaultNav from "../../hooks/useVaultNav";
 import { useCompanyStore } from "../../store/companyStore";
 import type { Note } from "../../store/noteStore";
@@ -47,6 +49,7 @@ import {
   noteBody,
   noteFields,
 } from "../../utils/noteFields";
+import { isTotpLabel, parseTotp } from "../../utils/totp";
 import { canEditNote, isNoteOwner } from "./NoteActions";
 
 interface ItemDetailProps {
@@ -86,6 +89,41 @@ const IconAction = ({
     />
   </Tooltip>
 );
+
+// An authenticator key, shown as the code it makes now. The key itself stays
+// out of view; Edit shows it.
+const TotpFieldRow = ({
+  noteId,
+  value,
+  clipboard,
+}: {
+  noteId: number;
+  value: string;
+  clipboard: FieldClipboard;
+}) => {
+  const { code, left, period } = useTotp(value);
+  const key = `${noteId}-totp`;
+  const copied = clipboard.isCopied(key);
+  return (
+    <div className="field-row">
+      <dt className="field-label">One-time code</dt>
+      <dd className="field-value">
+        <TotpCode code={code} left={left} period={period} />
+      </dd>
+      <div className="field-actions">
+        <IconAction
+          title={copied ? "Copied" : "Copy one-time code"}
+          icon={copied ? <CheckOutlined className="field-copied" /> : <CopyOutlined />}
+          onClick={() => {
+            if (!code) return;
+            reportSecretUse(noteId, "field_copied", "One-time code");
+            clipboard.copy(code, key, "One-time code");
+          }}
+        />
+      </div>
+    </div>
+  );
+};
 
 const ItemDetail = ({
   note,
@@ -336,6 +374,16 @@ const ItemDetail = ({
       {fields.length > 0 && (
         <dl className="fields-card">
           {fields.map((field, index) => {
+            if (isTotpLabel(field.label) && parseTotp(field.value)) {
+              return (
+                <TotpFieldRow
+                  key={`${note.id}-${index}`}
+                  noteId={note.id}
+                  value={field.value}
+                  clipboard={clipboard}
+                />
+              );
+            }
             const key = `${note.id}-${index}`;
             const secret = isSecretField(field.label);
             const url = isUrlField(field);

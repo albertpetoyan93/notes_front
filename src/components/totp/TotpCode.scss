@@ -1,0 +1,96 @@
+// Live authenticator code: grouped digits and a countdown ring.
+.totp-code {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+
+  &.is-sm {
+    gap: 6px;
+
+    .totp-digits {
+      font-size: 13px;
+      letter-spacing: 0.04em;
+    }
+
+    .totp-ring {
+      width: 18px;
+      height: 18px;
+    }
+
+    .totp-seconds {
+      display: none;
+    }
+  }
+}
+
+.totp-digits {
+  font-family: var(--fontFamilyCode);
+  font-size: 20px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+  color: var(--colorText);
+  transition: color 0.2s;
+}
+
+.totp-ring {
+  position: relative;
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+
+  svg {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    transform: rotate(-90deg);
+  }
+}
+
+.totp-ring-track {
+  fill: none;
+  stroke: var(--borderSubtle);
+  stroke-width: 2.5;
+}
+
+.totp-ring-bar {
+  fill: none;
+  stroke: var(--primary);
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  transition:
+    stroke-dashoffset 0.25s linear,
+    stroke 0.2s;
+}
+
+.totp-seconds {
+  position: relative;
+  font-family: var(--fontFamilyCode);
+  font-size: 9px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--textMuted);
+}
+
+.totp-code.is-ending {
+  .totp-digits,
+  .totp-seconds {
+    color: var(--warnText);
+  }
+
+  .totp-ring-bar {
+    stroke: var(--warnText);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .totp-ring-bar,
+  .totp-digits {
+    transition: none;
+  }
+}

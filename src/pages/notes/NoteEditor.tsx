@@ -1,7 +1,10 @@
-import { DeleteOutlined, PlusOutlined, SyncOutlined } from "@ant-design/icons";
-import { Button, Form, Input, Select, Switch, Tooltip } from "antd";
-import { useEffect, useMemo, useState } from "react";
+import { DeleteOutlined, PlusOutlined, ScanOutlined, SyncOutlined } from "@ant-design/icons";
+import { Button, Form, Input, Select, Switch, Tooltip, message } from "antd";
+import { useEffect, useMemo, useRef, useState, type ClipboardEvent } from "react";
 import ItemIcon from "../../components/itemIcon/ItemIcon";
+import TotpCode from "../../components/totp/TotpCode";
+import useTotp from "../../hooks/useTotp";
+import { TOTP_FIELD_LABEL, isTotpLabel, readTotpQr } from "../../utils/totp";
 import { CollectionItem, Note, useNoteStore } from "../../store/noteStore";
 import {
   CARD_BRANDS,
@@ -28,7 +31,7 @@ const generatePassword = (length = 20) => {
 
 // Fields a new item starts with. [label, value] when the field has a usual default.
 const TEMPLATES: Record<string, (string | [string, string])[]> = {
-  password: ["Platform", "Username", "Email", "Password", "Key/Pass", "URL", "2FA"],
+  password: ["Platform", "Username", "Email", "Password", "Key/Pass", "URL", TOTP_FIELD_LABEL],
   command: ["Command"],
   ssh: ["Host", ["Port", "22"], "Username", "Password", "SSH Key Path", "Connection String"],
   db: [["DB_HOST", "localhost"], ["DB_PORT", "5432"], "DB_USER", "DB_NAME", "DB_PASSWORD"],
@@ -43,6 +46,27 @@ const templateFields = (category: string): NoteField[] =>
 
 // Generated passwords go into real password fields, not a PIN or CVV.
 const isPasswordField = (label: string) => /pass/i.test(label);
+
+// Under an authenticator key: the code it makes now, so it can be checked
+// against the site, or why it can't be used.
+const TotpHint = ({ value }: { value: string }) => {
+  const { config, code, left, period } = useTotp(value);
+  if (!value.trim()) {
+    return <span className="field-hint">Paste the key the site shows, or scan its QR code.</span>;
+  }
+  if (!config) {
+    return (
+      <span className="field-hint is-error">
+        Not a valid key. Use the text key or an otpauth:// link.
+      </span>
+    );
+  }
+  return (
+    <span className="field-hint">
+      Code now <TotpCode code={code} left={left} period={period} size="sm" />
+    </span>
+  );
+};
 
 interface NoteEditorProps {
   note?: Note | null;
@@ -73,6 +97,8 @@ const NoteEditor = ({
   const [fields, setFields] = useState<NoteField[]>([]);
   const [shown, setShown] = useState<Set<number>>(new Set());
   const [saving, setSaving] = useState(false);
+  const qrInput = useRef<HTMLInputElement>(null);
+  const qrTarget = useRef<number | null>(null);
   const title = Form.useWatch("title", form) as string | undefined;
 
   useEffect(() => {
@@ -135,6 +161,24 @@ const NoteEditor = ({
         return field;
       })
     );
+
+  const applyQrImage = async (index: number, file: Blob) => {
+    try {
+      updateField(index, "value", await readTotpQr(file));
+      message.success("Authenticator key read from the QR code");
+    } catch (error) {
+      message.error(error instanceof Error ? error.message : "Could not read that image");
+    }
+  };
+
+  const pasteQr = (index: number, event: ClipboardEvent<HTMLInputElement>) => {
+    const image = [...event.clipboardData.files].find((file) => file.type.startsWith("image/"));
+    if (!image) return;
+    event.preventDefault();
+    applyQrImage(index, image);
+  };
+
+  const hasTotpField = fields.some((field) => isTotpLabel(field.label));
 
   const toggleShown = (index: number, visible: boolean) =>
     setShown((current) => {
@@ -264,11 +308,12 @@ const NoteEditor = ({
         {fields.map((field, index) => {
           const kind = cardFieldKind(field.label);
           const secret = isSecretField(field.label);
+          const totp = isTotpLabel(field.label);
           const value = formatCardField(field.label, field.value, "", brand);
           const onValue = (next: string) =>
             updateField(index, "value", formatCardField(field.label, next, field.value, brand));
           return (
-            <div key={index} className="field-row is-editing">
+            <div key={index} className={`field-row is-editing${totp ? " has-hint" : ""}`}>
               <Input
                 className="field-label-input"
                 placeholder="Field name"
@@ -295,15 +340,24 @@ const NoteEditor = ({
                   <Input.Password
                     className="mono"
                     aria-label={field.label || `Field ${index + 1}`}
-                    placeholder={kind === "cvv" ? cvvPlaceholder(brand) : "Value"}
+                    placeholder={
+                      kind === "cvv"
+                        ? cvvPlaceholder(brand)
+                        : totp
+                          ? "Key or otpauth:// link"
+                          : "Value"
+                    }
                     inputMode={kind === "cvv" ? "numeric" : undefined}
                     maxLength={kind === "cvv" ? (amex ? 4 : 3) : undefined}
+                    autoComplete="off"
+                    spellCheck={false}
                     value={value}
                     visibilityToggle={{
                       visible: shown.has(index),
                       onVisibleChange: (visible) => toggleShown(index, visible),
                     }}
                     onChange={(event) => onValue(event.target.value)}
+                    onPaste={totp ? (event) => pasteQr(index, event) : undefined}
                   />
                 ) : (
                   <Input
@@ -322,8 +376,23 @@ const NoteEditor = ({
                     onChange={(event) => onValue(event.target.value)}
                   />
                 )}
+                {totp && <TotpHint value={field.value} />}
               </div>
               <div className="field-actions">
+                {totp && (
+                  <Tooltip title="Scan a QR code from an image">
+                    <Button
+                      type="text"
+                      className="icon-btn"
+                      aria-label="Scan a QR code from an image"
+                      icon={<ScanOutlined />}
+                      onClick={() => {
+                        qrTarget.current = index;
+                        qrInput.current?.click();
+                      }}
+                    />
+                  </Tooltip>
+                )}
                 {isPasswordField(field.label) && (
                   <Tooltip title="Generate a strong password">
                     <Button
@@ -351,13 +420,40 @@ const NoteEditor = ({
             </div>
           );
         })}
-        <button
-          type="button"
-          className="field-add"
-          onClick={() => setFields((current) => [...current, { label: "", value: "" }])}
-        >
-          <PlusOutlined /> Add field
-        </button>
+        <div className="field-add-row">
+          <button
+            type="button"
+            className="field-add"
+            onClick={() => setFields((current) => [...current, { label: "", value: "" }])}
+          >
+            <PlusOutlined /> Add field
+          </button>
+          {category === "password" && !hasTotpField && (
+            <button
+              type="button"
+              className="field-add"
+              onClick={() =>
+                setFields((current) => [...current, { label: TOTP_FIELD_LABEL, value: "" }])
+              }
+            >
+              <PlusOutlined /> Authenticator key
+            </button>
+          )}
+        </div>
+        <input
+          ref={qrInput}
+          type="file"
+          accept="image/*"
+          style={{ display: "none" }}
+          aria-hidden="true"
+          tabIndex={-1}
+          onChange={(event) => {
+            const file = event.target.files?.[0];
+            const index = qrTarget.current;
+            event.target.value = "";
+            if (file && index !== null) applyQrImage(index, file);
+          }}
+        />
       </section>
 
       <Form.Item

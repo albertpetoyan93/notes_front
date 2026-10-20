@@ -637,27 +637,70 @@
     }
   }
 
+  // "Add field", and "Authenticator key" on logins that have none yet.
+  .field-add-row {
+    display: flex;
+    border-top: 1px solid var(--borderSubtle);
+
+    &:first-child {
+      border-top: 0;
+    }
+  }
+
   .field-add {
     display: flex;
+    flex: 1;
     align-items: center;
     gap: 8px;
-    width: 100%;
+    min-width: 0;
     height: 44px;
     padding: 0 16px;
     border: 0;
-    border-top: 1px solid var(--borderSubtle);
     background: none;
     color: var(--primaryText);
     font: inherit;
     font-weight: 500;
     cursor: pointer;
 
-    &:first-child {
-      border-top: 0;
+    & + & {
+      border-left: 1px solid var(--borderSubtle);
     }
 
     &:hover {
       background: var(--surfaceHover);
+    }
+  }
+
+  .field-value-input {
+    position: relative;
+    min-width: 0;
+  }
+
+  // Room under the input for the hint, so the input stays level with the
+  // field name and the icons.
+  .field-row.is-editing.has-hint {
+    padding-bottom: 28px;
+  }
+
+  // Under an authenticator key: the code it makes now, or why it can't.
+  .field-hint {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    right: 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding-left: 11px;
+    overflow: hidden;
+    font-size: 12px;
+    line-height: 20px;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    color: var(--textMuted);
+
+    &.is-error {
+      color: var(--colorError);
     }
   }
 
