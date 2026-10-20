@@ -1,11 +1,23 @@
-import { CheckSquareOutlined, InboxOutlined } from "@ant-design/icons";
+import {
+  CheckSquareOutlined,
+  InboxOutlined,
+  KeyOutlined,
+  LogoutOutlined,
+  ShareAltOutlined,
+} from "@ant-design/icons";
 import { Button, Modal, Select, message } from "antd";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { fetcherPost } from "../../configs/axios";
 import useVaultNav from "../../hooks/useVaultNav";
 import { Note, useNoteStore } from "../../store/noteStore";
 import { useVaultStore } from "../../store/vaultStore";
 import { categoryPlural } from "../../utils/noteCategory";
-import { healthIssues, searchText, type HealthKind } from "../../utils/noteFields";
+import {
+  healthIssues,
+  searchText,
+  type HealthKind,
+} from "../../utils/noteFields";
+import CollectionDialogs from "./CollectionDialogs";
 import ItemDetail from "./ItemDetail";
 import ItemList, { HealthSummary, ListFilter } from "./ItemList";
 import { isNoteOwner } from "./NoteActions";
@@ -79,10 +91,15 @@ const NotesPage = ({ companyId }: { companyId?: number }) => {
   const collections = useVaultStore((state) => state.collections);
   const refreshVault = useVaultStore((state) => state.refresh);
   const listVersion = useVaultStore((state) => state.listVersion);
+  const setImportOpen = useVaultStore((state) => state.setImportOpen);
   const phone = usePhone();
 
-  const [editing, setEditing] = useState<{ id: number; freshPassword: boolean } | null>(null);
+  const [editing, setEditing] = useState<{
+    id: number;
+    freshPassword: boolean;
+  } | null>(null);
   const [sharingNote, setSharingNote] = useState<Note | null>(null);
+  const [collectionShareOpen, setCollectionShareOpen] = useState(false);
   const [selecting, setSelecting] = useState(false);
   const [checkedIds, setCheckedIds] = useState<number[]>([]);
   const [bulkCollection, setBulkCollection] = useState<string>();
@@ -90,7 +107,9 @@ const NotesPage = ({ companyId }: { companyId?: number }) => {
   const isHealth = nav.view === "health";
   const isTrash = nav.view === "trash";
   const activeCollection =
-    collections.find((collection) => String(collection.id) === nav.collection) || null;
+    collections.find(
+      (collection) => String(collection.id) === nav.collection,
+    ) || null;
 
   const fetchList = useCallback(async () => {
     // Security health is worked out from the whole vault, which the shell already holds.
@@ -105,7 +124,17 @@ const NotesPage = ({ companyId }: { companyId?: number }) => {
       collectionId: nav.collection ? Number(nav.collection) : undefined,
       companyId,
     });
-  }, [fetchNotes, isHealth, isTrash, nav.category, nav.tag, nav.search, nav.view, nav.collection, companyId]);
+  }, [
+    fetchNotes,
+    isHealth,
+    isTrash,
+    nav.category,
+    nav.tag,
+    nav.search,
+    nav.view,
+    nav.collection,
+    companyId,
+  ]);
 
   useEffect(() => {
     fetchList();
@@ -123,7 +152,9 @@ const NotesPage = ({ companyId }: { companyId?: number }) => {
 
   const healthCounts = useMemo(() => {
     const counts: Record<HealthKind, number> = { weak: 0, reused: 0, stale: 0 };
-    summary.forEach((note) => healthIssues(note).forEach((kind) => (counts[kind] += 1)));
+    summary.forEach((note) =>
+      healthIssues(note).forEach((kind) => (counts[kind] += 1)),
+    );
     return counts;
   }, [summary]);
 
@@ -134,12 +165,15 @@ const NotesPage = ({ companyId }: { companyId?: number }) => {
         .filter((note) => {
           const issues = healthIssues(note);
           if (!issues.length) return false;
-          if (nav.health !== "1" && !issues.includes(nav.health as HealthKind)) return false;
+          if (nav.health !== "1" && !issues.includes(nav.health as HealthKind))
+            return false;
           return !query || searchText(note).includes(query);
         })
         .sort((a, b) => severity(a) - severity(b));
     }
-    return nav.view === "favorites" ? notes.filter((note) => note.isFavorite) : notes;
+    return nav.view === "favorites"
+      ? notes.filter((note) => note.isFavorite)
+      : notes;
   }, [isHealth, nav.search, nav.health, nav.view, summary, notes]);
 
   const explicit = nav.item
@@ -149,7 +183,9 @@ const NotesPage = ({ companyId }: { companyId?: number }) => {
       null
     : null;
   // On a wide screen the first item opens by itself; on a phone the list comes first.
-  const selected = nav.newCategory ? null : explicit || (phone ? null : list[0] || null);
+  const selected = nav.newCategory
+    ? null
+    : explicit || (phone ? null : list[0] || null);
 
   useEffect(() => {
     setEditing(null);
@@ -216,7 +252,9 @@ const NotesPage = ({ companyId }: { companyId?: number }) => {
       okButtonProps: { danger: true },
       onOk: async () => {
         const deleted = await emptyTrash();
-        message.success(deleted === 1 ? "Deleted 1 item" : `Deleted ${deleted} items`);
+        message.success(
+          deleted === 1 ? "Deleted 1 item" : `Deleted ${deleted} items`,
+        );
         nav.selectItem(null);
         afterChange();
       },
@@ -229,9 +267,15 @@ const NotesPage = ({ companyId }: { companyId?: number }) => {
     setBulkCollection(undefined);
     await afterChange();
     if (result.skipped) {
-      message.warning(`Updated ${result.updated}. Skipped ${result.skipped} you do not own.`);
+      message.warning(
+        `Updated ${result.updated}. Skipped ${result.skipped} you do not own.`,
+      );
     } else {
-      message.success(result.updated === 1 ? "Updated 1 item" : `Updated ${result.updated} items`);
+      message.success(
+        result.updated === 1
+          ? "Updated 1 item"
+          : `Updated ${result.updated} items`,
+      );
     }
   };
 
@@ -241,7 +285,7 @@ const NotesPage = ({ companyId }: { companyId?: number }) => {
       const result = await bulkUpdateNotes(
         checkedIds,
         "move",
-        bulkCollection === "none" ? null : Number(bulkCollection)
+        bulkCollection === "none" ? null : Number(bulkCollection),
       );
       await finishBulk(result);
     } catch (error: any) {
@@ -262,7 +306,7 @@ const NotesPage = ({ companyId }: { companyId?: number }) => {
         async () => {
           await Promise.allSettled(ids.map((id) => restoreNote(id)));
           await afterChange();
-        }
+        },
       );
     } catch (error: any) {
       message.error(error?.message || "Could not move the items to Trash");
@@ -294,17 +338,82 @@ const NotesPage = ({ companyId }: { companyId?: number }) => {
         : nav.view === "favorites"
           ? ["No favorites yet", "Star an item to pin it here."]
           : nav.view === "shared"
-            ? ["Nothing shared with you", "Items people share with you show up here."]
+            ? [
+                "Nothing shared with you",
+                "Items people share with you show up here.",
+              ]
             : companyId && collections.length === 0
-              ? ["No items yet", "Items show up here after a collection is shared with you."]
+              ? [
+                  "No items yet",
+                  "Items show up here after a collection is shared with you.",
+                ]
               : ["Nothing here yet", "Use New item to add your first one."];
 
-  const canSelect = !isHealth && !isTrash && list.some((note) => isNoteOwner(note));
+  const canSelect =
+    !isHealth && !isTrash && list.some((note) => isNoteOwner(note));
   const editableCollections = collections.filter(
-    (collection) => collection.permission === "owner" || collection.permission === "edit"
+    (collection) =>
+      collection.permission === "owner" || collection.permission === "edit",
   );
 
-  const toolbar = isTrash ? (
+  const canShareCollection =
+    !isTrash && !isHealth && !!activeCollection?.isOwner;
+  const shareCollectionButton = canShareCollection ? (
+    <Button
+      size="small"
+      icon={<ShareAltOutlined />}
+      onClick={() => {
+        if (companyId && activeCollection) {
+          nav.update({
+            tab: "collections",
+            share: String(activeCollection.id),
+            item: null,
+            new: null,
+          });
+        } else {
+          setCollectionShareOpen(true);
+        }
+      }}
+    >
+      Share
+    </Button>
+  ) : null;
+
+  // A personal collection someone shared with you: leave it, with all its items.
+  const canLeaveCollection =
+    !companyId &&
+    !isTrash &&
+    !isHealth &&
+    !!activeCollection &&
+    !activeCollection.isOwner;
+  const leaveCollection = () => {
+    if (!activeCollection) return;
+    const collection = activeCollection;
+    Modal.confirm({
+      title: `Leave "${collection.name}"?`,
+      content:
+        "You stop seeing this collection and every item in it. The owner keeps it and can share it with you again.",
+      okText: "Leave collection",
+      okButtonProps: { danger: true },
+      onOk: async () => {
+        try {
+          await fetcherPost(`/api/collections/${collection.id}/leave`, {});
+          message.success(`You left "${collection.name}"`);
+          nav.go();
+          refreshVault();
+        } catch (error: any) {
+          message.error(error?.message || "Could not leave the collection");
+        }
+      },
+    });
+  };
+  const leaveCollectionButton = canLeaveCollection ? (
+    <Button size="small" icon={<LogoutOutlined />} onClick={leaveCollection}>
+      Leave
+    </Button>
+  ) : null;
+
+  const selectionToolbar = isTrash ? (
     list.length > 0 && (
       <Button size="small" danger onClick={handleEmptyTrash}>
         Empty Trash
@@ -324,9 +433,21 @@ const NotesPage = ({ companyId }: { companyId?: number }) => {
     </Button>
   ) : null;
 
+  const toolbar =
+    shareCollectionButton || leaveCollectionButton || selectionToolbar ? (
+      <>
+        {shareCollectionButton}
+        {leaveCollectionButton}
+        {selectionToolbar}
+      </>
+    ) : null;
+
   const banner = isHealth ? (
     <HealthSummary
-      logins={summary.filter((note) => ["password", "login"].includes(note.category)).length}
+      logins={
+        summary.filter((note) => ["password", "login"].includes(note.category))
+          .length
+      }
       counts={healthCounts}
       flagged={summary.filter((note) => healthIssues(note).length > 0).length}
       active={nav.health}
@@ -357,7 +478,11 @@ const NotesPage = ({ companyId }: { companyId?: number }) => {
             })),
           ]}
         />
-        <Button size="small" onClick={handleBulkMove} disabled={!bulkCollection}>
+        <Button
+          size="small"
+          onClick={handleBulkMove}
+          disabled={!bulkCollection}
+        >
           Move
         </Button>
         <Button size="small" danger onClick={handleBulkTrash}>
@@ -376,7 +501,8 @@ const NotesPage = ({ companyId }: { companyId?: number }) => {
           requireCollection={!!companyId}
           defaultCollectionId={
             activeCollection &&
-            (activeCollection.permission === "owner" || activeCollection.permission === "edit")
+            (activeCollection.permission === "owner" ||
+              activeCollection.permission === "edit")
               ? activeCollection.id
               : undefined
           }
@@ -424,13 +550,16 @@ const NotesPage = ({ companyId }: { companyId?: number }) => {
         trash={isTrash}
         onBack={() => nav.update({ item: null })}
         onEdit={() => setEditing({ id: selected.id, freshPassword: false })}
-        onChangePassword={() => setEditing({ id: selected.id, freshPassword: true })}
+        onChangePassword={() =>
+          setEditing({ id: selected.id, freshPassword: true })
+        }
         onFavorite={() => handleFavorite(selected)}
         onShare={() => setSharingNote(selected)}
         onDelete={() => handleDelete(selected)}
         onRestore={() => handleRestore(selected)}
         onRemoveFromCollection={
-          activeCollection && (activeCollection.isOwner || isNoteOwner(selected))
+          activeCollection &&
+          (activeCollection.isOwner || isNoteOwner(selected))
             ? () => handleRemoveFromCollection(selected)
             : undefined
         }
@@ -458,11 +587,26 @@ const NotesPage = ({ companyId }: { companyId?: number }) => {
         footer={footer}
         emptyTitle={emptyTitle}
         emptyText={emptyText}
+        emptyAction={
+          // A new, empty personal vault: bring passwords over from another manager.
+          !companyId &&
+          nav.view === "all" &&
+          !nav.category &&
+          !nav.collection &&
+          !nav.tag &&
+          !nav.search ? (
+            <Button icon={<KeyOutlined />} onClick={() => setImportOpen(true)}>
+              Import from Google or Chrome
+            </Button>
+          ) : undefined
+        }
         selecting={selecting}
         checkedIds={checkedIds}
         onCheck={(id, checked) =>
           setCheckedIds((current) =>
-            checked ? [...current, id] : current.filter((noteId) => noteId !== id)
+            checked
+              ? [...current, id]
+              : current.filter((noteId) => noteId !== id),
           )
         }
         activeTag={nav.tag && title !== `#${nav.tag}` ? nav.tag : undefined}
@@ -473,7 +617,19 @@ const NotesPage = ({ companyId }: { companyId?: number }) => {
         {renderDetail()}
       </section>
 
-      <ShareModal visible={!!sharingNote} note={sharingNote} onClose={() => setSharingNote(null)} />
+      <ShareModal
+        visible={!!sharingNote}
+        note={sharingNote}
+        onClose={() => setSharingNote(null)}
+      />
+      {collectionShareOpen && activeCollection && (
+        <CollectionDialogs
+          mode="share"
+          collection={activeCollection}
+          onClose={() => setCollectionShareOpen(false)}
+          onChanged={afterChange}
+        />
+      )}
     </div>
   );
 };

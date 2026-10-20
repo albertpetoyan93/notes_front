@@ -7,6 +7,7 @@ import {
   FileAddOutlined,
   FolderOutlined,
   LogoutOutlined,
+  KeyOutlined,
   MoreOutlined,
   NumberOutlined,
   PlusOutlined,
@@ -70,7 +71,7 @@ const Heading = ({ children, action }: { children: ReactNode; action?: ReactNode
 
 const VaultSidebar = ({ companyId }: { companyId: number | null }) => {
   const nav = useVaultNav();
-  const { summary, collections, refresh, bumpList } = useVaultStore();
+  const { summary, collections, refresh, bumpList, setImportOpen } = useVaultStore();
   const { deleteCollection, exportNotes, importNotes } = useNoteStore();
   const company = useCompanyStore((state) =>
     state.companies.find((item) => item.id === companyId)
@@ -375,6 +376,22 @@ const VaultSidebar = ({ companyId }: { companyId: number | null }) => {
               menu={{
                 items: [
                   {
+                    key: "import-passwords",
+                    label: (
+                      <span className="backup-option">
+                        <span className="backup-icon passwords">
+                          <KeyOutlined />
+                        </span>
+                        <span className="backup-copy">
+                          <strong>Import passwords</strong>
+                          <small>From Google, Chrome, Firefox, 1Password…</small>
+                        </span>
+                      </span>
+                    ),
+                    onClick: () => setImportOpen(true),
+                  },
+                  { type: "divider" },
+                  {
                     key: "export",
                     label: (
                       <span className="backup-option">
@@ -411,7 +428,7 @@ const VaultSidebar = ({ companyId }: { companyId: number | null }) => {
                 <span className="nav-icon">
                   <CloudSyncOutlined />
                 </span>
-                <span className="nav-label">Backup</span>
+                <span className="nav-label">Import &amp; export</span>
               </button>
             </Dropdown>
           </>

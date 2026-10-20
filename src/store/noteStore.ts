@@ -46,6 +46,11 @@ export interface Note {
   };
 }
 
+// One item for POST /api/notes/import. Collections are given by name and created if missing.
+export type ImportedNote = Omit<Partial<Note>, "collections"> & {
+  collections?: string[];
+};
+
 export interface CollectionItem {
   id: number;
   name: string;
@@ -118,7 +123,7 @@ interface NoteStore {
     notes: Partial<Note>[];
   }>;
   importNotes: (
-    notes: Partial<Note>[]
+    notes: ImportedNote[]
   ) => Promise<{ imported: number; failed: { title: string; message: string }[] }>;
   fetchCollections: () => Promise<CollectionItem[]>;
   createCollection: (name: string) => Promise<CollectionItem>;

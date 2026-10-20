@@ -110,6 +110,7 @@ interface ItemListProps {
   footer?: ReactNode;
   emptyTitle: string;
   emptyText: string;
+  emptyAction?: ReactNode;
   selecting: boolean;
   checkedIds: number[];
   onCheck: (id: number, checked: boolean) => void;
@@ -150,6 +151,7 @@ const ItemList = ({
   footer,
   emptyTitle,
   emptyText,
+  emptyAction,
   selecting,
   checkedIds,
   onCheck,
@@ -203,6 +205,7 @@ const ItemList = ({
           <div className="list-empty">
             <strong>{emptyTitle}</strong>
             <span>{emptyText}</span>
+            {emptyAction}
           </div>
         ) : (
           notes.map((note) => {

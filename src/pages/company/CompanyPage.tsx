@@ -143,6 +143,7 @@ const CompanyPage = () => {
     canManage && ["collections", "members", "settings", "activity"].includes(requestedTab)
       ? requestedTab
       : "notes";
+  const requestedShareId = Number(searchParams.get("share")) || null;
 
   useEffect(() => {
     if (!loaded) load();
@@ -194,6 +195,25 @@ const CompanyPage = () => {
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [companyId, company?.memberStatus, companyTab]);
+
+  useEffect(() => {
+    if (companyTab !== "collections" || !requestedShareId) return;
+    const collection = companyCollections.find((item) => item.id === requestedShareId);
+    if (!collection) return;
+    setSharingCollection(collection);
+    setShareAudience(collection.companyShare ? "all" : "members");
+    setSharePermission(collection.companyShare || "view");
+    setShareEmails([]);
+    setUserOptions([]);
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.delete("share");
+        return next;
+      },
+      { replace: true }
+    );
+  }, [companyTab, requestedShareId, companyCollections, setSearchParams]);
 
   const createCollection = async () => {
     const trimmed = collectionName.trim();

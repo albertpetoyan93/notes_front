@@ -3,6 +3,7 @@ import {
   BankOutlined,
   BgColorsOutlined,
   DeleteOutlined,
+  KeyOutlined,
   PlusOutlined,
   SafetyCertificateOutlined,
   SearchOutlined,
@@ -44,6 +45,7 @@ const CommandPalette = ({
 }) => {
   const navigate = useNavigate();
   const summary = useVaultStore((state) => state.summary);
+  const setImportOpen = useVaultStore((state) => state.setImportOpen);
   const companies = useCompanyStore((state) => state.companies);
   const { mode, handleThemeChange } = useTheme();
   const [query, setQuery] = useState("");
@@ -91,6 +93,14 @@ const CommandPalette = ({
             { key: "go-shared", group: "Commands" as const, label: "Shared with me", hint: "Go to", icon: <UsergroupAddOutlined />, run: to({ shared: "true" }) },
             { key: "go-health", group: "Commands" as const, label: "Security health", hint: "Go to", icon: <SafetyCertificateOutlined />, run: to({ health: "1" }) },
             { key: "go-trash", group: "Commands" as const, label: "Trash", hint: "Go to", icon: <DeleteOutlined />, run: to({ trash: "true" }) },
+            {
+              key: "import-passwords",
+              group: "Commands" as const,
+              label: "Import passwords from Google, Chrome, Firefox…",
+              hint: "Import",
+              icon: <KeyOutlined />,
+              run: () => setImportOpen(true),
+            },
           ]
         : []),
       ...(companyId
@@ -117,7 +127,7 @@ const CommandPalette = ({
     ];
 
     return [...items, ...commands.filter((entry) => !q || entry.label.toLowerCase().includes(q))];
-  }, [query, summary, companies, companyId, base, mode, navigate, handleThemeChange]);
+  }, [query, summary, companies, companyId, base, mode, navigate, handleThemeChange, setImportOpen]);
 
   useEffect(() => {
     setActive(0);

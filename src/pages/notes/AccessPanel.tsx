@@ -1,5 +1,16 @@
-import { CrownOutlined, FolderOutlined, TeamOutlined, UserAddOutlined } from "@ant-design/icons";
-import { Button, Empty, Modal, Spin, Tag, message } from "antd";
+import {
+  BankOutlined,
+  CloseOutlined,
+  CrownOutlined,
+  EditOutlined,
+  EyeOutlined,
+  FolderOutlined,
+  LinkOutlined,
+  SettingOutlined,
+  TeamOutlined,
+  UserAddOutlined,
+} from "@ant-design/icons";
+import { Button, Empty, Modal, Spin, Tooltip, message } from "antd";
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { fetcherDelete, fetcherGet } from "../../configs/axios";
@@ -38,9 +49,6 @@ interface AccessList {
   companyId: number | null;
 }
 
-const permissionLabel = (permission: "view" | "edit") =>
-  permission === "edit" ? "Can edit" : "Can view";
-
 const expiry = (expiresAt: string | null) =>
   expiresAt ? ` · until ${dayjsExtra(expiresAt).format("D MMM YYYY")}` : "";
 
@@ -60,6 +68,61 @@ const routeText = (route: Route) => {
         ? `"${route.collectionName}" is shared with everyone in the company`
         : `"${route.collectionName}" is shared with them`;
   }
+};
+
+interface ChipAction {
+  label: string;
+  danger?: boolean;
+  onClick: () => void;
+}
+
+const shortDate = (value: string | null) => (value ? dayjsExtra(value).format("D MMM") : null);
+
+// One way a person gets in, as a small chip; its action is an icon on the chip.
+const RouteChip = ({ route, action }: { route: Route; action: ChipAction | null }) => {
+  const until = route.type !== "company" ? shortDate(route.expiresAt) : null;
+  const icon =
+    route.type === "direct" ? (
+      <LinkOutlined />
+    ) : route.type === "company" ? (
+      <BankOutlined />
+    ) : (
+      <FolderOutlined />
+    );
+  const label =
+    route.type === "direct"
+      ? "Direct"
+      : route.type === "collection"
+        ? route.collectionName
+        : route.role !== "member"
+          ? `Company ${route.role}`
+          : route.everyone
+            ? `${route.collectionName} · everyone`
+            : route.collectionName;
+
+  return (
+    <span className={`access-chip is-${route.type}`}>
+      <Tooltip title={routeText(route)}>
+        <span className="access-chip-text">
+          {icon}
+          <span className="access-chip-label">{label}</span>
+          {until && <span className="access-chip-until">until {until}</span>}
+        </span>
+      </Tooltip>
+      {action && (
+        <Tooltip title={action.label}>
+          <button
+            type="button"
+            className={`access-chip-action${action.danger ? " is-danger" : ""}`}
+            aria-label={action.label}
+            onClick={action.onClick}
+          >
+            {action.danger ? <CloseOutlined /> : <SettingOutlined />}
+          </button>
+        </Tooltip>
+      )}
+    </span>
+  );
 };
 
 // Everyone who can open an item, how they got access, and a way to take it away.
@@ -117,9 +180,7 @@ const AccessPanel = ({
       okButtonProps: { danger: true },
       onOk: async () => {
         try {
-          await fetcherDelete(
-            `/api/collections/${route.collectionId}/share/${person.userId}`
-          );
+          await fetcherDelete(`/api/collections/${route.collectionId}/share/${person.userId}`);
           message.success("Access revoked");
           await load();
           onChanged();
@@ -128,6 +189,30 @@ const AccessPanel = ({
         }
       },
     });
+
+  const routeAction = (person: Person, route: Route): ChipAction | null => {
+    if (route.type === "direct" && isOwner) {
+      return {
+        label: `Stop sharing with ${person.name}`,
+        danger: true,
+        onClick: () => revokeDirect(person),
+      };
+    }
+    if (route.type === "collection" && !route.collectionOwner && isOwner) {
+      return {
+        label: `Remove ${person.name} from "${route.collectionName}"`,
+        danger: true,
+        onClick: () => revokeCollection(person, route),
+      };
+    }
+    if (route.type === "company" && access?.companyId) {
+      return {
+        label: "Manage in company settings",
+        onClick: () => navigate(`/company/${access.companyId}?tab=collections`),
+      };
+    }
+    return null;
+  };
 
   if (error) return <p className="access-error">{error}</p>;
   if (!access) {
@@ -138,34 +223,37 @@ const AccessPanel = ({
     );
   }
 
+  const ownerPerson = access.owner;
+
   return (
     <div className="access-panel">
       <div className="access-summary">
-        <TeamOutlined />
-        <span>
+        <span className="access-summary-text">
+          <TeamOutlined />
           {access.count === 0
-            ? "Only the owner can open this item."
-            : `${access.count} ${access.count === 1 ? "person" : "people"} besides the owner can open this item.`}
+            ? "Only the owner"
+            : `${access.count} ${access.count === 1 ? "person" : "people"} besides the owner`}
         </span>
+        {isOwner && !access.companyId && (
+          <Button size="small" type="primary" icon={<UserAddOutlined />} onClick={onAddPeople}>
+            Add
+          </Button>
+        )}
       </div>
 
-      {isOwner && !access.companyId && (
-        <Button block icon={<UserAddOutlined />} onClick={onAddPeople}>
-          Share with more people
-        </Button>
-      )}
-
       <ul className="access-list">
-        {access.owner && (
+        {ownerPerson && (
           <li className="access-person">
             <span className="access-avatar is-owner">
               <CrownOutlined />
             </span>
             <div className="access-main">
-              <strong>{access.owner.name}</strong>
-              <span>{access.owner.email}</span>
+              <div className="access-name">
+                <strong>{ownerPerson.name}</strong>
+                <span className="access-pill is-owner">Owner</span>
+              </div>
+              <span className="access-email">{ownerPerson.email}</span>
             </div>
-            <Tag>Owner</Tag>
           </li>
         )}
         {access.people.map((person) => {
@@ -174,51 +262,20 @@ const AccessPanel = ({
             <li key={person.userId} className="access-person">
               <span className="access-avatar">{person.name.charAt(0).toUpperCase()}</span>
               <div className="access-main">
-                <strong>{person.name}</strong>
-                <span>{person.email}</span>
-                <ul className="access-routes">
+                <div className="access-name">
+                  <strong>{person.name}</strong>
+                  <span className={`access-pill${canEdit ? " is-edit" : ""}`}>
+                    {canEdit ? <EditOutlined /> : <EyeOutlined />}
+                    {canEdit ? "Can edit" : "Can view"}
+                  </span>
+                </div>
+                <span className="access-email">{person.email}</span>
+                <div className="access-routes">
                   {person.routes.map((route, index) => (
-                    <li key={index}>
-                      {route.type === "direct" ? null : <FolderOutlined />}
-                      <span>{routeText(route)}</span>
-                      {route.type === "direct" && isOwner && (
-                        <Button
-                          size="small"
-                          type="link"
-                          danger
-                          onClick={() => revokeDirect(person)}
-                        >
-                          Revoke
-                        </Button>
-                      )}
-                      {route.type === "collection" && !route.collectionOwner && isOwner && (
-                        <Button
-                          size="small"
-                          type="link"
-                          danger
-                          onClick={() => revokeCollection(person, route)}
-                        >
-                          Remove from collection
-                        </Button>
-                      )}
-                      {route.type === "company" && access.companyId && (
-                        <Button
-                          size="small"
-                          type="link"
-                          onClick={() =>
-                            navigate(`/company/${access.companyId}?tab=collections`)
-                          }
-                        >
-                          Manage
-                        </Button>
-                      )}
-                    </li>
+                    <RouteChip key={index} route={route} action={routeAction(person, route)} />
                   ))}
-                </ul>
+                </div>
               </div>
-              <Tag color={canEdit ? "purple" : undefined}>
-                {permissionLabel(canEdit ? "edit" : "view")}
-              </Tag>
             </li>
           );
         })}

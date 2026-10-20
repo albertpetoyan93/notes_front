@@ -2,6 +2,7 @@ import { Spin } from "antd";
 import React, { Suspense, useEffect, useState } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import CommandPalette from "../components/shell/CommandPalette";
+import ImportPasswordsModal from "../components/shell/ImportPasswordsModal";
 import TopBar from "../components/shell/TopBar";
 import VaultSidebar from "../components/shell/VaultSidebar";
 import useAuth from "../hooks/useAuth";
@@ -107,6 +108,8 @@ const ProtectedLayout: React.FC = () => {
         onClose={() => setPaletteOpen(false)}
         companyId={companyId}
       />
+      {/* Imports go to the personal vault. */}
+      {!companyId && <ImportPasswordsModal />}
     </div>
   );
 };

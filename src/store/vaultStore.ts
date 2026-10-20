@@ -13,6 +13,9 @@ interface VaultStore {
   // Bumped when something outside the notes page (sidebar, palette) changes
   // notes, so the page refetches its list.
   listVersion: number;
+  // The "Import from another password manager" dialog, opened from the sidebar or the palette.
+  importOpen: boolean;
+  setImportOpen: (open: boolean) => void;
   setScope: (companyId: number | null) => void;
   refresh: () => Promise<void>;
   bumpList: () => void;
@@ -24,6 +27,9 @@ export const useVaultStore = create<VaultStore>((set, get) => ({
   collections: [],
   loaded: false,
   listVersion: 0,
+  importOpen: false,
+
+  setImportOpen: (importOpen) => set({ importOpen }),
 
   setScope: (companyId) => {
     if (get().companyId === companyId && get().loaded) return;
