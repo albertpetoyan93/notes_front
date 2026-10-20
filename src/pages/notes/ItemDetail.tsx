@@ -19,7 +19,7 @@ import {
   StarOutlined,
   UndoOutlined,
 } from "@ant-design/icons";
-import { Button, Drawer, Modal, Tooltip, message } from "antd";
+import { Badge, Button, Drawer, Modal, Tooltip, message } from "antd";
 import { useState, type ReactNode } from "react";
 import ActivityList from "../../components/activity/ActivityList";
 import ItemIcon from "../../components/itemIcon/ItemIcon";
@@ -30,6 +30,7 @@ import { useCompanyStore } from "../../store/companyStore";
 import type { Note } from "../../store/noteStore";
 import { useVaultStore } from "../../store/vaultStore";
 import { reportSecretUse } from "../../utils/activity";
+import AccessPanel from "./AccessPanel";
 import "./ItemDetail.scss";
 import dayjsExtra from "../../utils/dayjs";
 import { openURL } from "../../utils/isUrl";
@@ -104,6 +105,7 @@ const ItemDetail = ({
   const refreshVault = useVaultStore((state) => state.refresh);
   const bumpList = useVaultStore((state) => state.bumpList);
   const [activityOpen, setActivityOpen] = useState(false);
+  const [accessOpen, setAccessOpen] = useState(false);
   const owner = isNoteOwner(note);
   const editable = canEditNote(note) && !trash;
   const fields = noteFields(note).filter((field) => field.value.trim());
@@ -124,7 +126,10 @@ const ItemDetail = ({
     : owner;
   // Shared with you outside a company: you can drop it from your list.
   const canLeave = !owner && !!note.isShared && !companyId && !trash;
-  const shareCount = (note as Note & { shareCount?: number }).shareCount || 0;
+  // People besides the owner who can open it; sent to whoever manages access.
+  const accessCount = (note as Note & { accessCount?: number }).accessCount;
+  const peopleText = (count: number) =>
+    `${count} ${count === 1 ? "person has" : "people have"} access`;
 
   const afterLeaving = () => {
     nav.selectItem(null);
@@ -211,10 +216,14 @@ const ItemDetail = ({
             {note.isShared && !note.collection?.companyId && (
               <span className="chip is-accent">Shared by {note.sharedByName || "someone"}</span>
             )}
-            {owner && shareCount > 0 && !trash && (
-              <button type="button" className="chip is-accent chip-button" onClick={onShare}>
+            {!!accessCount && !trash && (
+              <button
+                type="button"
+                className="chip is-accent chip-button"
+                onClick={() => setAccessOpen(true)}
+              >
                 <TeamOutlined />
-                Shared with {shareCount} {shareCount === 1 ? "person" : "people"}
+                {peopleText(accessCount)}
               </button>
             )}
             {(note.tags || []).map((tag) => (
@@ -249,6 +258,20 @@ const ItemDetail = ({
                 onClick={onFavorite}
               />
               {owner && <IconAction title="Share" icon={<ShareAltOutlined />} onClick={onShare} />}
+              {canSeeActivity && (
+                <Badge
+                  className="access-action"
+                  count={accessCount || 0}
+                  size="small"
+                  offset={[-6, 6]}
+                >
+                  <IconAction
+                    title={accessCount ? `Who has access (${accessCount})` : "Who has access"}
+                    icon={<TeamOutlined />}
+                    onClick={() => setAccessOpen(true)}
+                  />
+                </Badge>
+              )}
               {canSeeActivity && (
                 <IconAction
                   title="Activity"
@@ -395,6 +418,24 @@ const ItemDetail = ({
         destroyOnClose
       >
         <ActivityList url={`/api/notes/${note.id}/activity`} withTitle={false} />
+      </Drawer>
+
+      <Drawer
+        title={`Who has access · ${note.title}`}
+        open={accessOpen}
+        onClose={() => setAccessOpen(false)}
+        width={460}
+        destroyOnClose
+      >
+        <AccessPanel
+          noteId={note.id}
+          isOwner={owner}
+          onAddPeople={() => {
+            setAccessOpen(false);
+            onShare();
+          }}
+          onChanged={bumpList}
+        />
       </Drawer>
     </div>
   );

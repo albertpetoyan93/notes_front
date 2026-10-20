@@ -12,3 +12,108 @@
     outline-offset: 2px;
   }
 }
+
+// Who has access ------------------------------------------------------------
+
+.access-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.access-summary {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--primarySoft);
+  color: var(--primaryText);
+}
+
+.access-list,
+.access-routes {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.access-person {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 0;
+
+  & + & {
+    border-top: 1px solid var(--borderSubtle);
+  }
+
+  > .ant-tag {
+    margin: 2px 0 0;
+  }
+}
+
+.access-avatar {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--primarySoft);
+  color: var(--primaryText);
+  font-weight: 650;
+
+  &.is-owner {
+    background: var(--surfaceHover);
+    color: var(--textMuted);
+  }
+}
+
+.access-main {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+
+  > span {
+    font-size: 12.5px;
+    color: var(--textMuted);
+    overflow-wrap: anywhere;
+  }
+}
+
+.access-routes {
+  margin-top: 6px;
+
+  li {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    font-size: 12.5px;
+    color: var(--textMuted);
+  }
+
+  .ant-btn-link {
+    height: auto;
+    padding: 0;
+    font-size: 12.5px;
+  }
+}
+
+.access-loading {
+  display: grid;
+  place-items: center;
+  padding: 32px 0;
+}
+
+.access-error {
+  color: var(--colorError);
+}
+
+// Count on the "Who has access" button.
+.access-action .ant-badge-count {
+  background: var(--primary);
+  box-shadow: none;
+}
