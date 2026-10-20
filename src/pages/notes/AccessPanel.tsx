@@ -78,8 +78,8 @@ interface ChipAction {
 
 const shortDate = (value: string | null) => (value ? dayjsExtra(value).format("D MMM") : null);
 
-// One way a person gets in, as a small chip; its action is an icon on the chip.
-const RouteChip = ({ route, action }: { route: Route; action: ChipAction | null }) => {
+// One way a person gets in, as a small chip.
+const RouteChip = ({ route }: { route: Route }) => {
   const until = route.type !== "company" ? shortDate(route.expiresAt) : null;
   const icon =
     route.type === "direct" ? (
@@ -109,18 +109,6 @@ const RouteChip = ({ route, action }: { route: Route; action: ChipAction | null 
           {until && <span className="access-chip-until">until {until}</span>}
         </span>
       </Tooltip>
-      {action && (
-        <Tooltip title={action.label}>
-          <button
-            type="button"
-            className={`access-chip-action${action.danger ? " is-danger" : ""}`}
-            aria-label={action.label}
-            onClick={action.onClick}
-          >
-            {action.danger ? <CloseOutlined /> : <SettingOutlined />}
-          </button>
-        </Tooltip>
-      )}
     </span>
   );
 };
@@ -258,6 +246,14 @@ const AccessPanel = ({
         )}
         {access.people.map((person) => {
           const canEdit = person.routes.some((route) => route.permission === "edit");
+          const actions = person.routes
+            .map((route) => routeAction(person, route))
+            .filter((action): action is ChipAction => !!action)
+            // Company routes all lead to the same settings page; show it once.
+            .filter(
+              (action, index, list) =>
+                list.findIndex((item) => item.label === action.label) === index
+            );
           return (
             <li key={person.userId} className="access-person">
               <span className="access-avatar">{person.name.charAt(0).toUpperCase()}</span>
@@ -272,10 +268,26 @@ const AccessPanel = ({
                 <span className="access-email">{person.email}</span>
                 <div className="access-routes">
                   {person.routes.map((route, index) => (
-                    <RouteChip key={index} route={route} action={routeAction(person, route)} />
+                    <RouteChip key={index} route={route} />
                   ))}
                 </div>
               </div>
+              {actions.length > 0 && (
+                <div className="access-actions">
+                  {actions.map((action) => (
+                    <Tooltip key={action.label} title={action.label}>
+                      <button
+                        type="button"
+                        className={`access-row-action${action.danger ? " is-danger" : ""}`}
+                        aria-label={action.label}
+                        onClick={action.onClick}
+                      >
+                        {action.danger ? <CloseOutlined /> : <SettingOutlined />}
+                      </button>
+                    </Tooltip>
+                  ))}
+                </div>
+              )}
             </li>
           );
         })}
