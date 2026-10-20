@@ -124,8 +124,10 @@ const ItemDetail = ({
   const canSeeActivity = companyId
     ? companyRole === "owner" || companyRole === "admin"
     : owner;
-  // Shared with you outside a company: you can drop it from your list.
-  const canLeave = !owner && !!note.isShared && !companyId && !trash;
+  // Shared with you on its own (not through a collection): you can drop it from
+  // your list. Items from a shared collection leave with the collection.
+  const sharedDirectly = !!(note as Note & { sharedDirectly?: boolean }).sharedDirectly;
+  const canLeave = !owner && sharedDirectly && !companyId && !trash;
   // People besides the owner who can open it; sent to whoever manages access.
   const accessCount = (note as Note & { accessCount?: number }).accessCount;
   const peopleText = (count: number) =>
