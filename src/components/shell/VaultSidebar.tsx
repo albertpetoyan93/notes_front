@@ -6,6 +6,7 @@ import {
   EditOutlined,
   FileAddOutlined,
   FolderOutlined,
+  LogoutOutlined,
   MoreOutlined,
   NumberOutlined,
   PlusOutlined,
@@ -18,6 +19,7 @@ import {
   UsergroupAddOutlined,
 } from "@ant-design/icons";
 import { Dropdown, Modal, Tooltip, message } from "antd";
+import { fetcherPost } from "../../configs/axios";
 import { useRef, useState, type ReactNode } from "react";
 import useVaultNav from "../../hooks/useVaultNav";
 import CollectionDialogs from "../../pages/notes/CollectionDialogs";
@@ -117,6 +119,27 @@ const VaultSidebar = ({ companyId }: { companyId: number | null }) => {
     });
   };
 
+  // A collection someone shared with you: stop seeing it and all its items.
+  const leaveCollection = (collection: CollectionItem) => {
+    Modal.confirm({
+      title: `Leave "${collection.name}"?`,
+      content:
+        "You stop seeing this collection and every item in it. The owner keeps it and can share it with you again.",
+      okText: "Leave collection",
+      okButtonProps: { danger: true },
+      onOk: async () => {
+        try {
+          await fetcherPost(`/api/collections/${collection.id}/leave`, {});
+          if (nav.collection === String(collection.id)) nav.go();
+          changed();
+          message.success(`You left "${collection.name}"`);
+        } catch (error: any) {
+          message.error(error?.message || "Could not leave the collection");
+        }
+      },
+    });
+  };
+
   const handleExport = async () => {
     try {
       const backup = await exportNotes();
@@ -178,7 +201,16 @@ const VaultSidebar = ({ companyId }: { companyId: number | null }) => {
               onClick: () => removeCollection(collection),
             },
           ]
-        : []),
+        : [
+            ...(canEdit ? [{ type: "divider" as const }] : []),
+            {
+              key: "leave",
+              icon: <LogoutOutlined />,
+              label: "Leave collection",
+              danger: true,
+              onClick: () => leaveCollection(collection),
+            },
+          ]),
     ];
   };
 
