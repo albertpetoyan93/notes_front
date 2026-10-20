@@ -41,8 +41,6 @@ const templateFields = (category: string): NoteField[] =>
     Array.isArray(entry) ? { label: entry[0], value: entry[1] } : { label: entry, value: "" }
   );
 
-const ENCRYPT_BY_DEFAULT = new Set(["password", "address", "card"]);
-
 // Generated passwords go into real password fields, not a PIN or CVV.
 const isPasswordField = (label: string) => /pass/i.test(label);
 
@@ -93,7 +91,6 @@ const NoteEditor = ({
         content: noteBody(note),
         tags: note.tags || [],
         isFavorite: note.isFavorite,
-        isEncrypted: note.isEncrypted,
       });
       setCategory(key);
       const passwordAt = freshPassword ? existing.findIndex((field) => isPasswordField(field.label)) : -1;
@@ -108,7 +105,6 @@ const NoteEditor = ({
       form.resetFields();
       form.setFieldsValue({
         category: key,
-        isEncrypted: ENCRYPT_BY_DEFAULT.has(key),
         collectionIds: defaultCollectionId ? [defaultCollectionId] : [],
       });
       setCategory(key);
@@ -122,7 +118,6 @@ const NoteEditor = ({
   const changeCategory = (value: string) => {
     setCategory(value);
     setFields(templateFields(value));
-    if (ENCRYPT_BY_DEFAULT.has(value)) form.setFieldValue("isEncrypted", true);
   };
 
   const updateField = (index: number, key: keyof NoteField, value: string) =>
@@ -204,7 +199,7 @@ const NoteEditor = ({
           save();
         }
       }}
-      initialValues={{ category: "note", isFavorite: false, isEncrypted: false, tags: [] }}
+      initialValues={{ category: "note", isFavorite: false, tags: [] }}
     >
       <div className="detail-head">
         <ItemIcon note={preview} size="lg" />
@@ -382,14 +377,6 @@ const NoteEditor = ({
 
       <div className="editor-switches">
         <Form.Item name="isFavorite" valuePropName="checked" label="Favorite">
-          <Switch />
-        </Form.Item>
-        <Form.Item
-          name="isEncrypted"
-          valuePropName="checked"
-          label="Encrypt content"
-          tooltip="Encrypted on the server. Logins, cards and addresses are encrypted by default."
-        >
           <Switch />
         </Form.Item>
       </div>
