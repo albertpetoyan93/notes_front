@@ -1,3 +1,4 @@
+import { isRecoveryLabel } from "./recoveryCodes";
 import { isTotpLabel } from "./totp";
 
 export function isSecretField(label?: string) {
@@ -7,6 +8,7 @@ export function isSecretField(label?: string) {
     name.includes("pass") ||
     name === "cvv" ||
     name === "pin" ||
-    isTotpLabel(name)
+    isTotpLabel(name) ||
+    isRecoveryLabel(name)
   );
 }

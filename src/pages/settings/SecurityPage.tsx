@@ -67,8 +67,9 @@ const RecoveryCodes = ({ codes }: { codes: string[] }) => {
   return (
     <div className="recovery-codes">
       <p>
-        Each code signs you in once if you lose your phone. Store them somewhere safe, like a
-        password manager or on paper. They will not be shown again.
+        Each code signs you in once if you lose your phone. Keep them outside 2keevo, on paper
+        or in another safe place: if you are locked out, you can't open 2keevo to read them.
+        They will not be shown again.
       </p>
       <ul>
         {codes.map((code) => (

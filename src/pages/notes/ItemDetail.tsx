@@ -1,4 +1,5 @@
 import {
+  CheckCircleOutlined,
   CheckOutlined,
   CopyOutlined,
   DeleteOutlined,
@@ -20,7 +21,7 @@ import {
   UndoOutlined,
 } from "@ant-design/icons";
 import { Badge, Button, Drawer, Modal, Tooltip, message } from "antd";
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import ActivityList from "../../components/activity/ActivityList";
 import ItemIcon from "../../components/itemIcon/ItemIcon";
 import { fetcherPost } from "../../configs/axios";
@@ -29,7 +30,7 @@ import useFieldClipboard, { type FieldClipboard } from "../../hooks/useFieldClip
 import useTotp from "../../hooks/useTotp";
 import useVaultNav from "../../hooks/useVaultNav";
 import { useCompanyStore } from "../../store/companyStore";
-import type { Note } from "../../store/noteStore";
+import { useNoteStore, type Note } from "../../store/noteStore";
 import { useVaultStore } from "../../store/vaultStore";
 import { reportSecretUse } from "../../utils/activity";
 import AccessPanel from "./AccessPanel";
@@ -48,7 +49,14 @@ import {
   maskValue,
   noteBody,
   noteFields,
+  type NoteField,
 } from "../../utils/noteFields";
+import {
+  formatRecoveryCodes,
+  isRecoveryLabel,
+  parseRecoveryCodes,
+  recoverySummary,
+} from "../../utils/recoveryCodes";
 import { isTotpLabel, parseTotp } from "../../utils/totp";
 import { canEditNote, isNoteOwner } from "./NoteActions";
 
@@ -121,6 +129,126 @@ const TotpFieldRow = ({
           }}
         />
       </div>
+    </div>
+  );
+};
+
+// Recovery codes: how many are left, and, once shown, each code with copy and
+// a used mark (each works only once).
+const RecoveryCodesRow = ({
+  note,
+  field,
+  editable,
+  clipboard,
+  onSaved,
+}: {
+  note: Note;
+  field: NoteField;
+  editable: boolean;
+  clipboard: FieldClipboard;
+  onSaved: () => void;
+}) => {
+  const updateNote = useNoteStore((state) => state.updateNote);
+  const [value, setValue] = useState(field.value);
+  const [saving, setSaving] = useState(false);
+  useEffect(() => setValue(field.value), [field.value]);
+
+  const codes = parseRecoveryCodes(value);
+  const { left, total } = recoverySummary(codes);
+  const rowKey = `${note.id}-recovery-${field.label}`;
+  const shown = clipboard.isVisible(rowKey);
+
+  const toggleUsed = async (index: number) => {
+    const nextValue = formatRecoveryCodes(
+      codes.map((item, at) => (at === index ? { ...item, used: !item.used } : item))
+    );
+    const all = noteFields(note);
+    const at = all.findIndex((item) => item.label === field.label && item.value === field.value);
+    if (at < 0) return;
+    const content = note.content && typeof note.content === "object" ? note.content : {};
+    setValue(nextValue);
+    setSaving(true);
+    try {
+      await updateNote(note.id, {
+        content: {
+          ...content,
+          customFields: all.map((item, i) => (i === at ? { ...item, value: nextValue } : item)),
+        },
+      } as Partial<Note>);
+      onSaved();
+    } catch {
+      setValue(field.value);
+      message.error("Could not save the change");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="field-row recovery-row">
+      <dt className="field-label">{field.label}</dt>
+      <dd className="field-value">
+        {total ? (
+          <span className={`recovery-count${left <= 2 ? " is-low" : ""}`}>
+            {left === 0
+              ? `All ${total} used. Get new codes from the site.`
+              : `${left} of ${total} left${left <= 2 ? ". Get new codes soon." : ""}`}
+          </span>
+        ) : (
+          <span className="mono">{shown ? value : "••••••••"}</span>
+        )}
+      </dd>
+      <div className="field-actions">
+        <IconAction
+          title={shown ? "Hide recovery codes" : "Show recovery codes"}
+          icon={shown ? <EyeInvisibleOutlined /> : <EyeOutlined />}
+          pressed={shown}
+          onClick={() => {
+            if (!shown) reportSecretUse(note.id, "field_revealed", field.label);
+            clipboard.toggleVisible(rowKey);
+          }}
+        />
+      </div>
+      {shown && total > 0 && (
+        <div className="recovery-panel">
+          <ul className="recovery-list">
+            {codes.map((item, index) => {
+              const key = `${rowKey}-${index}`;
+              const copied = clipboard.isCopied(key);
+              return (
+                <li key={item.code} className={item.used ? "is-used" : undefined}>
+                  <span className="mono recovery-code">{item.code}</span>
+                  {item.used && <span className="recovery-used">Used</span>}
+                  <span className="recovery-actions">
+                    {!item.used && (
+                      <IconAction
+                        title={copied ? "Copied" : "Copy code"}
+                        icon={
+                          copied ? <CheckOutlined className="field-copied" /> : <CopyOutlined />
+                        }
+                        onClick={() => {
+                          reportSecretUse(note.id, "field_copied", field.label);
+                          clipboard.copy(item.code, key, "Recovery code");
+                        }}
+                      />
+                    )}
+                    {editable && (
+                      <IconAction
+                        title={item.used ? "Mark as not used" : "Mark as used"}
+                        icon={item.used ? <UndoOutlined /> : <CheckCircleOutlined />}
+                        onClick={() => !saving && toggleUsed(index)}
+                      />
+                    )}
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+          <p className="recovery-help">
+            Each code works once. Mark a code as used after you sign in with it.
+          </p>
+        </div>
+      )}
     </div>
   );
 };
@@ -374,6 +502,18 @@ const ItemDetail = ({
       {fields.length > 0 && (
         <dl className="fields-card">
           {fields.map((field, index) => {
+            if (isRecoveryLabel(field.label)) {
+              return (
+                <RecoveryCodesRow
+                  key={`${note.id}-${index}`}
+                  note={note}
+                  field={field}
+                  editable={editable}
+                  clipboard={clipboard}
+                  onSaved={bumpList}
+                />
+              );
+            }
             if (isTotpLabel(field.label) && parseTotp(field.value)) {
               return (
                 <TotpFieldRow

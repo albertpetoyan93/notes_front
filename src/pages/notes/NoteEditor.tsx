@@ -1,9 +1,24 @@
-import { DeleteOutlined, PlusOutlined, ScanOutlined, SyncOutlined } from "@ant-design/icons";
+import {
+  DeleteOutlined,
+  EyeInvisibleOutlined,
+  EyeOutlined,
+  FileTextOutlined,
+  PlusOutlined,
+  ScanOutlined,
+  SyncOutlined,
+} from "@ant-design/icons";
 import { Button, Form, Input, Select, Switch, Tooltip, message } from "antd";
 import { useEffect, useMemo, useRef, useState, type ClipboardEvent } from "react";
 import ItemIcon from "../../components/itemIcon/ItemIcon";
 import TotpCode from "../../components/totp/TotpCode";
 import useTotp from "../../hooks/useTotp";
+import {
+  RECOVERY_FIELD_LABEL,
+  isRecoveryLabel,
+  normalizeRecoveryCodes,
+  parseRecoveryCodes,
+  recoverySummary,
+} from "../../utils/recoveryCodes";
 import { TOTP_FIELD_LABEL, isTotpLabel, readTotpQr } from "../../utils/totp";
 import { CollectionItem, Note, useNoteStore } from "../../store/noteStore";
 import {
@@ -46,6 +61,28 @@ const templateFields = (category: string): NoteField[] =>
 
 // Generated passwords go into real password fields, not a PIN or CVV.
 const isPasswordField = (label: string) => /pass/i.test(label);
+
+// Under recovery codes: how many were read, so a bad paste shows at once.
+const RecoveryHint = ({ value }: { value: string }) => {
+  if (!value.trim()) {
+    return (
+      <span className="field-hint">
+        Paste the codes, or load the .txt file the site gave you.
+      </span>
+    );
+  }
+  const codes = parseRecoveryCodes(value);
+  if (!codes.length) {
+    return <span className="field-hint is-error">No codes found. Put one code per line.</span>;
+  }
+  const { left, total } = recoverySummary(codes);
+  return (
+    <span className="field-hint">
+      {total} {total === 1 ? "code" : "codes"}
+      {left < total ? `, ${total - left} used` : ""}
+    </span>
+  );
+};
 
 // Under an authenticator key: the code it makes now, so it can be checked
 // against the site, or why it can't be used.
@@ -99,6 +136,8 @@ const NoteEditor = ({
   const [saving, setSaving] = useState(false);
   const qrInput = useRef<HTMLInputElement>(null);
   const qrTarget = useRef<number | null>(null);
+  const codesInput = useRef<HTMLInputElement>(null);
+  const codesTarget = useRef<number | null>(null);
   const title = Form.useWatch("title", form) as string | undefined;
 
   useEffect(() => {
@@ -178,7 +217,22 @@ const NoteEditor = ({
     applyQrImage(index, image);
   };
 
+  const applyCodesFile = async (index: number, file: File) => {
+    try {
+      if (file.size > 100_000) throw new Error("That file is too large for recovery codes.");
+      const text = await file.text();
+      const codes = parseRecoveryCodes(text);
+      if (!codes.length) throw new Error("No recovery codes found in that file.");
+      updateField(index, "value", normalizeRecoveryCodes(text));
+      toggleShown(index, true);
+      message.success(`${codes.length} recovery codes loaded`);
+    } catch (error) {
+      message.error(error instanceof Error ? error.message : "Could not read that file");
+    }
+  };
+
   const hasTotpField = fields.some((field) => isTotpLabel(field.label));
+  const hasRecoveryField = fields.some((field) => isRecoveryLabel(field.label));
 
   const toggleShown = (index: number, visible: boolean) =>
     setShown((current) => {
@@ -309,11 +363,12 @@ const NoteEditor = ({
           const kind = cardFieldKind(field.label);
           const secret = isSecretField(field.label);
           const totp = isTotpLabel(field.label);
+          const recovery = isRecoveryLabel(field.label);
           const value = formatCardField(field.label, field.value, "", brand);
           const onValue = (next: string) =>
             updateField(index, "value", formatCardField(field.label, next, field.value, brand));
           return (
-            <div key={index} className={`field-row is-editing${totp ? " has-hint" : ""}`}>
+            <div key={index} className={`field-row is-editing${totp || recovery ? " has-hint" : ""}`}>
               <Input
                 className="field-label-input"
                 placeholder="Field name"
@@ -335,6 +390,26 @@ const NoteEditor = ({
                       : [...CARD_BRANDS]
                     ).map((item) => ({ value: item, label: item }))}
                     onChange={setBrand}
+                  />
+                ) : recovery && field.value && !shown.has(index) ? (
+                  <Input
+                    readOnly
+                    className="mono recovery-masked"
+                    aria-label={`${field.label || "Recovery codes"}, hidden. Click to show.`}
+                    value={"•".repeat(16)}
+                    onClick={() => toggleShown(index, true)}
+                  />
+                ) : recovery ? (
+                  <TextArea
+                    className="mono"
+                    aria-label={field.label || `Field ${index + 1}`}
+                    placeholder="One code per line"
+                    autoSize={{ minRows: 3, maxRows: 10 }}
+                    autoComplete="off"
+                    spellCheck={false}
+                    value={field.value}
+                    onChange={(event) => updateField(index, "value", event.target.value)}
+                    onBlur={() => updateField(index, "value", normalizeRecoveryCodes(field.value))}
                   />
                 ) : secret ? (
                   <Input.Password
@@ -377,8 +452,36 @@ const NoteEditor = ({
                   />
                 )}
                 {totp && <TotpHint value={field.value} />}
+                {recovery && <RecoveryHint value={field.value} />}
               </div>
               <div className="field-actions">
+                {recovery && (
+                  <>
+                    <Tooltip title="Load from a .txt file">
+                      <Button
+                        type="text"
+                        className="icon-btn"
+                        aria-label="Load recovery codes from a .txt file"
+                        icon={<FileTextOutlined />}
+                        onClick={() => {
+                          codesTarget.current = index;
+                          codesInput.current?.click();
+                        }}
+                      />
+                    </Tooltip>
+                    {!!field.value && (
+                      <Tooltip title={shown.has(index) ? "Hide codes" : "Show codes"}>
+                        <Button
+                          type="text"
+                          className="icon-btn"
+                          aria-label={shown.has(index) ? "Hide codes" : "Show codes"}
+                          icon={shown.has(index) ? <EyeInvisibleOutlined /> : <EyeOutlined />}
+                          onClick={() => toggleShown(index, !shown.has(index))}
+                        />
+                      </Tooltip>
+                    )}
+                  </>
+                )}
                 {totp && (
                   <Tooltip title="Scan a QR code from an image">
                     <Button
@@ -439,6 +542,18 @@ const NoteEditor = ({
               <PlusOutlined /> Authenticator key
             </button>
           )}
+          {category === "password" && !hasRecoveryField && (
+            <button
+              type="button"
+              className="field-add"
+              onClick={() => {
+                setFields((current) => [...current, { label: RECOVERY_FIELD_LABEL, value: "" }]);
+                toggleShown(fields.length, true);
+              }}
+            >
+              <PlusOutlined /> Recovery codes
+            </button>
+          )}
         </div>
         <input
           ref={qrInput}
@@ -452,6 +567,20 @@ const NoteEditor = ({
             const index = qrTarget.current;
             event.target.value = "";
             if (file && index !== null) applyQrImage(index, file);
+          }}
+        />
+        <input
+          ref={codesInput}
+          type="file"
+          accept=".txt,text/plain"
+          style={{ display: "none" }}
+          aria-hidden="true"
+          tabIndex={-1}
+          onChange={(event) => {
+            const file = event.target.files?.[0];
+            const index = codesTarget.current;
+            event.target.value = "";
+            if (file && index !== null) applyCodesFile(index, file);
           }}
         />
       </section>

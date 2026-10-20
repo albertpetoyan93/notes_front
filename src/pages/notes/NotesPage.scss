@@ -640,6 +640,7 @@
   // "Add field", and "Authenticator key" on logins that have none yet.
   .field-add-row {
     display: flex;
+    flex-wrap: wrap;
     border-top: 1px solid var(--borderSubtle);
 
     &:first-child {
@@ -649,10 +650,11 @@
 
   .field-add {
     display: flex;
-    flex: 1;
+    flex: 1 0 auto;
     align-items: center;
     gap: 8px;
     min-width: 0;
+    white-space: nowrap;
     height: 44px;
     padding: 0 16px;
     border: 0;
@@ -680,6 +682,11 @@
   // field name and the icons.
   .field-row.is-editing.has-hint {
     padding-bottom: 28px;
+  }
+
+  // Saved recovery codes stay hidden until clicked.
+  .recovery-masked.ant-input {
+    cursor: pointer;
   }
 
   // Under an authenticator key: the code it makes now, or why it can't.
