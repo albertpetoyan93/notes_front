@@ -1,5 +1,5 @@
 import { useCallback } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { categoryKey } from "../utils/noteCategory";
 
 export type VaultView = "all" | "favorites" | "shared" | "trash" | "health";
@@ -21,9 +21,16 @@ const NAV_KEYS = [
 
 const isPhone = () => window.matchMedia("(max-width: 820px)").matches;
 
+// Pages that show the vault list; anywhere else (settings), going to a
+// section leaves the page for the personal vault.
+const isVaultPath = (pathname: string) =>
+  pathname === "/" || pathname === "/notes" || pathname.startsWith("/company/");
+
 // The vault's place lives in the URL, so every view can be linked and reloaded.
 const useVaultNav = () => {
   const [params, setParams] = useSearchParams();
+  const { pathname } = useLocation();
+  const navigate = useNavigate();
 
   const view: VaultView =
     params.get("trash") === "true"
@@ -58,13 +65,22 @@ const useVaultNav = () => {
 
   const go = useCallback(
     (updates: Record<string, string | null | undefined> = {}) => {
+      if (!isVaultPath(pathname)) {
+        const next = new URLSearchParams();
+        Object.entries(updates).forEach(([key, value]) => {
+          if (value && value !== "all") next.set(key, value);
+        });
+        const query = next.toString();
+        navigate(query ? `/notes?${query}` : "/notes");
+        return;
+      }
       const cleared: Record<string, string | null> = {};
       NAV_KEYS.forEach((key) => {
         cleared[key] = null;
       });
       update({ ...cleared, ...updates });
     },
-    [update]
+    [update, pathname, navigate]
   );
 
   const selectItem = useCallback(
