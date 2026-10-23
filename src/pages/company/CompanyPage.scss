@@ -185,3 +185,94 @@
     font-size: 12.5px;
   }
 }
+
+// Security policies in the company's settings.
+.policy-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 16px;
+
+  h2 {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 600;
+  }
+}
+
+.policy-intro {
+  margin: 0 0 8px;
+  font-size: 13px;
+  color: var(--textMuted);
+}
+
+.policy-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 0;
+  border-top: 1px solid var(--borderSubtle);
+}
+
+.policy-icon {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  background: var(--primarySoft);
+  color: var(--primaryText);
+}
+
+.policy-main {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 200px;
+
+  strong {
+    font-weight: 600;
+  }
+
+  span {
+    font-size: 12.5px;
+    color: var(--textMuted);
+  }
+}
+
+.policy-people {
+  margin: 8px 0 0;
+  padding-left: 18px;
+
+  span {
+    color: var(--textMuted);
+  }
+}
+
+// Shown to members a company's 2FA rule keeps out.
+.company-blocked {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin: 16px;
+  padding: 14px 16px;
+  border-radius: 12px;
+  background: var(--warnSoft);
+  box-shadow: inset 3px 0 0 var(--warnText);
+
+  .company-blocked-text {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 220px;
+
+    strong {
+      color: var(--warnText);
+    }
+  }
+}

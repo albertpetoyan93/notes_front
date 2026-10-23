@@ -2,14 +2,18 @@ import {
   KeyOutlined,
   CloseOutlined,
   FilterOutlined,
+  ReloadOutlined,
   StarFilled,
   TeamOutlined,
 } from "@ant-design/icons";
-import { Checkbox, Input, Skeleton } from "antd";
+import { Button, Checkbox, Input, Skeleton } from "antd";
 import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import ItemIcon from "../../components/itemIcon/ItemIcon";
+import type { BreachCheckState } from "../../hooks/useBreachCheck";
 import type { Note } from "../../store/noteStore";
+import dayjsExtra from "../../utils/dayjs";
 import {
+  HEALTH_KINDS,
   HEALTH_LABEL,
   healthIssues,
   notePasskeys,
@@ -63,12 +67,14 @@ export const HealthSummary = ({
   flagged,
   active,
   onPick,
+  breach,
 }: {
   logins: number;
   counts: Record<HealthKind, number>;
   flagged: number;
   active: string;
   onPick: (kind: HealthKind | null) => void;
+  breach?: BreachCheckState;
 }) => {
   const score = logins ? Math.round((100 * (logins - flagged)) / logins) : 100;
   return (
@@ -88,7 +94,7 @@ export const HealthSummary = ({
         <span style={{ width: `${score}%` }} />
       </div>
       <div className="health-tiles">
-        {(["weak", "reused", "stale"] as HealthKind[]).map((kind) => (
+        {HEALTH_KINDS.map((kind) => (
           <button
             key={kind}
             type="button"
@@ -101,6 +107,28 @@ export const HealthSummary = ({
           </button>
         ))}
       </div>
+      {breach && (
+        <div className="health-breach" aria-live="polite">
+          <span className={`health-breach-text${breach.error ? " is-error" : ""}`}>
+            {breach.running
+              ? `Checking for leaked passwords… ${breach.done} of ${breach.total}`
+              : breach.error
+                ? breach.error
+                : breach.checkedAt
+                  ? `Leak check: ${dayjsExtra(breach.checkedAt).fromNow()}`
+                  : "Leak check has not run yet"}
+          </span>
+          <Button
+            size="small"
+            type="text"
+            icon={<ReloadOutlined />}
+            loading={breach.running}
+            onClick={breach.checkNow}
+          >
+            Check now
+          </Button>
+        </div>
+      )}
     </div>
   );
 };

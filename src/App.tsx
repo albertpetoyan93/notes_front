@@ -7,6 +7,7 @@ import {
   useThemeVariant,
 } from "./contexts/ThemeVariantContext";
 import { getThemeConfig } from "./configs/theme";
+import AppStatus from "./components/pwa/AppStatus";
 import AppRoutes from "./routes";
 
 function AppContent() {
@@ -35,6 +36,7 @@ function AppContent() {
       <BrowserRouter basename={import.meta.env.VITE_APP_BASE_NAME}>
         <AppRoutes />
       </BrowserRouter>
+      <AppStatus />
     </ConfigProvider>
   );
 }

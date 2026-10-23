@@ -63,7 +63,13 @@ const TopBar = ({
     <Link to="/notes" className="topbar-brand" aria-label="2keevo, personal vault">
       <BrandLockup />
     </Link>
-    <button type="button" className="topbar-search" onClick={onSearch} aria-keyshortcuts="Control+K Meta+K">
+    <button
+      type="button"
+      className="topbar-search"
+      onClick={onSearch}
+      aria-label="Search the vault"
+      aria-keyshortcuts="Control+K Meta+K"
+    >
       <SearchOutlined />
       <span className="topbar-search-text">Search the vault or run a command…</span>
       <kbd>{shortcut}</kbd>

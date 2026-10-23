@@ -8,6 +8,7 @@ import {
   FolderOutlined,
   LogoutOutlined,
   KeyOutlined,
+  SafetyOutlined,
   MoreOutlined,
   NumberOutlined,
   PlusOutlined,
@@ -71,7 +72,8 @@ const Heading = ({ children, action }: { children: ReactNode; action?: ReactNode
 
 const VaultSidebar = ({ companyId }: { companyId: number | null }) => {
   const nav = useVaultNav();
-  const { summary, collections, refresh, bumpList, setImportOpen } = useVaultStore();
+  const { summary, collections, refresh, bumpList, setImportOpen, setAuthenticatorImportOpen } =
+    useVaultStore();
   const { deleteCollection, exportNotes, importNotes } = useNoteStore();
   const company = useCompanyStore((state) =>
     state.companies.find((item) => item.id === companyId)
@@ -389,6 +391,21 @@ const VaultSidebar = ({ companyId }: { companyId: number | null }) => {
                       </span>
                     ),
                     onClick: () => setImportOpen(true),
+                  },
+                  {
+                    key: "import-authenticator",
+                    label: (
+                      <span className="backup-option">
+                        <span className="backup-icon authenticator">
+                          <SafetyOutlined />
+                        </span>
+                        <span className="backup-copy">
+                          <strong>Import authenticator codes</strong>
+                          <small>From Google Authenticator</small>
+                        </span>
+                      </span>
+                    ),
+                    onClick: () => setAuthenticatorImportOpen(true),
                   },
                   { type: "divider" },
                   {

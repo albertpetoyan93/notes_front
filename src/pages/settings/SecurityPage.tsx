@@ -23,6 +23,8 @@ import { useAuthStore } from "../../store/authStore";
 import dayjsExtra from "../../utils/dayjs";
 import { browserAndOs, isPhoneAgent } from "../../utils/device";
 import "../company/CompanyPage.scss";
+import AutoLockSection from "./AutoLockSection";
+import ClipboardSection from "./ClipboardSection";
 import PasskeysSection from "./PasskeysSection";
 import "./SecurityPage.scss";
 
@@ -405,6 +407,10 @@ const SecurityPage = () => {
       </section>
 
       <PasskeysSection />
+
+      <AutoLockSection />
+
+      <ClipboardSection />
 
       <section className="security-section">
         <div className="security-section-head">

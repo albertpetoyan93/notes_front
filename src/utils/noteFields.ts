@@ -101,21 +101,28 @@ export const noteSubtitle = (note: Note) => {
   }
 };
 
-export type HealthKind = "weak" | "reused" | "stale";
+export type HealthKind = "breached" | "weak" | "reused" | "stale";
+
+// Most urgent first: a leaked password is the one to change today.
+export const HEALTH_KINDS: HealthKind[] = ["breached", "weak", "reused", "stale"];
 
 export const HEALTH_LABEL: Record<HealthKind, string> = {
+  breached: "Leaked",
   weak: "Weak",
   reused: "Reused",
   stale: "Old",
 };
 
 export const HEALTH_TITLE: Record<HealthKind, string> = {
+  breached: "Leaked password",
   weak: "Weak password",
   reused: "Reused password",
   stale: "Password not changed in over 6 months",
 };
 
 export const HEALTH_HELP: Record<HealthKind, string> = {
+  breached:
+    "This password appears in known data leaks, so attackers try it. Change it on the site and here.",
   weak: "It is short or uses too few kinds of characters.",
   reused: "Another login in your vault uses the same password.",
   stale: "Changing passwords now and then limits the damage of an old leak.",
@@ -124,7 +131,7 @@ export const HEALTH_HELP: Record<HealthKind, string> = {
 export const healthIssues = (note: Pick<Note, "passwordHealth">): HealthKind[] => {
   const health = note.passwordHealth;
   if (!health) return [];
-  return (["weak", "reused", "stale"] as HealthKind[]).filter((kind) => health[kind]);
+  return HEALTH_KINDS.filter((kind) => !!health[kind]);
 };
 
 export const searchText = (note: Note) =>

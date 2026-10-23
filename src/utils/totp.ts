@@ -145,8 +145,8 @@ export const groupCode = (code: string) => {
   return `${code.slice(0, half)} ${code.slice(half)}`;
 };
 
-// Reads the otpauth:// link from a screenshot or photo of the site's QR code.
-export const readTotpQr = async (file: Blob): Promise<string> => {
+// The text inside a QR code in a screenshot or photo.
+export const readQrImage = async (file: Blob): Promise<string> => {
   const { default: jsQR } = await import("jsqr");
   const bitmap = await createImageBitmap(file);
   // Large photos are scaled down; QR codes stay readable and decoding stays fast.
@@ -163,8 +163,19 @@ export const readTotpQr = async (file: Blob): Promise<string> => {
   const pixels = context.getImageData(0, 0, width, height);
   const result = jsQR(pixels.data, width, height, { inversionAttempts: "attemptBoth" });
   if (!result?.data) throw new Error("No QR code found in that image.");
-  if (!parseTotp(result.data)) {
+  return result.data.trim();
+};
+
+// Reads the otpauth:// link from a screenshot or photo of the site's QR code.
+export const readTotpQr = async (file: Blob): Promise<string> => {
+  const text = await readQrImage(file);
+  if (/^otpauth-migration:/i.test(text)) {
+    throw new Error(
+      "This is a Google Authenticator transfer code. Use Import → Google Authenticator to add all its accounts."
+    );
+  }
+  if (!parseTotp(text)) {
     throw new Error("That QR code is not an authenticator code (otpauth://totp/…).");
   }
-  return result.data.trim();
+  return text;
 };

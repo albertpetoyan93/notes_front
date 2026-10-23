@@ -14,6 +14,7 @@ import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import ActivityList from "../../components/activity/ActivityList";
 import axios from "../../configs/axios";
 import NotesPage from "../notes/NotesPage";
+import CompanyPoliciesSection from "./CompanyPoliciesSection";
 import { useNoteStore } from "../../store/noteStore";
 import { useCompanyStore } from "../../store/companyStore";
 import { useVaultStore } from "../../store/vaultStore";
@@ -651,7 +652,7 @@ const CompanyPage = () => {
       <div className="manage-head">
         <div>
           <h1 className="display-font">Settings</h1>
-          <p>How {company.name} appears to its members.</p>
+          <p>The name {company.name} goes by, and the security rules for its members.</p>
         </div>
       </div>
       <section className="manage-card">
@@ -669,6 +670,7 @@ const CompanyPage = () => {
           </Button>
         </div>
       </section>
+      <CompanyPoliciesSection companyId={companyId} />
     </>
   );
 
@@ -685,6 +687,17 @@ const CompanyPage = () => {
 
   return (
     <>
+      {company.blocked === "2fa" && !panel && (
+        <div className="company-blocked" role="alert">
+          <div className="company-blocked-text">
+            <strong>{company.name} requires two-factor authentication</strong>
+            <span>Turn it on for your account to see the company's items.</span>
+          </div>
+          <Button type="primary" onClick={() => navigate("/settings/security")}>
+            Set up two-factor authentication
+          </Button>
+        </div>
+      )}
       {panel ? <div className="manage-page">{panel}</div> : <NotesPage companyId={companyId} />}
       <Modal
         title={`Invite to ${company.name}`}

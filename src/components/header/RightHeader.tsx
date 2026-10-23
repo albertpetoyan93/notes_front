@@ -1,13 +1,24 @@
-import { BellOutlined, LogoutOutlined, MoonOutlined, SafetyOutlined, SunOutlined } from "@ant-design/icons";
-import { Badge, Button, Dropdown, Empty, Tooltip } from "antd";
+import {
+  BellOutlined,
+  DownloadOutlined,
+  LinkOutlined,
+  LockOutlined,
+  LogoutOutlined,
+  MoonOutlined,
+  SafetyOutlined,
+  SunOutlined,
+} from "@ant-design/icons";
+import { Badge, Button, Dropdown, Empty, Modal, Tooltip } from "antd";
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import CompanyRequests from "../company/CompanyRequests";
 import axios from "../../configs/axios";
 import { useTheme } from "../../contexts/ThemeContext";
 import useAuth from "../../hooks/useAuth";
+import useInstallApp from "../../hooks/useInstallApp";
 import { useAuthStore } from "../../store/authStore";
 import { useCompanyStore } from "../../store/companyStore";
+import { lockVault } from "../../utils/autoLock";
 
 interface AppNotification {
   id: number;
@@ -21,6 +32,32 @@ interface AppNotification {
 const RightHeader = () => {
   const { mode, handleThemeChange } = useTheme();
   const { logOut } = useAuth();
+  const installApp = useInstallApp();
+
+  const install = () => {
+    if (!installApp.appleSteps) {
+      installApp.install();
+      return;
+    }
+    Modal.info({
+      title: "Add 2keevo to your Home Screen",
+      icon: <DownloadOutlined />,
+      content: (
+        <ol className="install-steps">
+          <li>
+            In Safari, tap <strong>Share</strong> (the square with an arrow).
+          </li>
+          <li>
+            Choose <strong>Add to Home Screen</strong>.
+          </li>
+          <li>
+            Tap <strong>Add</strong>. 2keevo opens full screen from its icon.
+          </li>
+        </ol>
+      ),
+      okText: "Got it",
+    });
+  };
   const navigate = useNavigate();
   const { me } = useAuthStore();
   const [items, setItems] = useState<AppNotification[]>([]);
@@ -127,6 +164,28 @@ const RightHeader = () => {
               key: "security",
               icon: <SafetyOutlined />,
               onClick: () => navigate("/settings/security"),
+            },
+            {
+              label: "One-time links",
+              key: "links",
+              icon: <LinkOutlined />,
+              onClick: () => navigate("/links"),
+            },
+            ...(installApp.available
+              ? [
+                  {
+                    label: "Install app",
+                    key: "install",
+                    icon: <DownloadOutlined />,
+                    onClick: install,
+                  },
+                ]
+              : []),
+            {
+              label: "Lock now",
+              key: "lock",
+              icon: <LockOutlined />,
+              onClick: () => lockVault(),
             },
             { type: "divider" },
             {

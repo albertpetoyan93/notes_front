@@ -3,6 +3,7 @@ import React, { lazy } from "react";
 const NotesPage = lazy(() => import("../pages/notes/NotesPage"));
 const CompanyPage = lazy(() => import("../pages/company/CompanyPage"));
 const SecurityPage = lazy(() => import("../pages/settings/SecurityPage"));
+const SecretLinksPage = lazy(() => import("../pages/settings/SecretLinksPage"));
 
 interface RouteConfig {
   path?: string;
@@ -29,6 +30,10 @@ const ProtectedRoutes: RouteConfig[] = [
   {
     path: "/settings/security",
     element: <SecurityPage />,
+  },
+  {
+    path: "/links",
+    element: <SecretLinksPage />,
   },
 ];
 

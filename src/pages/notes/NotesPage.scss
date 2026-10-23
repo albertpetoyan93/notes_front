@@ -38,6 +38,11 @@
   font-weight: 600;
   line-height: 16px;
 
+  &.is-breached {
+    color: #ffffff;
+    background: var(--colorError);
+  }
+
   &.is-weak {
     color: var(--dangerText);
     background: var(--dangerSoft);
@@ -325,7 +330,7 @@
 
 .health-tiles {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 8px;
 }
 
@@ -351,6 +356,10 @@
     box-shadow: 0 0 0 1px var(--primary);
   }
 
+  &.is-breached .health-tile-count {
+    color: var(--colorError);
+  }
+
   &.is-weak .health-tile-count {
     color: var(--dangerText);
   }
@@ -361,6 +370,25 @@
 
   &.is-stale .health-tile-count {
     color: var(--staleText);
+  }
+}
+
+// "Leak check: 2 days ago · Check now" under the tiles.
+.health-breach {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px 8px;
+  margin-top: 10px;
+  font-size: 12.5px;
+}
+
+.health-breach-text {
+  color: var(--textMuted);
+
+  &.is-error {
+    color: var(--colorError);
   }
 }
 
@@ -472,6 +500,15 @@
 
     span {
       color: var(--textMuted);
+    }
+  }
+
+  &.is-breached {
+    background: var(--dangerSoft);
+    box-shadow: inset 3px 0 0 var(--colorError);
+
+    .alert-icon {
+      color: var(--colorError);
     }
   }
 

@@ -13,13 +13,16 @@ import { fetcherPost } from "../../configs/axios";
 import useVaultNav from "../../hooks/useVaultNav";
 import { Note, useNoteStore } from "../../store/noteStore";
 import { useVaultStore } from "../../store/vaultStore";
+import { useCompanyStore } from "../../store/companyStore";
 import { categoryPlural } from "../../utils/noteCategory";
 import {
   healthIssues,
   searchText,
+  HEALTH_KINDS,
   type HealthKind,
 } from "../../utils/noteFields";
 import CollectionDialogs from "./CollectionDialogs";
+import useBreachCheck from "../../hooks/useBreachCheck";
 import ItemDetail from "./ItemDetail";
 import ItemList, { HealthSummary, ListFilter } from "./ItemList";
 import { isNoteOwner } from "./NoteActions";
@@ -69,7 +72,7 @@ const undoToast = (text: string, undo: () => Promise<void>) => {
   });
 };
 
-const HEALTH_ORDER: HealthKind[] = ["weak", "reused", "stale"];
+const HEALTH_ORDER = HEALTH_KINDS;
 const severity = (note: Note) => {
   const first = healthIssues(note)[0];
   return first ? HEALTH_ORDER.indexOf(first) : HEALTH_ORDER.length;
@@ -94,6 +97,13 @@ const NotesPage = ({ companyId }: { companyId?: number }) => {
   const refreshVault = useVaultStore((state) => state.refresh);
   const listVersion = useVaultStore((state) => state.listVersion);
   const setImportOpen = useVaultStore((state) => state.setImportOpen);
+  // The company's password rule, shown in the editor for its logins.
+  const company = useCompanyStore((state) =>
+    companyId ? state.companies.find((item) => item.id === companyId) : undefined
+  );
+  const passwordRule = company?.policies?.minPasswordLength
+    ? { length: company.policies.minPasswordLength, company: company.name }
+    : null;
   const phone = usePhone();
 
   const [editing, setEditing] = useState<{
@@ -107,6 +117,8 @@ const NotesPage = ({ companyId }: { companyId?: number }) => {
   const [bulkCollection, setBulkCollection] = useState<string>();
 
   const isHealth = nav.view === "health";
+  // Checks for leaked passwords while Security health is open.
+  const breach = useBreachCheck(summary, isHealth, refreshVault);
   const isTrash = nav.view === "trash";
   const activeCollection =
     collections.find(
@@ -153,7 +165,7 @@ const NotesPage = ({ companyId }: { companyId?: number }) => {
   }, [fetchList, refreshVault]);
 
   const healthCounts = useMemo(() => {
-    const counts: Record<HealthKind, number> = { weak: 0, reused: 0, stale: 0 };
+    const counts: Record<HealthKind, number> = { breached: 0, weak: 0, reused: 0, stale: 0 };
     summary.forEach((note) =>
       healthIssues(note).forEach((kind) => (counts[kind] += 1)),
     );
@@ -469,6 +481,7 @@ const NotesPage = ({ companyId }: { companyId?: number }) => {
       flagged={summary.filter((note) => healthIssues(note).length > 0).length}
       active={nav.health}
       onPick={(kind) => nav.update({ health: kind || "1", item: null })}
+      breach={breach}
     />
   ) : isTrash && list.length > 0 ? (
     <div className="list-note">
@@ -516,6 +529,7 @@ const NotesPage = ({ companyId }: { companyId?: number }) => {
           initialCategory={nav.newCategory}
           collections={collections}
           requireCollection={!!companyId}
+          passwordRule={passwordRule}
           defaultCollectionId={
             activeCollection &&
             (activeCollection.permission === "owner" ||
@@ -550,6 +564,7 @@ const NotesPage = ({ companyId }: { companyId?: number }) => {
           freshPassword={editing.freshPassword}
           collections={collections}
           requireCollection={!!companyId}
+          passwordRule={passwordRule}
           onCancel={() => setEditing(null)}
           onSaved={() => {
             const fixed = editing.freshPassword;

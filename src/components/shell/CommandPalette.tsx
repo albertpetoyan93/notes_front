@@ -4,6 +4,7 @@ import {
   BgColorsOutlined,
   DeleteOutlined,
   KeyOutlined,
+  SafetyOutlined,
   PlusOutlined,
   SafetyCertificateOutlined,
   SearchOutlined,
@@ -46,6 +47,7 @@ const CommandPalette = ({
   const navigate = useNavigate();
   const summary = useVaultStore((state) => state.summary);
   const setImportOpen = useVaultStore((state) => state.setImportOpen);
+  const setAuthenticatorImportOpen = useVaultStore((state) => state.setAuthenticatorImportOpen);
   const companies = useCompanyStore((state) => state.companies);
   const { mode, handleThemeChange } = useTheme();
   const [query, setQuery] = useState("");
@@ -101,6 +103,14 @@ const CommandPalette = ({
               icon: <KeyOutlined />,
               run: () => setImportOpen(true),
             },
+            {
+              key: "import-authenticator",
+              group: "Commands" as const,
+              label: "Import authenticator codes from Google Authenticator",
+              hint: "Import",
+              icon: <SafetyOutlined />,
+              run: () => setAuthenticatorImportOpen(true),
+            },
           ]
         : []),
       ...(companyId
@@ -127,7 +137,7 @@ const CommandPalette = ({
     ];
 
     return [...items, ...commands.filter((entry) => !q || entry.label.toLowerCase().includes(q))];
-  }, [query, summary, companies, companyId, base, mode, navigate, handleThemeChange, setImportOpen]);
+  }, [query, summary, companies, companyId, base, mode, navigate, handleThemeChange, setImportOpen, setAuthenticatorImportOpen]);
 
   useEffect(() => {
     setActive(0);

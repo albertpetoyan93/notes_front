@@ -16,6 +16,9 @@ interface VaultStore {
   // The "Import from another password manager" dialog, opened from the sidebar or the palette.
   importOpen: boolean;
   setImportOpen: (open: boolean) => void;
+  // "Import from Google Authenticator" dialog.
+  authenticatorImportOpen: boolean;
+  setAuthenticatorImportOpen: (open: boolean) => void;
   setScope: (companyId: number | null) => void;
   refresh: () => Promise<void>;
   bumpList: () => void;
@@ -30,6 +33,8 @@ export const useVaultStore = create<VaultStore>((set, get) => ({
   importOpen: false,
 
   setImportOpen: (importOpen) => set({ importOpen }),
+  authenticatorImportOpen: false,
+  setAuthenticatorImportOpen: (authenticatorImportOpen) => set({ authenticatorImportOpen }),
 
   setScope: (companyId) => {
     if (get().companyId === companyId && get().loaded) return;

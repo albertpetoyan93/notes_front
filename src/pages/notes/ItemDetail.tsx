@@ -11,9 +11,11 @@ import {
   FolderOutlined,
   HistoryOutlined,
   KeyOutlined,
+  LinkOutlined,
   LeftOutlined,
   LogoutOutlined,
   MinusCircleOutlined,
+  RollbackOutlined,
   SafetyCertificateOutlined,
   ShareAltOutlined,
   StarFilled,
@@ -35,8 +37,11 @@ import { useNoteStore, type Note } from "../../store/noteStore";
 import { useVaultStore } from "../../store/vaultStore";
 import { reportSecretUse } from "../../utils/activity";
 import AccessPanel from "./AccessPanel";
+import VersionHistory from "./VersionHistory";
+import SendLinkModal from "../../components/secretLink/SendLinkModal";
 import "./ItemDetail.scss";
 import dayjsExtra from "../../utils/dayjs";
+import { cardFieldKind } from "../../utils/cardField";
 import { openURL } from "../../utils/isUrl";
 import { categoryClass, categoryLabel } from "../../utils/noteCategory";
 import {
@@ -127,7 +132,7 @@ const TotpFieldRow = ({
           onClick={() => {
             if (!code) return;
             reportSecretUse(noteId, "field_copied", "One-time code");
-            clipboard.copy(code, key, "One-time code");
+            clipboard.copy(code, key, "One-time code", true);
           }}
         />
       </div>
@@ -230,7 +235,7 @@ const RecoveryCodesRow = ({
                         }
                         onClick={() => {
                           reportSecretUse(note.id, "field_copied", field.label);
-                          clipboard.copy(item.code, key, "Recovery code");
+                          clipboard.copy(item.code, key, "Recovery code", true);
                         }}
                       />
                     )}
@@ -273,6 +278,8 @@ const ItemDetail = ({
   const refreshVault = useVaultStore((state) => state.refresh);
   const bumpList = useVaultStore((state) => state.bumpList);
   const [activityOpen, setActivityOpen] = useState(false);
+  const [versionsOpen, setVersionsOpen] = useState(false);
+  const [linkOpen, setLinkOpen] = useState(false);
   const [accessOpen, setAccessOpen] = useState(false);
   const owner = isNoteOwner(note);
   const editable = canEditNote(note) && !trash;
@@ -357,7 +364,8 @@ const ItemDetail = ({
 
   const copyField = (value: string, key: string, label: string, secret: boolean) => {
     if (secret) reportSecretUse(note.id, "field_copied", label);
-    clipboard.copy(value, key, label);
+    // Card numbers are shown, but still cleared from the clipboard.
+    clipboard.copy(value, key, label, secret || cardFieldKind(label) === "number");
   };
 
   const edited = dayjsExtra(note.updatedAt);
@@ -448,6 +456,20 @@ const ItemDetail = ({
                   title="Activity"
                   icon={<HistoryOutlined />}
                   onClick={() => setActivityOpen(true)}
+                />
+              )}
+              {editable && (
+                <IconAction
+                  title="Send as a one-time link"
+                  icon={<LinkOutlined />}
+                  onClick={() => setLinkOpen(true)}
+                />
+              )}
+              {editable && (
+                <IconAction
+                  title="Version history"
+                  icon={<RollbackOutlined />}
+                  onClick={() => setVersionsOpen(true)}
                 />
               )}
               {canLeave && (
@@ -635,6 +657,24 @@ const ItemDetail = ({
         destroyOnClose
       >
         <ActivityList url={`/api/notes/${note.id}/activity`} withTitle={false} />
+      </Drawer>
+
+      <SendLinkModal open={linkOpen} note={note} onClose={() => setLinkOpen(false)} />
+
+      <Drawer
+        title={`Version history · ${note.title}`}
+        open={versionsOpen}
+        onClose={() => setVersionsOpen(false)}
+        width={460}
+        destroyOnClose
+      >
+        <VersionHistory
+          note={note}
+          onRestored={() => {
+            bumpList();
+            refreshVault();
+          }}
+        />
       </Drawer>
 
       <Drawer

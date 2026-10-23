@@ -7,6 +7,17 @@ export interface CompanySummary {
   status: "active" | "suspended";
   role: "owner" | "admin" | "member";
   memberStatus: "invited" | "active" | "removed";
+  /** Security rules set by the company's owners and admins. */
+  policies?: CompanyPolicies;
+  /** Set when the company's rules keep its items closed to you (no 2FA). */
+  blocked?: "2fa" | null;
+}
+
+export interface CompanyPolicies {
+  require2fa?: boolean;
+  minPasswordLength?: number | null;
+  maxSessionDays?: number | null;
+  maxIdleMinutes?: number | null;
 }
 
 interface CompanyStore {

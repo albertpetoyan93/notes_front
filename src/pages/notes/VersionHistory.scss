@@ -1,0 +1,202 @@
+// Version history drawer: a timeline of saves, and one version's fields.
+.version-intro {
+  margin: 0 0 12px;
+  font-size: 13px;
+  color: var(--textMuted);
+}
+
+.version-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.version-row {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  width: 100%;
+  padding: 10px 8px 10px 4px;
+  border: 0;
+  border-radius: 10px;
+  background: none;
+  color: var(--colorText);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+
+  &:hover {
+    background: var(--surfaceHover);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--primary);
+    outline-offset: 1px;
+  }
+}
+
+// The line joining the dots.
+.version-list li:not(:last-child) .version-row::after {
+  content: "";
+  position: absolute;
+  top: 26px;
+  bottom: -10px;
+  left: 13px;
+  width: 2px;
+  background: var(--borderSubtle);
+}
+
+.version-dot {
+  flex: none;
+  width: 12px;
+  height: 12px;
+  margin: 4px 0 0 4px;
+  border: 2px solid var(--primary);
+  border-radius: 50%;
+  background: var(--surfaceCard);
+}
+
+.version-list li:first-child .version-dot {
+  background: var(--primary);
+}
+
+.version-main {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.version-when {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  strong {
+    font-weight: 600;
+  }
+
+  .ant-tag {
+    margin: 0;
+  }
+}
+
+.version-who {
+  font-size: 12.5px;
+  color: var(--textMuted);
+}
+
+.version-changes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.version-change {
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--surfaceHover);
+  font-size: 11.5px;
+  color: var(--textMuted);
+}
+
+.version-detail {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+
+  > .ant-btn-text {
+    padding-left: 4px;
+  }
+
+  > .ant-btn-block {
+    width: 100%;
+  }
+}
+
+.version-detail-head {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+
+  span {
+    font-size: 12.5px;
+    color: var(--textMuted);
+  }
+}
+
+.version-fields {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  margin: 0;
+  overflow: hidden;
+  border: 1px solid var(--borderSubtle);
+  border-radius: 12px;
+
+  > div {
+    display: grid;
+    grid-template-columns: 110px minmax(0, 1fr);
+    gap: 10px;
+    align-items: center;
+    padding: 8px 12px;
+
+    & + div {
+      border-top: 1px solid var(--borderSubtle);
+    }
+
+    &.is-changed {
+      background: var(--warnSoft);
+      box-shadow: inset 3px 0 0 var(--warnText);
+    }
+  }
+
+  dt {
+    font-size: 12.5px;
+    color: var(--textMuted);
+  }
+
+  dd {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    min-width: 0;
+    margin: 0;
+    overflow-wrap: anywhere;
+  }
+}
+
+.version-body {
+  white-space: pre-wrap;
+}
+
+.version-legend {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: -4px 0 0;
+  font-size: 12px;
+  color: var(--textMuted);
+}
+
+.version-swatch {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  background: var(--warnSoft);
+  box-shadow: inset 3px 0 0 var(--warnText);
+}
+
+.version-loading {
+  display: grid;
+  place-items: center;
+  padding: 32px 0;
+}
+
+.version-error {
+  color: var(--colorError);
+}

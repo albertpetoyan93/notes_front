@@ -1,4 +1,5 @@
 import axios from "axios";
+import { useLockStore } from "../store/lockStore";
 
 const axiosServices = axios.create({
   baseURL: import.meta.env.VITE_APP_API_URL || "http://localhost:9000/",
@@ -38,11 +39,17 @@ axiosServices.interceptors.response.use(
       url.includes("/api/auth/login") ||
       url.includes("/api/auth/2fa/verify") ||
       url.includes("/api/auth/passkeys/login") ||
+      url.includes("/api/auth/unlock") ||
       url.includes("/api/auth/register") ||
       url.includes("/api/auth/forgot-password") ||
       url.includes("/api/auth/reset-password") ||
       url.includes("/api/auth/refresh") ||
       url.includes("/api/auth/logout");
+
+    // The session is locked (idle time, or locked in another tab): show the lock screen.
+    if (status === 423) {
+      useLockStore.getState().setLocked(true);
+    }
 
     if (status === 401 && original && !original._retry && !skipRefresh) {
       original._retry = true;

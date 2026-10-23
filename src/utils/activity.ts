@@ -64,10 +64,30 @@ export const describeActivity = (event: ActivityEvent, withTitle = true) => {
       return "signed out all other devices";
     case "password_reset":
       return "reset the password";
+    case "secret_link_created":
+      return `made a one-time link${d.label ? ` "${d.label}"` : ""}`;
+    case "secret_link_revoked":
+      return "cancelled a one-time link";
+    case "secret_link_opened":
+      return `had a one-time link${d.label ? ` "${d.label}"` : ""} opened by someone`;
+    case "session_unlocked":
+      return `unlocked 2keevo${d.method === "passkey" ? " with a passkey" : ""}`;
+    case "unlock_failed":
+      return "entered a wrong password to unlock 2keevo";
+    case "auto_lock_changed":
+      return Number(d.minutes)
+        ? `set auto-lock to ${Number(d.minutes) === 60 ? "1 hour" : `${d.minutes} minutes`}`
+        : "turned off auto-lock";
     case "item_created":
       return `created${item}`;
     case "item_updated":
       return `edited${item}`;
+    case "item_version_viewed":
+      return `opened an older version of${item}`;
+    case "item_version_restored":
+      return `restored an older version of${item}${
+        d.versionDate ? ` (from ${new Date(String(d.versionDate)).toLocaleDateString()})` : ""
+      }`;
     case "item_trashed":
       return `moved${item} to Trash`;
     case "item_restored":
@@ -109,6 +129,22 @@ export const describeActivity = (event: ActivityEvent, withTitle = true) => {
       return `invited ${d.email || "someone"} as ${d.role === "admin" ? "an admin" : "a member"}`;
     case "member_removed":
       return `removed ${target} from the company`;
+    case "company_policy_changed": {
+      const names: Record<string, string> = {
+        require2fa: d.require2fa ? "required two-factor authentication" : "stopped requiring two-factor authentication",
+        minPasswordLength: d.minPasswordLength
+          ? `set the minimum password length to ${d.minPasswordLength}`
+          : "removed the minimum password length",
+        maxIdleMinutes: d.maxIdleMinutes
+          ? `set auto-lock to at most ${d.maxIdleMinutes} minutes`
+          : "removed the auto-lock limit",
+        maxSessionDays: d.maxSessionDays
+          ? `set sign-ins to end after ${d.maxSessionDays} ${Number(d.maxSessionDays) === 1 ? "day" : "days"}`
+          : "removed the sign-in age limit",
+      };
+      const changed = Array.isArray(d.changed) ? (d.changed as string[]) : [];
+      return changed.map((key) => names[key] || key).join(", ") || "changed the security policies";
+    }
     case "member_role_changed":
       return `made ${target} ${d.role === "admin" ? "an admin" : "a member"}`;
     default:
@@ -122,6 +158,8 @@ export const isNotableActivity = (action: string) =>
     "login_failed",
     "two_factor_failed",
     "two_factor_disabled",
+    "unlock_failed",
+    "secret_link_opened",
     "passkey_removed",
     "field_revealed",
     "field_copied",

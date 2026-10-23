@@ -1,0 +1,49 @@
+// "Offline" and "new version" bars, at the bottom so they never cover the
+// top bar; above the phone's home indicator.
+.app-status {
+  position: fixed;
+  left: max(16px, env(safe-area-inset-left, 0px));
+  right: max(16px, env(safe-area-inset-right, 0px));
+  bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  z-index: 1200;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: fit-content;
+  max-width: 560px;
+  margin-inline: auto;
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: var(--colorText);
+  color: var(--colorBgLayout);
+  box-shadow: 0 8px 28px rgb(0 0 0 / 0.18);
+  font-size: 13.5px;
+
+  > span {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .ant-btn-text {
+    color: inherit;
+  }
+
+  &.is-offline {
+    background: var(--warnSoft);
+    color: var(--warnText);
+    box-shadow: inset 0 0 0 1px var(--warnText), 0 8px 28px rgb(0 0 0 / 0.12);
+  }
+
+  & + .app-status {
+    bottom: calc(72px + env(safe-area-inset-bottom, 0px));
+  }
+}
+
+.install-steps {
+  margin: 8px 0 0;
+  padding-left: 18px;
+
+  li + li {
+    margin-top: 6px;
+  }
+}

@@ -116,8 +116,11 @@
     flex-wrap: wrap;
   }
 
+  // Full row width, so no indent (that pushed buttons past the card's edge).
   .security-page .manage-actions {
+    flex-wrap: wrap;
     width: 100%;
+    margin-left: 0;
     justify-content: flex-end;
   }
 }

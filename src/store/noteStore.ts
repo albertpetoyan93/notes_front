@@ -43,6 +43,8 @@ export interface Note {
     weak: boolean;
     reused: boolean;
     stale: boolean;
+    // Times the password appears in known leaks; 0 or missing when not seen.
+    breached?: number;
   };
 }
 

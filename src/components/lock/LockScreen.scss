@@ -1,0 +1,86 @@
+// The lock screen replaces the whole app while the session is locked.
+.lock-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 1100;
+  display: grid;
+  place-items: center;
+  padding: max(24px, env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px))
+    max(24px, env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px));
+  overflow-y: auto;
+  background: var(--colorBgLayout);
+}
+
+.lock-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  max-width: 380px;
+  padding: 32px 28px 20px;
+  border: 1px solid var(--borderSubtle);
+  border-radius: 18px;
+  background: var(--surfaceCard);
+  box-shadow: 0 12px 40px rgb(0 0 0 / 0.08);
+  text-align: center;
+
+  h1 {
+    margin: 0;
+    font-size: 22px;
+    font-weight: 650;
+  }
+
+  .ant-btn-block {
+    width: 100%;
+  }
+}
+
+.lock-brand {
+  margin-bottom: 8px;
+}
+
+.lock-icon {
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: var(--primarySoft);
+  color: var(--primaryText);
+  font-size: 22px;
+}
+
+.lock-who {
+  margin: -4px 0 8px;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--textMuted);
+}
+
+.lock-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  text-align: left;
+}
+
+.lock-label {
+  font-size: 13px;
+  font-weight: 550;
+}
+
+.lock-error {
+  margin: 0;
+  font-size: 13px;
+  color: var(--colorError);
+}
+
+.lock-note {
+  margin: 8px 0 0;
+  font-size: 12.5px;
+  color: var(--textMuted);
+}

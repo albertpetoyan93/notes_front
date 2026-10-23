@@ -66,5 +66,12 @@ export const signInWithPasskey = async (autofill = false) => {
   return fetcherPost("/api/auth/passkeys/login/verify", { challengeToken, response });
 };
 
+/** Unlock a locked vault with one of the signed-in account's passkeys. */
+export const unlockWithPasskey = async () => {
+  const { options, challengeToken } = await fetcherPost("/api/auth/unlock/passkey/options", {});
+  const response = await startAuthentication({ optionsJSON: options });
+  return fetcherPost("/api/auth/unlock/passkey", { challengeToken, response });
+};
+
 /** Stop a waiting autofill request, e.g. when the sign-in page closes. */
 export const cancelPasskeyRequest = () => WebAuthnAbortService.cancelCeremony();

@@ -121,6 +121,8 @@ interface NoteEditorProps {
   defaultCollectionId?: number;
   // Fill the first password field with a fresh one (the "Change password" fix).
   freshPassword?: boolean;
+  /** A company's minimum password length for its logins. */
+  passwordRule?: { length: number; company: string } | null;
   onCancel: () => void;
   onSaved: (note: Note) => void;
 }
@@ -133,6 +135,7 @@ const NoteEditor = ({
   requireCollection,
   defaultCollectionId,
   freshPassword,
+  passwordRule,
   onCancel,
   onSaved,
 }: NoteEditorProps) => {
@@ -387,7 +390,12 @@ const NoteEditor = ({
           const onValue = (next: string) =>
             updateField(index, "value", formatCardField(field.label, next, field.value, brand));
           return (
-            <div key={index} className={`field-row is-editing${totp || recovery ? " has-hint" : ""}`}>
+            <div
+              key={index}
+              className={`field-row is-editing${
+                totp || recovery || (passwordRule && isPasswordField(field.label)) ? " has-hint" : ""
+              }`}
+            >
               <Input
                 className="field-label-input"
                 placeholder="Field name"
@@ -472,6 +480,16 @@ const NoteEditor = ({
                 )}
                 {totp && <TotpHint value={field.value} />}
                 {recovery && <RecoveryHint value={field.value} />}
+                {passwordRule && isPasswordField(field.label) && (
+                  <span
+                    className={`field-hint${
+                      field.value && field.value.length < passwordRule.length ? " is-error" : ""
+                    }`}
+                  >
+                    At least {passwordRule.length} characters ({passwordRule.company} rule)
+                    {field.value ? ` · ${field.value.length} now` : ""}
+                  </span>
+                )}
               </div>
               <div className="field-actions">
                 {recovery && (

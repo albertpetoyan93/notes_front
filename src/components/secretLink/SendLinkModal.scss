@@ -1,0 +1,105 @@
+// Create a one-time link, then show it once.
+.send-link-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+
+  fieldset {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin: 0;
+    padding: 10px 12px;
+    border: 1px solid var(--borderSubtle);
+    border-radius: 10px;
+
+    .ant-checkbox-wrapper {
+      margin: 0;
+    }
+  }
+
+  legend {
+    padding: 0 4px;
+    font-size: 13px;
+    font-weight: 550;
+  }
+}
+
+.send-link-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+
+  @media (max-width: 480px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.send-link-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+
+  > span {
+    font-size: 13px;
+    font-weight: 550;
+  }
+
+  small {
+    font-size: 12px;
+    color: var(--textMuted);
+  }
+}
+
+.send-link-secret {
+  margin-left: 6px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--surfaceHover);
+  font-size: 11px;
+  color: var(--textMuted);
+}
+
+.send-link-done {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.send-link-ok {
+  font-size: 32px;
+  color: var(--colorSuccess);
+}
+
+.send-link-url {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+
+  .ant-input {
+    font-family: var(--fontFamilyCode);
+    font-size: 12.5px;
+  }
+}
+
+.send-link-facts {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  margin: 0;
+  padding-left: 18px;
+  font-size: 13px;
+}
+
+.send-link-note {
+  width: 100%;
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--warnSoft);
+  color: var(--warnText);
+  font-size: 12.5px;
+}
