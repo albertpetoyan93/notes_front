@@ -10,6 +10,7 @@ import {
   EyeOutlined,
   FolderOutlined,
   HistoryOutlined,
+  KeyOutlined,
   LeftOutlined,
   LogoutOutlined,
   MinusCircleOutlined,
@@ -49,6 +50,7 @@ import {
   maskValue,
   noteBody,
   noteFields,
+  notePasskeys,
   type NoteField,
 } from "../../utils/noteFields";
 import {
@@ -275,6 +277,7 @@ const ItemDetail = ({
   const owner = isNoteOwner(note);
   const editable = canEditNote(note) && !trash;
   const fields = noteFields(note).filter((field) => field.value.trim());
+  const passkeys = notePasskeys(note);
   const body = noteBody(note);
   const issues = trash ? [] : healthIssues(note);
   const collections = note.collections?.length
@@ -562,6 +565,30 @@ const ItemDetail = ({
             );
           })}
         </dl>
+      )}
+
+      {passkeys.length > 0 && (
+        <section className="fields-card passkeys-card" aria-label="Passkeys">
+          {passkeys.map((passkey) => (
+            <div key={passkey.credentialId} className="passkey-row">
+              <span className="passkey-icon" aria-hidden="true">
+                <KeyOutlined />
+              </span>
+              <div className="passkey-text">
+                <strong>Passkey for {passkey.rpId}</strong>
+                <span>
+                  {passkey.userDisplayName || passkey.userName || "No account name"}
+                  {passkey.createdAt
+                    ? ` · added ${dayjsExtra(passkey.createdAt).format("D MMM YYYY")}`
+                    : ""}
+                </span>
+              </div>
+              <Tooltip title="On that site, choose “Sign in with a passkey” and pick 2keevo. The key itself is never shown.">
+                <span className="passkey-hint">Signs in with the extension</span>
+              </Tooltip>
+            </div>
+          ))}
+        </section>
       )}
 
       {body && (

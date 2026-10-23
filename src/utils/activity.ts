@@ -42,7 +42,7 @@ export const describeActivity = (event: ActivityEvent, withTitle = true) => {
   switch (event.action) {
     case "login":
       return `signed in${d.kind === "extension" ? " to the browser extension" : ""}${
-        d.twoFactor ? " with 2FA" : ""
+        d.passkey ? " with a passkey" : d.twoFactor ? " with 2FA" : ""
       }`;
     case "login_failed":
       return `entered a wrong password${d.kind === "extension" ? " in the browser extension" : ""}`;
@@ -54,6 +54,10 @@ export const describeActivity = (event: ActivityEvent, withTitle = true) => {
       return "turned off two-factor authentication";
     case "recovery_codes_regenerated":
       return "created new recovery codes";
+    case "passkey_added":
+      return `added a passkey${d.name ? ` (${d.name})` : ""}`;
+    case "passkey_removed":
+      return `removed a passkey${d.name ? ` (${d.name})` : ""}`;
     case "session_revoked":
       return "signed out a device";
     case "other_sessions_revoked":
@@ -118,6 +122,7 @@ export const isNotableActivity = (action: string) =>
     "login_failed",
     "two_factor_failed",
     "two_factor_disabled",
+    "passkey_removed",
     "field_revealed",
     "field_copied",
     "vault_exported",

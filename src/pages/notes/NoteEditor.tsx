@@ -3,6 +3,7 @@ import {
   EyeInvisibleOutlined,
   EyeOutlined,
   FileTextOutlined,
+  KeyOutlined,
   PlusOutlined,
   ScanOutlined,
   SyncOutlined,
@@ -33,7 +34,14 @@ import {
   isAmexBrand,
 } from "../../utils/cardField";
 import { CATEGORY_ORDER, categoryKey, categoryLabel } from "../../utils/noteCategory";
-import { isSecretField, noteBody, noteFields, type NoteField } from "../../utils/noteFields";
+import {
+  isSecretField,
+  noteBody,
+  noteFields,
+  notePasskeys,
+  type NoteField,
+  type NotePasskey,
+} from "../../utils/noteFields";
 
 const { TextArea } = Input;
 
@@ -132,6 +140,8 @@ const NoteEditor = ({
   const { createNote, updateNote } = useNoteStore();
   const [category, setCategory] = useState("note");
   const [fields, setFields] = useState<NoteField[]>([]);
+  // Passkeys for other sites: the editor can only remove them; the server keeps the keys.
+  const [passkeys, setPasskeys] = useState<NotePasskey[]>([]);
   const [shown, setShown] = useState<Set<number>>(new Set());
   const [saving, setSaving] = useState(false);
   const qrInput = useRef<HTMLInputElement>(null);
@@ -165,6 +175,7 @@ const NoteEditor = ({
         )
       );
       setShown(passwordAt >= 0 ? new Set([passwordAt]) : new Set());
+      setPasskeys(notePasskeys(note));
     } else {
       const key = categoryKey(initialCategory || "note");
       form.resetFields();
@@ -175,6 +186,7 @@ const NoteEditor = ({
       setCategory(key);
       setFields(templateFields(key));
       setShown(new Set());
+      setPasskeys([]);
     }
     // Reset only when a different item (or a new one) opens.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -262,7 +274,14 @@ const NoteEditor = ({
     }
     const payload: Record<string, unknown> = {
       ...values,
-      content: { mainContent: values.content || "", customFields: fields },
+      content: {
+        mainContent: values.content || "",
+        customFields: fields,
+        // Which stored passkeys to keep, by id. Left out when the item never had any.
+        ...(note && notePasskeys(note).length
+          ? { passkeys: passkeys.map(({ credentialId }) => ({ credentialId })) }
+          : {}),
+      },
     };
     if (canChooseCollection) payload.collectionIds = values.collectionIds || [];
     else delete payload.collectionIds;
@@ -584,6 +603,35 @@ const NoteEditor = ({
           }}
         />
       </section>
+
+      {passkeys.length > 0 && (
+        <section className="fields-card passkeys-card" aria-label="Passkeys">
+          {passkeys.map((passkey) => (
+            <div key={passkey.credentialId} className="passkey-row">
+              <span className="passkey-icon" aria-hidden="true">
+                <KeyOutlined />
+              </span>
+              <div className="passkey-text">
+                <strong>Passkey for {passkey.rpId}</strong>
+                <span>{passkey.userDisplayName || passkey.userName || "No account name"}</span>
+              </div>
+              <Tooltip title="Removes it from 2keevo when you save. Also remove it in the site's security settings.">
+                <Button
+                  type="text"
+                  className="icon-btn"
+                  aria-label={`Remove passkey for ${passkey.rpId}`}
+                  icon={<DeleteOutlined />}
+                  onClick={() =>
+                    setPasskeys((current) =>
+                      current.filter((item) => item.credentialId !== passkey.credentialId)
+                    )
+                  }
+                />
+              </Tooltip>
+            </div>
+          ))}
+        </section>
+      )}
 
       <Form.Item
         name="content"

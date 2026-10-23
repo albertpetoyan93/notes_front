@@ -26,6 +26,22 @@ export const noteBody = (note: Pick<Note, "content">) => {
   return String(content?.mainContent || "");
 };
 
+/** A passkey for another website, as the vault sees it: the private key stays on the server. */
+export interface NotePasskey {
+  credentialId: string;
+  rpId: string;
+  userName: string;
+  userDisplayName?: string;
+  createdAt: string;
+}
+
+export const notePasskeys = (note: Pick<Note, "content">): NotePasskey[] => {
+  const content = note.content as { passkeys?: NotePasskey[] } | null;
+  return content && typeof content === "object" && Array.isArray(content.passkeys)
+    ? content.passkeys.filter((passkey) => passkey?.credentialId)
+    : [];
+};
+
 export const decryptionFailed = (note: Pick<Note, "content">) =>
   !!(note.content as { decryptionFailed?: boolean } | null)?.decryptionFailed;
 

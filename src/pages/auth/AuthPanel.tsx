@@ -1,11 +1,16 @@
-import { MoonOutlined, SunOutlined } from "@ant-design/icons";
+import { KeyOutlined, MoonOutlined, SunOutlined } from "@ant-design/icons";
 import { Button, Form, Input } from "antd";
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 import { BrandLockup } from "../../components/header/LeftHeader";
 import { useTheme } from "../../contexts/ThemeContext";
 import useAuth from "../../hooks/useAuth";
 import { useAuthStore } from "../../store/authStore";
+import {
+  cancelPasskeyRequest,
+  passkeyAutofillSupported,
+  passkeysSupported,
+} from "../../utils/passkeys";
 import TwoFactorStep from "./TwoFactorStep";
 import "./AuthPanel.scss";
 
@@ -34,11 +39,35 @@ export const AuthFrame = ({ children }: { children: ReactNode }) => {
 };
 
 const AuthPanel = ({ mode }: { mode: AuthMode }) => {
-  const { login, register } = useAuth();
+  const { login, loginWithPasskey, register } = useAuth();
   const { loading } = useAuthStore();
   const location = useLocation();
   const [form] = Form.useForm();
   const [challengeToken, setChallengeToken] = useState<string | null>(null);
+  const [passkeyBusy, setPasskeyBusy] = useState(false);
+  const passkeyLogin = mode === "login" && !challengeToken;
+
+  // Offer saved passkeys in the email field's suggestions, where the browser can.
+  const listenForAutofill = () =>
+    passkeyAutofillSupported().then((supported) => {
+      if (supported) loginWithPasskey(true);
+    });
+
+  useEffect(() => {
+    if (!passkeyLogin) return;
+    listenForAutofill();
+    return () => cancelPasskeyRequest();
+    // Start once per visit to the sign-in form.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [passkeyLogin]);
+
+  // The button replaces the waiting autofill request; restart it if this one is cancelled.
+  const onPasskey = async () => {
+    setPasskeyBusy(true);
+    const signedIn = await loginWithPasskey(false);
+    setPasskeyBusy(false);
+    if (!signedIn) listenForAutofill();
+  };
 
   const onLogin = async (values: { email: string; password: string }) => {
     try {
@@ -104,7 +133,7 @@ const AuthPanel = ({ mode }: { mode: AuthMode }) => {
                 { type: "email", message: "Please enter a valid email" },
               ]}
             >
-              <Input placeholder="Email address" />
+              <Input placeholder="Email address" autoComplete="username webauthn" />
             </Form.Item>
             <div className="auth-password-wrap">
               <NavLink
@@ -132,6 +161,22 @@ const AuthPanel = ({ mode }: { mode: AuthMode }) => {
             >
               Sign In
             </Button>
+            {passkeysSupported() && (
+              <>
+                <div className="auth-or" aria-hidden="true">
+                  <span>or</span>
+                </div>
+                <Button
+                  className="auth-passkey"
+                  icon={<KeyOutlined />}
+                  loading={passkeyBusy}
+                  onClick={onPasskey}
+                  block
+                >
+                  Sign in with a passkey
+                </Button>
+              </>
+            )}
             <p className="auth-switch">
               Don't have an account?{" "}
               <NavLink

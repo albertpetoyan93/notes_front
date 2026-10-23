@@ -23,6 +23,7 @@ import { useAuthStore } from "../../store/authStore";
 import dayjsExtra from "../../utils/dayjs";
 import { browserAndOs, isPhoneAgent } from "../../utils/device";
 import "../company/CompanyPage.scss";
+import PasskeysSection from "./PasskeysSection";
 import "./SecurityPage.scss";
 
 interface TwoFactorStatus {
@@ -357,7 +358,7 @@ const SecurityPage = () => {
       <div className="manage-head">
         <div>
           <h1>Security</h1>
-          <p>Protect your vault with a second sign-in step and see where you are signed in.</p>
+          <p>Passkeys, a second sign-in step, and where you are signed in.</p>
         </div>
       </div>
 
@@ -402,6 +403,8 @@ const SecurityPage = () => {
           </div>
         )}
       </section>
+
+      <PasskeysSection />
 
       <section className="security-section">
         <div className="security-section-head">

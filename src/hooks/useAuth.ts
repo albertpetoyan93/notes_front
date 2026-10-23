@@ -3,6 +3,7 @@ import { fetcherGet, fetcherPost } from "../configs/axios";
 import { useAuthStore } from "../store/authStore";
 import { message } from "antd";
 import { keevoReturnPath } from "../utils/keevoReturn";
+import { isCancelled, signInWithPasskey } from "../utils/passkeys";
 
 export const endpoints = {
   login: "/api/auth/login",
@@ -65,6 +66,29 @@ const useAuth = () => {
     }
   };
 
+  /**
+   * Sign in with a passkey. With `autofill`, it waits quietly until a passkey is picked
+   * from the email field's suggestions. Returns false when the person cancelled.
+   */
+  const loginWithPasskey = async (autofill = false) => {
+    try {
+      await signInWithPasskey(autofill);
+    } catch (err: any) {
+      if (isCancelled(err)) return false;
+      if (!autofill || err?.message) {
+        message.error(err?.message || "Could not sign in with the passkey");
+      }
+      return false;
+    }
+    setStore({ loading: true });
+    try {
+      await finishSignIn();
+      return true;
+    } finally {
+      setStore({ loading: false });
+    }
+  };
+
   const register = async (newData: any) => {
     setStore({ loading: true });
     try {
@@ -122,6 +146,7 @@ const useAuth = () => {
   return {
     logOut,
     login,
+    loginWithPasskey,
     verifyTwoFactor,
     register,
     requestPasswordReset,

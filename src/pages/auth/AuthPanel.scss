@@ -166,6 +166,34 @@
   }
 }
 
+.auth-or {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 14px 0;
+  color: #94a3b8;
+  font-size: 12px;
+
+  &::before,
+  &::after {
+    content: "";
+    flex: 1;
+    height: 1px;
+    background: rgba(15, 23, 42, 0.1);
+  }
+}
+
+.auth-passkey.ant-btn {
+  height: 44px;
+  border-radius: 12px;
+  font-weight: 600;
+}
+
+[data-theme="dark"] .auth-or::before,
+[data-theme="dark"] .auth-or::after {
+  background: rgba(255, 255, 255, 0.1);
+}
+
 .auth-switch {
   margin: 14px 0 0;
   text-align: center;

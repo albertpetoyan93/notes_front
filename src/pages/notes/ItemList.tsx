@@ -1,4 +1,5 @@
 import {
+  KeyOutlined,
   CloseOutlined,
   FilterOutlined,
   StarFilled,
@@ -8,7 +9,13 @@ import { Checkbox, Input, Skeleton } from "antd";
 import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import ItemIcon from "../../components/itemIcon/ItemIcon";
 import type { Note } from "../../store/noteStore";
-import { HEALTH_LABEL, healthIssues, noteSubtitle, type HealthKind } from "../../utils/noteFields";
+import {
+  HEALTH_LABEL,
+  healthIssues,
+  notePasskeys,
+  noteSubtitle,
+  type HealthKind,
+} from "../../utils/noteFields";
 import { categoryLabel } from "../../utils/noteCategory";
 import { isNoteOwner } from "./NoteActions";
 
@@ -133,6 +140,7 @@ const ItemRowContent = ({ note }: { note: Note }) => {
         {note.isShared && !note.collection?.companyId && (
           <TeamOutlined aria-label={`Shared by ${note.sharedByName || "someone"}`} />
         )}
+        {notePasskeys(note).length > 0 && <KeyOutlined aria-label="Has a passkey" />}
         {note.isFavorite && <StarFilled className="favorite-on" aria-label="Favorite" />}
       </span>
     </>
