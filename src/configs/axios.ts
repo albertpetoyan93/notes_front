@@ -51,7 +51,10 @@ axiosServices.interceptors.response.use(
       useLockStore.getState().setLocked(true);
     }
 
-    if (status === 401 && original && !original._retry && !skipRefresh) {
+    // An expired access token, not a wrong password: always refresh and retry.
+    const expired = error.response?.data?.code === "session_expired";
+
+    if (status === 401 && original && !original._retry && (!skipRefresh || expired)) {
       original._retry = true;
       try {
         if (!refreshPromise) {
