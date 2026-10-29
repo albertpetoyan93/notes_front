@@ -48,6 +48,16 @@ const usd = (cents: number) =>
 const date = (value: string | null) => (value ? dayjsExtra(value).format("D MMM YYYY") : "—");
 const ownerIcon = (owner: Owner) => (owner.kind === "company" ? <BankOutlined /> : <UserOutlined />);
 
+/** A website as a link only when it's http(s); the server checks this too, but old rows may not. */
+const safeUrl = (value: string) => {
+  try {
+    const url = new URL(value);
+    return url.protocol === "http:" || url.protocol === "https:" ? url.href : null;
+  } catch {
+    return null;
+  }
+};
+
 // 2keevo's own view of billing: who pays, who's trying it, what failed, and discount requests.
 const AdminPage = () => {
   const me = useAuthStore((state) => state.me);
@@ -183,9 +193,13 @@ const AdminPage = () => {
                     {request.website && (
                       <>
                         {" · "}
-                        <a href={request.website} target="_blank" rel="noopener noreferrer nofollow">
-                          {request.website}
-                        </a>
+                        {safeUrl(request.website) ? (
+                          <a href={safeUrl(request.website)!} target="_blank" rel="noopener noreferrer nofollow">
+                            {request.website}
+                          </a>
+                        ) : (
+                          request.website
+                        )}
                       </>
                     )}
                   </span>

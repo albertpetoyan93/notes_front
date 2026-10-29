@@ -73,7 +73,11 @@ axiosServices.interceptors.response.use(
         }
         await refreshPromise;
         return axiosServices(original);
-      } catch {
+      } catch (refreshError: any) {
+        // Why the session ended, for bug reports (the server says which check refused it).
+        console.warn(
+          `Session refresh refused (${refreshError?.response?.data?.reason || refreshError?.message || "unknown"}) while calling ${url}`
+        );
         redirectToLogin();
       }
     }
