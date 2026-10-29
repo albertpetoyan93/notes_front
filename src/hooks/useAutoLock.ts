@@ -36,7 +36,11 @@ const useAutoLock = (signedIn: boolean) => {
 
     const check = () => {
       if (useLockStore.getState().locked) return;
-      const minutes = useAuthStore.getState().me?.autoLockMinutes ?? DEFAULT_AUTO_LOCK_MINUTES;
+      const me = useAuthStore.getState().me;
+      const own: number = me?.autoLockMinutes ?? DEFAULT_AUTO_LOCK_MINUTES;
+      // A company limit wins over a longer (or "never") personal choice, as on the server.
+      const limit: number | null = me?.autoLockLimit ?? null;
+      const minutes = limit ? (own > 0 ? Math.min(own, limit) : limit) : own;
       if (minutes > 0 && Date.now() - lastActivity() > minutes * 60 * 1000) lockVault();
     };
 

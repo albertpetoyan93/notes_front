@@ -1,6 +1,8 @@
 import { create } from "zustand";
 import axios from "../configs/axios";
 import type { CollectionItem, Note } from "./noteStore";
+import { openCollectionNames, prepareNotes } from "../utils/vaultItems";
+import { useBillingStore } from "./billingStore";
 
 // Everything the shell needs about the open vault (personal or one company):
 // an unfiltered list of its notes for counts, Security health and the command
@@ -51,11 +53,22 @@ export const useVaultStore = create<VaultStore>((set, get) => ({
           companyId ? `/api/companies/${companyId}/collections` : "/api/collections"
         ),
       ]);
+      // End-to-end names and items are opened here (names first: items show
+      // their collections' names); health is worked out here too.
+      const opened = await openCollectionNames((collections.data || []) as CollectionItem[]);
+      const prepared = await prepareNotes(notes.data || []);
+      // The password health report is part of paid plans (worked out here for
+      // end-to-end items, so the plan is checked here too).
+      const billing = await useBillingStore.getState().ensure();
+      const summary =
+        billing && !billing.limits.passwordHealth
+          ? prepared.map((note) => (note.passwordHealth ? { ...note, passwordHealth: undefined } : note))
+          : prepared;
       // A slower response for a vault the user already left is dropped.
       if (get().companyId !== companyId) return;
       set({
-        summary: notes.data || [],
-        collections: (collections.data || []).map((collection: CollectionItem) =>
+        summary,
+        collections: opened.map((collection: CollectionItem) =>
           companyId
             ? { ...collection, isOwner: collection.permission === "owner" }
             : collection

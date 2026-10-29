@@ -3,9 +3,11 @@ import { Button, Input, Modal, Spin, Tag, message } from "antd";
 import { useCallback, useEffect, useState } from "react";
 import { fetcherDelete, fetcherGet } from "../../configs/axios";
 import axios from "../../configs/axios";
+import { useAuthStore } from "../../store/authStore";
 import dayjsExtra from "../../utils/dayjs";
 import {
   addPasskey,
+  enablePasskeyUnlock,
   isCancelled,
   passkeysSupported,
   suggestedPasskeyName,
@@ -60,7 +62,9 @@ const AddPasskeyModal = ({
           Your device will ask for your face, fingerprint or screen lock. After that you can sign
           in to 2keevo without your password.
         </p>
-        <label htmlFor="passkey-password">Your 2keevo password</label>
+        <label htmlFor="passkey-password">
+          {useAuthStore.getState().me?.e2eEnabled ? "Your master password" : "Your 2keevo password"}
+        </label>
         <Input.Password
           id="passkey-password"
           autoFocus
@@ -85,7 +89,23 @@ const AddPasskeyModal = ({
 const PasskeysSection = () => {
   const [passkeys, setPasskeys] = useState<PasskeyRow[] | null>(null);
   const [adding, setAdding] = useState(false);
+  const [enabling, setEnabling] = useState(false);
   const supported = passkeysSupported();
+  // End-to-end accounts: a passkey can also open the vault, if it supports PRF.
+  const e2e = !!useAuthStore((state) => state.me)?.e2eEnabled;
+
+  const turnOnUnlock = async () => {
+    setEnabling(true);
+    try {
+      const updated = await enablePasskeyUnlock();
+      setPasskeys((rows) => rows?.map((row) => (row.id === updated.id ? updated : row)) || null);
+      message.success(`“${updated.name}” now opens your vault too.`);
+    } catch (err) {
+      if (!isCancelled(err)) message.error(errorText(err, "Could not set up unlock with this passkey"));
+    } finally {
+      setEnabling(false);
+    }
+  };
 
   const load = useCallback(async () => {
     try {
@@ -199,6 +219,7 @@ const PasskeysSection = () => {
                 <strong>
                   {passkey.name}{" "}
                   {passkey.synced ? <Tag color="purple">Synced</Tag> : <Tag>This device only</Tag>}
+                  {e2e && passkey.unlocksVault && <Tag color="green">Unlocks vault</Tag>}
                 </strong>
                 <span>
                   {`Added ${dayjsExtra(passkey.createdAt).format("ll")} · `}
@@ -208,6 +229,11 @@ const PasskeysSection = () => {
                 </span>
               </div>
               <div className="manage-actions">
+                {e2e && !passkey.unlocksVault && supported && (
+                  <Button size="small" loading={enabling} onClick={turnOnUnlock}>
+                    Use to unlock
+                  </Button>
+                )}
                 <Button size="small" onClick={() => rename(passkey)}>
                   Rename
                 </Button>
@@ -226,7 +252,11 @@ const PasskeysSection = () => {
           setAdding(false);
           if (added) {
             setPasskeys((rows) => [...(rows || []), added]);
-            message.success("Passkey added. Next time, choose “Sign in with a passkey”.");
+            message.success(
+              e2e
+                ? "Passkey added. To open your vault with it too, choose “Use to unlock”."
+                : "Passkey added. Next time, choose “Sign in with a passkey”."
+            );
           }
         }}
       />

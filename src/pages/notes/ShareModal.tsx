@@ -13,6 +13,7 @@ import {
 } from "antd";
 import { useEffect, useRef, useState } from "react";
 import { NoteShare, useNoteStore } from "../../store/noteStore";
+import { isPlanLimit, planAllows } from "../../store/billingStore";
 
 const { Text } = Typography;
 
@@ -138,6 +139,7 @@ const ShareModal = ({ visible, note, onClose }: ShareModalProps) => {
         | { identifier: string; message: string }[]
         | undefined;
 
+      if (isPlanLimit(apiError)) return;
       if (failed?.length) {
         message.error({
           className: "share-message-left",
@@ -231,9 +233,11 @@ const ShareModal = ({ visible, note, onClose }: ShareModalProps) => {
           <Select
             options={[
               { value: "never", label: "Never" },
-              { value: "1", label: "In 1 day" },
-              { value: "7", label: "In 7 days" },
-              { value: "30", label: "In 30 days" },
+              ...["1", "7", "30"].map((days) => ({
+                value: days,
+                label: `In ${days} ${days === "1" ? "day" : "days"}${planAllows("shareExpiry") ? "" : " (Premium)"}`,
+                disabled: !planAllows("shareExpiry"),
+              })),
             ]}
           />
         </Form.Item>

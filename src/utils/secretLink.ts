@@ -1,7 +1,9 @@
 // One-time secret links, encrypted in the browser. The key is random and
 // lives only in the link after "#", which browsers never send to a server.
 // With a passphrase, a key derived from it (PBKDF2, 600k rounds) is mixed in,
-// so the link alone isn't enough.
+// so the link alone isn't enough. The server checks the passphrase through a
+// proof made from it and the link's key, and destroys the link after 5 wrong
+// ones: nothing it hands out lets anyone guess the passphrase offline.
 
 export interface SecretPayload {
   v: 1;
@@ -14,7 +16,7 @@ export interface SealedSecret {
   ciphertext: string;
   iv: string;
   salt?: string;
-  check?: string;
+  proof?: string;
 }
 
 export const MAX_SECRET_BYTES = 50 * 1024;
@@ -40,22 +42,43 @@ export const fromB64url = (text: string) => {
 
 const random = (length: number) => crypto.getRandomValues(new Uint8Array(length));
 
-const aesKey = async (linkKey: Uint8Array, passphrase?: string, salt?: Uint8Array) => {
-  let material = linkKey;
-  if (passphrase) {
-    const base = await crypto.subtle.importKey("raw", encoder.encode(passphrase), "PBKDF2", false, [
-      "deriveBits",
-    ]);
-    const bits = await crypto.subtle.deriveBits(
-      { name: "PBKDF2", salt: salt!, iterations: PBKDF2_ROUNDS, hash: "SHA-256" },
+const passphraseBits = async (passphrase: string, salt: Uint8Array) => {
+  const base = await crypto.subtle.importKey("raw", encoder.encode(passphrase), "PBKDF2", false, [
+    "deriveBits",
+  ]);
+  return new Uint8Array(
+    await crypto.subtle.deriveBits(
+      { name: "PBKDF2", salt, iterations: PBKDF2_ROUNDS, hash: "SHA-256" },
       base,
       256
-    );
-    material = new Uint8Array([...linkKey, ...new Uint8Array(bits)]);
-  }
+    )
+  );
+};
+
+const aesKey = async (linkKey: Uint8Array, bits?: Uint8Array) => {
+  const material = bits ? new Uint8Array([...linkKey, ...bits]) : linkKey;
   const digest = await crypto.subtle.digest("SHA-256", material);
   return crypto.subtle.importKey("raw", digest, "AES-GCM", false, ["encrypt", "decrypt"]);
 };
+
+/**
+ * What the server checks to open a link with a passphrase. Made from the
+ * passphrase and the link's key (a different hash input than the AES key), so
+ * it says nothing about the passphrase to anyone without the link.
+ */
+const passphraseProof = async (linkKey: Uint8Array, bits: Uint8Array) =>
+  toB64url(
+    new Uint8Array(
+      await crypto.subtle.digest(
+        "SHA-256",
+        new Uint8Array([...encoder.encode("2keevo/secret-proof/v1"), ...linkKey, ...bits])
+      )
+    )
+  );
+
+/** The proof to send when opening a link with a passphrase. */
+export const proofFor = async (fragment: string, passphrase: string, salt: string) =>
+  passphraseProof(fromB64url(fragment), await passphraseBits(passphrase, fromB64url(salt)));
 
 const seal = async (key: CryptoKey, bytes: Uint8Array) => {
   const iv = random(12);
@@ -71,17 +94,16 @@ export const sealSecret = async (payload: SecretPayload, passphrase?: string) =>
   }
   const linkKey = random(32);
   const salt = passphrase ? random(16) : undefined;
-  const key = await aesKey(linkKey, passphrase, salt);
-  const body: SealedSecret = await seal(key, bytes);
-  if (salt) {
-    const check = await seal(key, encoder.encode(CHECK_TEXT));
+  const bits = passphrase && salt ? await passphraseBits(passphrase, salt) : undefined;
+  const body: SealedSecret = await seal(await aesKey(linkKey, bits), bytes);
+  if (salt && bits) {
     body.salt = toB64url(salt);
-    body.check = `${check.iv}.${check.ciphertext}`;
+    body.proof = await passphraseProof(linkKey, bits);
   }
   return { body, fragment: toB64url(linkKey) };
 };
 
-/** Tests a passphrase without opening the link (no view is used). */
+/** Links made before proofs: tests a passphrase here, without opening the link. */
 export const passphraseMatches = async (
   fragment: string,
   passphrase: string,
@@ -89,7 +111,7 @@ export const passphraseMatches = async (
   check: string
 ) => {
   try {
-    const key = await aesKey(fromB64url(fragment), passphrase, fromB64url(salt));
+    const key = await aesKey(fromB64url(fragment), await passphraseBits(passphrase, fromB64url(salt)));
     const [iv, ciphertext] = check.split(".");
     const plain = await crypto.subtle.decrypt(
       { name: "AES-GCM", iv: fromB64url(iv) },
@@ -108,7 +130,8 @@ export const unsealSecret = async (
   passphrase?: string,
   salt?: string
 ): Promise<SecretPayload> => {
-  const key = await aesKey(fromB64url(fragment), passphrase, salt ? fromB64url(salt) : undefined);
+  const bits = passphrase && salt ? await passphraseBits(passphrase, fromB64url(salt)) : undefined;
+  const key = await aesKey(fromB64url(fragment), bits);
   const plain = await crypto.subtle.decrypt(
     { name: "AES-GCM", iv: fromB64url(sealed.iv) },
     key,

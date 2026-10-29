@@ -219,13 +219,14 @@ const AuthPanel = ({ mode }: { mode: AuthMode }) => {
             </Form.Item>
             <Form.Item
               name="password"
-              label="Password"
+              label="Master password"
+              extra="It encrypts your vault on this device. 2keevo never sees it and can't reset it; you'll get a recovery key."
               rules={[
-                { required: true, message: "Please enter your password" },
-                { min: 6, message: "Password must be at least 6 characters" },
+                { required: true, message: "Please choose a master password" },
+                { min: 12, message: "Use at least 12 characters" },
               ]}
             >
-              <Input.Password placeholder="Password" />
+              <Input.Password placeholder="At least 12 characters" />
             </Form.Item>
             <Form.Item
               name="confirmPassword"

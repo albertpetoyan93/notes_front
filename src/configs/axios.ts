@@ -1,4 +1,5 @@
 import axios from "axios";
+import { useBillingStore } from "../store/billingStore";
 import { useLockStore } from "../store/lockStore";
 
 const axiosServices = axios.create({
@@ -40,6 +41,11 @@ axiosServices.interceptors.response.use(
       url.includes("/api/auth/2fa/verify") ||
       url.includes("/api/auth/passkeys/login") ||
       url.includes("/api/auth/unlock") ||
+      // These answer 401 for a wrong master password or recovery key.
+      url.includes("/api/auth/e2e/enable") ||
+      url.includes("/api/auth/e2e/master-password") ||
+      url.includes("/api/auth/e2e/recovery-key") ||
+      url.includes("/api/auth/e2e/recover") ||
       url.includes("/api/auth/register") ||
       url.includes("/api/auth/forgot-password") ||
       url.includes("/api/auth/reset-password") ||
@@ -70,6 +76,12 @@ axiosServices.interceptors.response.use(
       } catch {
         redirectToLogin();
       }
+    }
+
+    // A plan limit: offer the upgrade. Screens skip their own error for these.
+    if (status === 402 && error.response?.data?.code === "plan_limit") {
+      const { message, feature, plan } = error.response.data;
+      useBillingStore.getState().openUpgrade({ message, feature, plan });
     }
 
     return Promise.reject(

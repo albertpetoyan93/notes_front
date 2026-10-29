@@ -54,6 +54,18 @@ export const describeActivity = (event: ActivityEvent, withTitle = true) => {
       return "turned off two-factor authentication";
     case "recovery_codes_regenerated":
       return "created new recovery codes";
+    case "trial_started":
+      return `started a free ${d.plan === "team" ? "Team" : d.plan === "family" ? "Family" : "Premium"} trial`;
+    case "family_invited":
+      return "invited someone to their family";
+    case "family_joined":
+      return "joined a family";
+    case "family_left":
+      return "left a family";
+    case "company_exported":
+      return "exported a company's items";
+    case "discount_requested":
+      return `asked for the ${d.kind === "school" ? "school" : "nonprofit"} discount`;
     case "passkey_added":
       return `added a passkey${d.name ? ` (${d.name})` : ""}`;
     case "passkey_removed":

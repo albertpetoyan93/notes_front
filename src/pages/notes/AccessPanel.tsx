@@ -15,6 +15,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { fetcherDelete, fetcherGet } from "../../configs/axios";
 import dayjsExtra from "../../utils/dayjs";
+import { collectionName } from "../../utils/vaultItems";
 
 type Route =
   | { type: "direct"; permission: "view" | "edit"; expiresAt: string | null }
@@ -58,15 +59,15 @@ const routeText = (route: Route) => {
       return `Shared with them directly${expiry(route.expiresAt)}`;
     case "collection":
       return route.collectionOwner
-        ? `Added to their collection "${route.collectionName}"`
-        : `Through the shared collection "${route.collectionName}"${expiry(route.expiresAt)}`;
+        ? `Added to their collection "${collectionName(route.collectionId, route.collectionName)}"`
+        : `Through the shared collection "${collectionName(route.collectionId, route.collectionName)}"${expiry(route.expiresAt)}`;
     case "company":
       if (route.role !== "member") {
-        return `Company ${route.role}: sees every collection, including "${route.collectionName}"`;
+        return `Company ${route.role}: sees every collection, including "${collectionName(route.collectionId, route.collectionName)}"`;
       }
       return route.everyone
-        ? `"${route.collectionName}" is shared with everyone in the company`
-        : `"${route.collectionName}" is shared with them`;
+        ? `"${collectionName(route.collectionId, route.collectionName)}" is shared with everyone in the company`
+        : `"${collectionName(route.collectionId, route.collectionName)}" is shared with them`;
   }
 };
 

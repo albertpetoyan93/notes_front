@@ -7,7 +7,8 @@ import {
 import { Button, Empty, Modal, Spin, Tag, Tooltip, message } from "antd";
 import { useCallback, useEffect, useState } from "react";
 import { fetcherGet, fetcherPost } from "../../configs/axios";
-import type { Note } from "../../store/noteStore";
+import { useNoteStore, type Note } from "../../store/noteStore";
+import { openVersions } from "../../utils/vaultItems";
 import dayjsExtra from "../../utils/dayjs";
 import { categoryLabel } from "../../utils/noteCategory";
 import { isSecretField, maskValue, noteBody, noteFields, type NoteField } from "../../utils/noteFields";
@@ -46,12 +47,13 @@ const VersionHistory = ({
 
   const load = useCallback(async () => {
     try {
-      setVersions(await fetcherGet(`/api/notes/${note.id}/versions`));
+      // End-to-end items: the versions arrive sealed and are opened here.
+      setVersions(await openVersions(note, await fetcherGet(`/api/notes/${note.id}/versions`)));
       setError("");
     } catch (loadError: any) {
       setError(loadError?.message || "Could not load the history");
     }
-  }, [note.id]);
+  }, [note]);
 
   useEffect(() => {
     load();
@@ -60,7 +62,8 @@ const VersionHistory = ({
   const openVersion = async (row: VersionRow) => {
     setLoadingId(row.id);
     try {
-      setOpen(await fetcherGet(`/api/notes/${note.id}/versions/${row.id}`));
+      // An end-to-end version was opened with the list already.
+      setOpen(note.e2e ? (row as unknown as VersionDetail) : await fetcherGet(`/api/notes/${note.id}/versions/${row.id}`));
       setShown(new Set());
     } catch (openError: any) {
       message.error(openError?.message || "Could not open that version");
@@ -78,7 +81,17 @@ const VersionHistory = ({
       okText: "Restore",
       onOk: async () => {
         try {
-          await fetcherPost(`/api/notes/${note.id}/versions/${version.id}/restore`, {});
+          if (note.e2e) {
+            // Saved like an edit, sealed here: the server can't read the version.
+            await useNoteStore.getState().updateNote(note.id, {
+              title: version.title,
+              content: version.content,
+              tags: version.tags,
+              category: version.category as Note["category"],
+            });
+          } else {
+            await fetcherPost(`/api/notes/${note.id}/versions/${version.id}/restore`, {});
+          }
           message.success("Version restored");
           setOpen(null);
           await load();

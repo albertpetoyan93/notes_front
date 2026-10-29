@@ -1,5 +1,20 @@
 import { create } from "zustand";
 import axios from "../configs/axios";
+import {
+  e2eActive,
+  collectionName,
+  openCollectionNames,
+  openNote,
+  runKeyTasks,
+  openNotes,
+  sealNewCollectionName,
+  sealRenamedCollection,
+  prepareNotes,
+  sealCreate,
+  sealUpdate,
+  unsealItems,
+  withE2E,
+} from "../utils/vaultItems";
 
 export interface NoteContent {
   mainContent: string;
@@ -29,6 +44,11 @@ export interface Note {
   tags?: string[];
   isFavorite: boolean;
   isEncrypted: boolean;
+  /** Encrypted in the browser (end-to-end); opened by utils/vaultItems. */
+  e2e?: boolean;
+  e2eId?: string | null;
+  itemKey?: string | null;
+  encData?: string | null;
   userId: number;
   createdAt: string;
   updatedAt: string;
@@ -118,12 +138,9 @@ interface NoteStore {
   ) => Promise<{ shared: NoteShare[]; failed: { identifier: string; message: string }[] }>;
   getNoteShares: (noteId: number) => Promise<NoteShare[]>;
   revokeShare: (noteId: number, userId: number) => Promise<void>;
-  exportNotes: () => Promise<{
-    version: number;
-    exportedAt: string;
-    skipped: number;
-    notes: Partial<Note>[];
-  }>;
+  exportNotes: () => Promise<VaultBackup>;
+  /** A company's items, for its owner (also while the company is suspended). */
+  exportCompany: (companyId: number) => Promise<VaultBackup>;
   importNotes: (
     notes: ImportedNote[]
   ) => Promise<{ imported: number; failed: { title: string; message: string }[] }>;
@@ -157,6 +174,128 @@ interface NoteStore {
   setSearchQuery: (query: string) => void;
 }
 
+export interface VaultBackup {
+  version: number;
+  exportedAt: string;
+  skipped: number;
+  notes: Partial<Note>[];
+}
+
+/** A backup file from the server, with end-to-end items opened here (only this browser can). */
+const openBackup = async (input: any): Promise<VaultBackup> => {
+  // Encrypted collection names come empty, with ids: filled in from the names opened here.
+  const backup = {
+    ...input,
+    notes: (input?.notes || []).map((note: any) => {
+      const ids: number[] = note.collectionIds || [];
+      const names = (note.collections || []).map((name: string, at: number) => name || collectionName(ids[at]));
+      const named = { ...note, collections: names, collection: note.collection || names[0] || null };
+      delete named.collectionIds;
+      return named;
+    }),
+  };
+  if (!backup.notes.some((note: Partial<Note>) => note.e2e)) return backup;
+  // End-to-end items come sealed: open them for the backup file.
+  const opened = await openNotes(backup.notes as Partial<Note>[]);
+  return {
+    ...backup,
+    skipped: backup.skipped + opened.filter((note) => (note.content as NoteContent)?.decryptionFailed).length,
+    notes: opened
+      .filter((note) => !(note.content as NoteContent)?.decryptionFailed)
+      .map((note) => {
+        const plain: Partial<Note> = { ...note };
+        delete plain.e2e;
+        delete plain.e2eId;
+        delete plain.itemKey;
+        delete plain.encData;
+        delete (plain as { e2eKeys?: unknown }).e2eKeys;
+        return plain;
+      }),
+  };
+};
+
+/** The person's collections, names opened. */
+const myCollections = async (): Promise<(CollectionItem & { encName?: string; nameKey?: string; e2eKey?: string })[]> =>
+  openCollectionNames((await axios.get("/api/collections")).data);
+
+/** The server can't compare encrypted names, so a duplicate is caught here. */
+const assertNewName = async (name: string, exceptId?: number) => {
+  const wanted = name.trim().toLowerCase();
+  const taken = (await myCollections()).some(
+    (item) => item.isOwner && item.id !== exceptId && item.name.trim().toLowerCase() === wanted
+  );
+  if (taken) throw new Error(`You already have a collection named "${name.trim()}"`);
+};
+
+const isE2EConflict = (error: any) => error?.code === "e2e_items";
+
+/** Create an item: sealed in end-to-end vaults, unless it goes into a shared or company collection. */
+const postNew = async (note: Partial<Note>) => {
+  if (!e2eActive()) return (await axios.post("/api/notes", note)).data;
+  // Sealed once: key copies the server asks for are made for this item key.
+  const sealed = await sealCreate(note);
+  try {
+    return (await withE2E((e2eKeys) => axios.post("/api/notes", { ...sealed, e2eKeys }))).data;
+  } catch (error) {
+    // Someone with access to a target collection has no keys: saved readable.
+    if (!isE2EConflict(error)) throw error;
+    return (await axios.post("/api/notes", note)).data;
+  }
+};
+
+/**
+ * Save changes to an item. End-to-end items are sealed first; moving one into
+ * a shared collection makes it readable, then saves the changes as usual.
+ */
+const saveChanges = async (id: number, changes: Partial<Note>, known: Note[]) => {
+  const listed = known.find((note) => note.id === id);
+  if ((listed && !listed.e2e) || !e2eActive()) return (await axios.put(`/api/notes/${id}`, changes)).data;
+  // Sealed items are saved whole: start from the server's latest copy, not
+  // the list in memory, so a change made elsewhere meanwhile isn't undone.
+  const current = await openNote((await axios.get(`/api/notes/${id}`)).data);
+  if (!current.e2e) return (await axios.put(`/api/notes/${id}`, changes)).data;
+  const body = await sealUpdate(current, changes);
+  try {
+    return (await withE2E((e2eKeys) => axios.put(`/api/notes/${id}`, { ...body, e2eKeys }), { unseal: false })).data;
+  } catch (error) {
+    if (!isE2EConflict(error)) throw error;
+    await unsealItems([id]);
+    return (await axios.put(`/api/notes/${id}`, changes)).data;
+  }
+};
+
+/** Import into an end-to-end vault: collections by name, each item sealed here. */
+const importSealed = async (notes: ImportedNote[]) => {
+  const collections: CollectionItem[] = await myCollections();
+  const byName = new Map(collections.filter((item) => item.isOwner).map((item) => [item.name.toLowerCase(), item.id]));
+  let imported = 0;
+  const failed: { title: string; message: string }[] = [];
+  for (const item of notes) {
+    const title = String(item?.title || "").trim();
+    try {
+      if (!title) throw new Error("Title is required");
+      const collectionIds: number[] = [];
+      for (const raw of item.collections || []) {
+        const name = String(raw || "").trim().slice(0, 100);
+        if (!name) continue;
+        let id = byName.get(name.toLowerCase());
+        if (!id) {
+          id = (await axios.post("/api/collections", await sealNewCollectionName(name))).data.id as number;
+          byName.set(name.toLowerCase(), id);
+        }
+        collectionIds.push(id);
+      }
+      const rest: Partial<ImportedNote> = { ...item };
+      delete rest.collections;
+      await postNew({ ...rest, title: title.slice(0, 255), tags: (item.tags || []).slice(0, 20), collectionIds } as Partial<Note>);
+      imported += 1;
+    } catch {
+      failed.push({ title: title || "Untitled", message: "Could not import this note" });
+    }
+  }
+  return { imported, failed };
+};
+
 export const useNoteStore = create<NoteStore>((set, get) => ({
   notes: [],
   loading: false,
@@ -172,13 +311,15 @@ export const useNoteStore = create<NoteStore>((set, get) => ({
       if (filters?.category && filters.category !== "all") {
         params.append("category", filters.category);
       }
-      if (filters?.project && filters.project !== "all") {
+      if (!e2eActive() && filters?.project && filters.project !== "all") {
         params.append("project", filters.project);
       }
-      if (filters?.tag && filters.tag !== "all") {
+      // End-to-end vaults filter here: the server can't read these items.
+      const clientSide = e2eActive();
+      if (!clientSide && filters?.tag && filters.tag !== "all") {
         params.append("tag", filters.tag);
       }
-      if (filters?.search) {
+      if (!clientSide && filters?.search) {
         params.append("search", filters.search);
       }
       if (filters?.isFavorite) {
@@ -198,7 +339,7 @@ export const useNoteStore = create<NoteStore>((set, get) => ({
       }
 
       const response = await axios.get(`/api/notes?${params.toString()}`);
-      set({ notes: response.data, loading: false });
+      set({ notes: await prepareNotes(response.data, filters), loading: false });
     } catch (error: any) {
       set({ error: error.message, loading: false });
     }
@@ -209,7 +350,7 @@ export const useNoteStore = create<NoteStore>((set, get) => ({
     try {
       const response = await axios.get(`/api/notes/${id}`);
       set({ loading: false });
-      return response.data;
+      return openNote(response.data);
     } catch (error: any) {
       set({ error: error.message, loading: false });
       throw error;
@@ -219,12 +360,12 @@ export const useNoteStore = create<NoteStore>((set, get) => ({
   createNote: async (note) => {
     set({ loading: true, error: null });
     try {
-      const response = await axios.post("/api/notes", note);
+      const saved = await openNote(await postNew(note));
       set((state) => ({
-        notes: [response.data, ...state.notes],
+        notes: [saved, ...state.notes],
         loading: false,
       }));
-      return response.data;
+      return saved;
     } catch (error: any) {
       set({ error: error.message, loading: false });
       throw error;
@@ -234,12 +375,12 @@ export const useNoteStore = create<NoteStore>((set, get) => ({
   updateNote: async (id, note) => {
     set({ loading: true, error: null });
     try {
-      const response = await axios.put(`/api/notes/${id}`, note);
+      const saved = await openNote(await saveChanges(id, note, get().notes));
       set((state) => ({
-        notes: state.notes.map((n) => (n.id === id ? response.data : n)),
+        notes: state.notes.map((n) => (n.id === id ? saved : n)),
         loading: false,
       }));
-      return response.data;
+      return saved;
     } catch (error: any) {
       set({ error: error.message, loading: false });
       throw error;
@@ -294,8 +435,9 @@ export const useNoteStore = create<NoteStore>((set, get) => ({
 
     try {
       const response = await axios.post(`/api/notes/${id}/favorite`);
+      const saved = await openNote(response.data);
       set((state) => ({
-        notes: state.notes.map((n) => (n.id === id ? response.data : n)),
+        notes: state.notes.map((n) => (n.id === id ? { ...saved, passwordHealth: n.passwordHealth } : n)),
       }));
     } catch (error: any) {
       set((state) => ({
@@ -333,11 +475,14 @@ export const useNoteStore = create<NoteStore>((set, get) => ({
 
   shareNote: async (noteId, identifier, permission = "view", expiresIn = "never") => {
     const identifiers = Array.isArray(identifier) ? identifier : [identifier];
-    const response = await axios.post(`/api/notes/${noteId}/share`, {
-      identifiers,
-      permission,
-      expiresIn,
-    });
+    const response = await withE2E((e2eKeys) =>
+      axios.post(`/api/notes/${noteId}/share`, {
+        identifiers,
+        permission,
+        expiresIn,
+        e2eKeys,
+      })
+    );
     return response.data;
   },
 
@@ -352,27 +497,40 @@ export const useNoteStore = create<NoteStore>((set, get) => ({
 
   exportNotes: async () => {
     const response = await axios.get("/api/notes/export");
-    return response.data;
+    return openBackup(response.data);
+  },
+
+  exportCompany: async (companyId: number) => {
+    const response = await axios.get(`/api/companies/${companyId}/export`);
+    return openBackup(response.data);
   },
 
   importNotes: async (notes) => {
+    // End-to-end vaults encrypt each item here: a readable copy never reaches the server.
+    if (e2eActive()) return importSealed(notes);
     const response = await axios.post("/api/notes/import", { notes });
     return response.data;
   },
 
   fetchCollections: async () => {
     const response = await axios.get("/api/collections");
-    return response.data;
+    return openCollectionNames(response.data);
   },
 
+  // End-to-end accounts: the name is encrypted here, so the duplicate check is too.
   createCollection: async (name: string) => {
-    const response = await axios.post("/api/collections", { name });
-    return response.data;
+    if (!e2eActive()) return (await axios.post("/api/collections", { name })).data;
+    await assertNewName(name);
+    const response = await axios.post("/api/collections", await sealNewCollectionName(name.trim()));
+    return (await openCollectionNames([response.data]))[0];
   },
 
   renameCollection: async (id: number, name: string) => {
-    const response = await axios.put(`/api/collections/${id}`, { name });
-    return response.data;
+    const current = e2eActive() ? (await myCollections()).find((item) => item.id === id) : undefined;
+    if (!current?.encName) return (await axios.put(`/api/collections/${id}`, { name })).data;
+    await assertNewName(name, id);
+    const response = await axios.put(`/api/collections/${id}`, await sealRenamedCollection(current, name.trim()));
+    return (await openCollectionNames([response.data]))[0];
   },
 
   deleteCollection: async (id: number) => {
@@ -380,7 +538,9 @@ export const useNoteStore = create<NoteStore>((set, get) => ({
   },
 
   addNotesToCollection: async (id: number, noteIds: number[]) => {
-    const response = await axios.post(`/api/collections/${id}/notes`, { noteIds });
+    const response = await withE2E((e2eKeys) => axios.post(`/api/collections/${id}/notes`, { noteIds, e2eKeys }));
+    // A collection that just got a key: its name moves to it now, not on the next sign-in.
+    runKeyTasks().catch(() => undefined);
     return response.data;
   },
 
@@ -390,7 +550,7 @@ export const useNoteStore = create<NoteStore>((set, get) => ({
 
   availableCollectionNotes: async (id: number) => {
     const response = await axios.get(`/api/collections/${id}/available-notes`);
-    return response.data;
+    return (await openNotes(response.data)).map(({ id: noteId, title }) => ({ id: noteId as number, title: title as string }));
   },
 
   shareCollection: async (
@@ -399,11 +559,15 @@ export const useNoteStore = create<NoteStore>((set, get) => ({
     permission: "view" | "edit" = "view",
     expiresIn = "never"
   ) => {
-    const response = await axios.post(`/api/collections/${id}/share`, {
-      identifiers,
-      permission,
-      expiresIn,
-    });
+    const response = await withE2E((e2eKeys) =>
+      axios.post(`/api/collections/${id}/share`, {
+        identifiers,
+        permission,
+        expiresIn,
+        e2eKeys,
+      })
+    );
+    runKeyTasks().catch(() => undefined);
     return response.data;
   },
 
@@ -422,11 +586,14 @@ export const useNoteStore = create<NoteStore>((set, get) => ({
   },
 
   bulkUpdateNotes: async (noteIds, action, collectionId = null) => {
-    const response = await axios.post("/api/notes/bulk", {
-      noteIds,
-      action,
-      collectionId,
-    });
+    const response = await withE2E((e2eKeys) =>
+      axios.post("/api/notes/bulk", {
+        noteIds,
+        action,
+        collectionId,
+        e2eKeys,
+      })
+    );
     return response.data;
   },
 

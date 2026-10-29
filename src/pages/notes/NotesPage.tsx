@@ -9,10 +9,12 @@ import {
 } from "@ant-design/icons";
 import { Button, Modal, Select, Tooltip, message } from "antd";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { fetcherPost } from "../../configs/axios";
 import useVaultNav from "../../hooks/useVaultNav";
 import { Note, useNoteStore } from "../../store/noteStore";
 import { useVaultStore } from "../../store/vaultStore";
+import { useBillingStore } from "../../store/billingStore";
 import { useCompanyStore } from "../../store/companyStore";
 import { categoryPlural } from "../../utils/noteCategory";
 import {
@@ -80,6 +82,9 @@ const severity = (note: Note) => {
 
 const NotesPage = ({ companyId }: { companyId?: number }) => {
   const nav = useVaultNav();
+  const navigate = useNavigate();
+  // The password health report is part of paid plans.
+  const healthIncluded = useBillingStore((state) => state.billing?.limits.passwordHealth ?? true);
   const {
     notes,
     loading,
@@ -118,7 +123,7 @@ const NotesPage = ({ companyId }: { companyId?: number }) => {
 
   const isHealth = nav.view === "health";
   // Checks for leaked passwords while Security health is open.
-  const breach = useBreachCheck(summary, isHealth, refreshVault);
+  const breach = useBreachCheck(summary, isHealth && healthIncluded, refreshVault);
   const isTrash = nav.view === "trash";
   const activeCollection =
     collections.find(
@@ -471,7 +476,14 @@ const NotesPage = ({ companyId }: { companyId?: number }) => {
       </>
     ) : null;
 
-  const banner = isHealth ? (
+  const banner = isHealth && !healthIncluded ? (
+    <div className="list-note health-locked">
+      <span>The password health report (weak, reused and old passwords) is part of Premium.</span>
+      <Button size="small" type="primary" onClick={() => navigate("/settings/billing")}>
+        See plans
+      </Button>
+    </div>
+  ) : isHealth ? (
     <HealthSummary
       logins={
         summary.filter((note) => ["password", "login"].includes(note.category))

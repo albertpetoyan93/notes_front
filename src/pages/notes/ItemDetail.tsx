@@ -282,7 +282,7 @@ const ItemDetail = ({
   const [linkOpen, setLinkOpen] = useState(false);
   const [accessOpen, setAccessOpen] = useState(false);
   const owner = isNoteOwner(note);
-  const editable = canEditNote(note) && !trash;
+  const editable = canEditNote(note) && !trash && !decryptionFailed(note);
   const fields = noteFields(note).filter((field) => field.value.trim());
   const passkeys = notePasskeys(note);
   const body = noteBody(note);

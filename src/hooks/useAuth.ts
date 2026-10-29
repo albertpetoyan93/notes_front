@@ -2,8 +2,17 @@ import { useNavigate } from "react-router-dom";
 import { fetcherGet, fetcherPost } from "../configs/axios";
 import { useAuthStore } from "../store/authStore";
 import { message } from "antd";
-import { keevoReturnPath } from "../utils/keevoReturn";
+import { returnPath } from "../utils/keevoReturn";
 import { isCancelled, signInWithPasskey } from "../utils/passkeys";
+import { forgetVaultKeys } from "../store/keyStore";
+import { masterKeysFor, openVault } from "../utils/vaultKeys";
+import { createAccountKeys } from "../crypto/account";
+import { useKeyStore } from "../store/keyStore";
+import { masterPasswordProblems } from "../utils/masterPassword";
+import { setNewAccountRecovery } from "../utils/newAccount";
+
+// Between the password step and the 2FA step, the master key waits here (memory only).
+let pendingMasterKey: Uint8Array | null = null;
 
 export const endpoints = {
   login: "/api/auth/login",
@@ -32,16 +41,23 @@ const useAuth = () => {
 
   const finishSignIn = async () => {
     await getMe();
-    navigate(keevoReturnPath() || "/");
+    navigate(returnPath() || "/");
   };
 
   const login = async (newData: any): Promise<LoginChallenge | null> => {
     setStore({ loading: true });
     try {
-      const data = await fetcherPost(endpoints.login, newData);
+      // End-to-end accounts: the password never leaves this browser. It becomes
+      // a master key (slow on purpose), and only a derived sign-in key is sent.
+      const keys = await masterKeysFor(String(newData.email || ""), String(newData.password || ""));
+      const body = keys ? { email: newData.email, authKey: keys.authKey } : newData;
+      pendingMasterKey = keys?.masterKey || null;
+      const data = await fetcherPost(endpoints.login, body);
       if (data?.twoFactorRequired) {
         return { challengeToken: data.challengeToken };
       }
+      if (pendingMasterKey) await openVault(pendingMasterKey);
+      pendingMasterKey = null;
       await finishSignIn();
       return null;
     } catch (err: any) {
@@ -57,6 +73,8 @@ const useAuth = () => {
     setStore({ loading: true });
     try {
       await fetcherPost(endpoints.verifyTwoFactor, { challengeToken, code });
+      if (pendingMasterKey) await openVault(pendingMasterKey);
+      pendingMasterKey = null;
       await finishSignIn();
     } catch (err: any) {
       message.error(err.message || "That code is not valid.");
@@ -89,13 +107,20 @@ const useAuth = () => {
     }
   };
 
-  const register = async (newData: any) => {
+  // Every new account is end-to-end: the keys are made here from the master
+  // password, which never leaves this browser. Then the recovery key, once.
+  const register = async ({ password, ...newData }: any) => {
     setStore({ loading: true });
     try {
-      await fetcherPost(endpoints.register, newData);
-      message.success("Registration successful!");
+      const problems = await masterPasswordProblems(String(password || ""));
+      if (problems.length) throw new Error(`Your master password needs ${problems.join(", and ")}.`);
+      const made = await createAccountKeys(String(password));
+      await fetcherPost(endpoints.register, { ...newData, e2e: made.request });
+      useKeyStore.getState().setKeys(made.unlocked);
+      setNewAccountRecovery(made.recoveryKey, String(newData.email || ""));
       await getMe();
-      navigate("/");
+      // Keep `?next=` for after the recovery key (a plan picked on the website).
+      navigate({ pathname: "/auth/recovery-key", search: window.location.search });
     } catch (err: any) {
       message.error(err.message || "Registration failed");
       console.log(err);
@@ -133,6 +158,7 @@ const useAuth = () => {
   };
 
   const logOut = async () => {
+    forgetVaultKeys();
     try {
       await fetcherPost("/api/auth/logout", {});
     } catch {

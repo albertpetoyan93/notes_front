@@ -864,3 +864,9 @@
     }
   }
 }
+
+// Security health on a plan without the report.
+.list-note.health-locked {
+  justify-content: space-between;
+  flex-wrap: wrap;
+}

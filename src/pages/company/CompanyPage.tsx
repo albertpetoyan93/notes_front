@@ -15,9 +15,13 @@ import ActivityList from "../../components/activity/ActivityList";
 import axios from "../../configs/axios";
 import NotesPage from "../notes/NotesPage";
 import CompanyPoliciesSection from "./CompanyPoliciesSection";
+import ResetMasterPassword from "./ResetMasterPassword";
+import { recoveryStatus } from "../../utils/companyRecovery";
 import { useNoteStore } from "../../store/noteStore";
 import { useCompanyStore } from "../../store/companyStore";
 import { useVaultStore } from "../../store/vaultStore";
+import { knownTitle } from "../../utils/itemTitles";
+import { collectionName, openCollectionNames } from "../../utils/vaultItems";
 import "./CompanyPage.scss";
 
 interface MemberRow {
@@ -49,7 +53,7 @@ const MemberAccessSummary = ({ access }: { access: MemberAccess | null }) => {
           <ul>
             {collections.map((collection) => (
               <li key={collection.id}>
-                {collection.name}{" "}
+                {collectionName(collection.id, collection.name)}{" "}
                 <span>({collection.permission === "edit" ? "can edit" : "can view"})</span>
               </li>
             ))}
@@ -62,7 +66,7 @@ const MemberAccessSummary = ({ access }: { access: MemberAccess | null }) => {
           <ul>
             {secretsAccessed.slice(0, 10).map((item) => (
               <li key={item.noteId}>
-                {item.title} <span>({item.count}×)</span>
+                {item.title || knownTitle(item.noteId) || "An item"} <span>({item.count}×)</span>
               </li>
             ))}
           </ul>
@@ -114,8 +118,11 @@ const CompanyPage = () => {
   const loaded = useCompanyStore((state) => state.loaded);
   const load = useCompanyStore((state) => state.load);
   const company = companies.find((item) => item.id === companyId);
-  const canManage = company?.role === "owner" || company?.role === "admin";
+  // A suspended company can't be managed (only reopened or exported, from Billing).
+  const canManage = company?.status !== "suspended" && (company?.role === "owner" || company?.role === "admin");
   const [members, setMembers] = useState<MemberRow[]>([]);
+  // Admin recovery: whose master password this viewer can reset.
+  const [recoverable, setRecoverable] = useState<Set<number>>(new Set());
   const [membersLoading, setMembersLoading] = useState(false);
   const [roleSavingId, setRoleSavingId] = useState<number | null>(null);
   const inviteOpen = useCompanyStore((state) => state.inviteOpen);
@@ -169,6 +176,8 @@ const CompanyPage = () => {
     try {
       const response = await axios.get(`/api/companies/${companyId}/members`);
       setMembers(response.data || []);
+      const recovery = await recoveryStatus(companyId).catch(() => null);
+      setRecoverable(new Set(recovery?.canRecover ? recovery.recoverable || [] : []));
     } catch (error: any) {
       message.error(error?.message || "Could not load members");
     } finally {
@@ -184,7 +193,8 @@ const CompanyPage = () => {
 
   const loadWorkspace = async () => {
     const collectionResponse = await axios.get(`/api/companies/${companyId}/collections`);
-    const collections = collectionResponse.data || [];
+    // Encrypted names are opened here.
+    const collections = await openCollectionNames((collectionResponse.data || []) as CompanyCollection[]);
     setCompanyCollections(collections);
     return collections as CompanyCollection[];
   };
@@ -600,6 +610,9 @@ const CompanyPage = () => {
                   ) : (
                     <span className={`company-role ${member.role}`}>{roleLabel[member.role]}</span>
                   )}
+                  {canManageMember && member.status === "active" && member.userId && recoverable.has(member.userId) && (
+                    <ResetMasterPassword companyId={companyId} userId={member.userId} email={member.email} />
+                  )}
                   {(canRemove || canDelete) && (
                     <Tooltip title={removeLabel}>
                       <Button
@@ -687,6 +700,23 @@ const CompanyPage = () => {
 
   return (
     <>
+      {company.status === "suspended" && !panel && (
+        <div className="company-blocked" role="alert">
+          <div className="company-blocked-text">
+            <strong>{company.name} is suspended</strong>
+            <span>
+              {company.role === "owner"
+                ? "The Team plan ended unpaid. The company's items are hidden but kept; subscribe to Team to reopen it, or export them from Billing."
+                : "The company's plan ended. Its items are hidden but kept, and your personal vault is untouched. The owner can reopen it."}
+            </span>
+          </div>
+          {company.role === "owner" && (
+            <Button type="primary" onClick={() => navigate("/settings/billing")}>
+              Open Billing
+            </Button>
+          )}
+        </div>
+      )}
       {company.blocked === "2fa" && !panel && (
         <div className="company-blocked" role="alert">
           <div className="company-blocked-text">

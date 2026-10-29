@@ -4,6 +4,8 @@ const NotesPage = lazy(() => import("../pages/notes/NotesPage"));
 const CompanyPage = lazy(() => import("../pages/company/CompanyPage"));
 const SecurityPage = lazy(() => import("../pages/settings/SecurityPage"));
 const SecretLinksPage = lazy(() => import("../pages/settings/SecretLinksPage"));
+const BillingPage = lazy(() => import("../pages/settings/BillingPage"));
+const AdminPage = lazy(() => import("../pages/admin/AdminPage"));
 
 interface RouteConfig {
   path?: string;
@@ -32,8 +34,16 @@ const ProtectedRoutes: RouteConfig[] = [
     element: <SecurityPage />,
   },
   {
+    path: "/settings/billing",
+    element: <BillingPage />,
+  },
+  {
     path: "/links",
     element: <SecretLinksPage />,
+  },
+  {
+    path: "/admin",
+    element: <AdminPage />,
   },
 ];
 

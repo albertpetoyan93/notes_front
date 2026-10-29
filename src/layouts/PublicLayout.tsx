@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { Outlet, useNavigate } from "react-router-dom";
 import useAuth from "../hooks/useAuth";
 import { useAuthStore } from "../store/authStore";
-import { keevoReturnPath } from "../utils/keevoReturn";
+import { returnPath } from "../utils/keevoReturn";
 
 const PublicLayout = () => {
   const navigate = useNavigate();
@@ -11,7 +11,7 @@ const PublicLayout = () => {
 
   useEffect(() => {
     if (me) {
-      navigate(keevoReturnPath() || "/");
+      navigate(returnPath() || "/");
       return;
     }
 
@@ -19,7 +19,7 @@ const PublicLayout = () => {
     getMe()
       .then((res) => {
         if (!cancelled && res) {
-          navigate(keevoReturnPath() || "/");
+          navigate(returnPath() || "/");
         }
       })
       .catch(() => {

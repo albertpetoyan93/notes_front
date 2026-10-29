@@ -28,6 +28,7 @@ import CollectionDialogs from "../../pages/notes/CollectionDialogs";
 import { useCompanyStore } from "../../store/companyStore";
 import { CollectionItem, useNoteStore } from "../../store/noteStore";
 import { useVaultStore } from "../../store/vaultStore";
+import { useBillingStore } from "../../store/billingStore";
 import { CATEGORY_ORDER, categoryClass, categoryKey, categoryPlural } from "../../utils/noteCategory";
 import { healthIssues } from "../../utils/noteFields";
 import VaultSwitcher from "./VaultSwitcher";
@@ -40,6 +41,7 @@ const NavItem = ({
   label,
   count,
   countTone,
+  tag,
   onClick,
 }: {
   active?: boolean;
@@ -47,6 +49,7 @@ const NavItem = ({
   label: string;
   count?: number;
   countTone?: "warn";
+  tag?: ReactNode;
   onClick: () => void;
 }) => (
   <button
@@ -60,6 +63,7 @@ const NavItem = ({
     {count !== undefined && count > 0 && (
       <span className={countTone ? `nav-count ${countTone}` : "nav-count"}>{count}</span>
     )}
+    {tag}
   </button>
 );
 
@@ -72,6 +76,8 @@ const Heading = ({ children, action }: { children: ReactNode; action?: ReactNode
 
 const VaultSidebar = ({ companyId }: { companyId: number | null }) => {
   const nav = useVaultNav();
+  const healthIncluded = useBillingStore((state) => state.billing?.limits.passwordHealth ?? true);
+  const openUpgrade = useBillingStore((state) => state.openUpgrade);
   const { summary, collections, refresh, bumpList, setImportOpen, setAuthenticatorImportOpen } =
     useVaultStore();
   const { deleteCollection, exportNotes, importNotes } = useNoteStore();
@@ -79,7 +85,10 @@ const VaultSidebar = ({ companyId }: { companyId: number | null }) => {
     state.companies.find((item) => item.id === companyId)
   );
   const canManage =
-    !!company && company.memberStatus === "active" && (company.role === "owner" || company.role === "admin");
+    !!company &&
+    company.memberStatus === "active" &&
+    company.status !== "suspended" &&
+    (company.role === "owner" || company.role === "admin");
   const [dialog, setDialog] = useState<{
     mode: "create" | "rename" | "add" | "share";
     collection: CollectionItem | null;
@@ -350,9 +359,18 @@ const VaultSidebar = ({ companyId }: { companyId: number | null }) => {
               active={nav.view === "health"}
               icon={<SafetyCertificateOutlined />}
               label="Security health"
-              count={flagged}
+              count={healthIncluded ? flagged : undefined}
               countTone="warn"
-              onClick={() => nav.go({ health: "1" })}
+              tag={healthIncluded ? undefined : <span className="premium-tag">Premium</span>}
+              onClick={() =>
+                healthIncluded
+                  ? nav.go({ health: "1" })
+                  : openUpgrade({
+                      message: "The password health report finds weak, reused and old passwords. It's part of Premium.",
+                      feature: "passwordHealth",
+                      plan: "premium",
+                    })
+              }
             />
             <NavItem
               active={nav.view === "trash"}

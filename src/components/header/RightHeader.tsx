@@ -1,5 +1,7 @@
 import {
   BellOutlined,
+  CreditCardOutlined,
+  DashboardOutlined,
   DownloadOutlined,
   LinkOutlined,
   LockOutlined,
@@ -166,11 +168,28 @@ const RightHeader = () => {
               onClick: () => navigate("/settings/security"),
             },
             {
+              label: "Billing",
+              key: "billing",
+              icon: <CreditCardOutlined />,
+              onClick: () => navigate("/settings/billing"),
+            },
+            {
               label: "One-time links",
               key: "links",
               icon: <LinkOutlined />,
               onClick: () => navigate("/links"),
             },
+            // 2keevo's own admins (ADMIN_EMAILS on the server).
+            ...(me?.isAdmin
+              ? [
+                  {
+                    label: "Admin",
+                    key: "admin",
+                    icon: <DashboardOutlined />,
+                    onClick: () => navigate("/admin"),
+                  },
+                ]
+              : []),
             ...(installApp.available
               ? [
                   {

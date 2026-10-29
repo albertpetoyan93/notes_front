@@ -10,6 +10,7 @@ import {
 } from "../../utils/activity";
 import dayjsExtra from "../../utils/dayjs";
 import { browserAndOs } from "../../utils/device";
+import { knownTitle } from "../../utils/itemTitles";
 import "./ActivityList.scss";
 
 // A page of the audit log with "Show older". `url` may already carry filters.
@@ -29,9 +30,18 @@ const ActivityList = ({
   const [error, setError] = useState("");
 
   const fetchPage = useCallback(
-    (before?: number) => {
+    async (before?: number) => {
       const joiner = url.includes("?") ? "&" : "?";
-      return fetcherGet(before ? `${url}${joiner}before=${before}` : url) as Promise<ActivityPage>;
+      const page = (await fetcherGet(before ? `${url}${joiner}before=${before}` : url)) as ActivityPage;
+      // End-to-end items have no title on the server: use the one opened here.
+      return {
+        ...page,
+        events: page.events.map((event) =>
+          event.details?.title || !knownTitle(event.noteId)
+            ? event
+            : { ...event, details: { ...event.details, title: knownTitle(event.noteId) } }
+        ),
+      };
     },
     [url]
   );

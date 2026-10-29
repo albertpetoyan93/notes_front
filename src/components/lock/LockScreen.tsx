@@ -6,6 +6,7 @@ import useAuth from "../../hooks/useAuth";
 import { useAuthStore } from "../../store/authStore";
 import { afterUnlock } from "../../utils/autoLock";
 import { isCancelled, passkeysSupported, unlockWithPasskey } from "../../utils/passkeys";
+import { masterKeysFor, openVault } from "../../utils/vaultKeys";
 import { BrandLockup } from "../header/LeftHeader";
 import "./LockScreen.scss";
 
@@ -17,6 +18,8 @@ const LockScreen = ({ onUnlocked }: { onUnlocked: () => void }) => {
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState<"password" | "passkey" | null>(null);
   const [error, setError] = useState("");
+  // End-to-end accounts open their keys here, from the master password.
+  const masterPassword = !!me?.e2eEnabled;
 
   const done = () => {
     setPassword("");
@@ -30,7 +33,14 @@ const LockScreen = ({ onUnlocked }: { onUnlocked: () => void }) => {
     setBusy("password");
     setError("");
     try {
-      await fetcherPost("/api/auth/unlock", { password });
+      if (masterPassword) {
+        const keys = await masterKeysFor(String(me?.email || ""), password);
+        if (!keys) throw new Error("Could not unlock. Try again.");
+        const result = await fetcherPost("/api/auth/unlock", { authKey: keys.authKey });
+        await openVault(keys.masterKey, result.keys);
+      } else {
+        await fetcherPost("/api/auth/unlock", { password });
+      }
       done();
     } catch (unlockError: any) {
       setError(unlockError?.message || "Could not unlock. Try again.");
@@ -45,7 +55,14 @@ const LockScreen = ({ onUnlocked }: { onUnlocked: () => void }) => {
     setBusy("passkey");
     setError("");
     try {
-      await unlockWithPasskey();
+      const result = await unlockWithPasskey();
+      // End-to-end accounts: only a passkey set up for unlock can open the keys.
+      if (masterPassword && !result.vaultOpened) {
+        // The server unlocked the session, but the vault didn't open here: lock it again.
+        await fetcherPost("/api/auth/lock", {}).catch(() => undefined);
+        setError("This passkey can't open your vault yet. Use your master password, then turn on unlock for it in Security settings.");
+        return;
+      }
       done();
     } catch (unlockError: any) {
       if (!isCancelled(unlockError)) {
@@ -77,7 +94,7 @@ const LockScreen = ({ onUnlocked }: { onUnlocked: () => void }) => {
 
         <form className="lock-form" onSubmit={submit}>
           <label htmlFor="lock-password" className="lock-label">
-            Your 2keevo password
+            {masterPassword ? "Your master password" : "Your 2keevo password"}
           </label>
           <Input.Password
             id="lock-password"
@@ -101,10 +118,11 @@ const LockScreen = ({ onUnlocked }: { onUnlocked: () => void }) => {
             loading={busy === "password"}
             disabled={!password}
           >
-            Unlock
+            {busy === "password" && masterPassword ? "Opening your vault…" : "Unlock"}
           </Button>
         </form>
 
+        {/* End-to-end accounts: passkeys set up for unlock open the keys (PRF). */}
         {passkeysSupported() && (
           <Button
             size="large"

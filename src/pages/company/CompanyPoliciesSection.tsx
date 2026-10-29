@@ -1,8 +1,9 @@
-import { ClockCircleOutlined, KeyOutlined, LockOutlined, SafetyOutlined } from "@ant-design/icons";
+import { ClockCircleOutlined, KeyOutlined, LockOutlined, SafetyOutlined, UnlockOutlined } from "@ant-design/icons";
 import { Modal, Select, Spin, Switch, message } from "antd";
 import { useCallback, useEffect, useState } from "react";
 import { fetcherGet, fetcherPut } from "../../configs/axios";
 import { useCompanyStore, type CompanyPolicies } from "../../store/companyStore";
+import { disableRecovery, enableRecovery, recoveryStatus, type RecoveryStatus } from "../../utils/companyRecovery";
 
 interface PoliciesResponse {
   policies: CompanyPolicies;
@@ -19,14 +20,37 @@ const CompanyPoliciesSection = ({ companyId }: { companyId: number }) => {
   const loadCompanies = useCompanyStore((state) => state.load);
   const [data, setData] = useState<PoliciesResponse | null>(null);
   const [saving, setSaving] = useState(false);
+  const [recovery, setRecovery] = useState<RecoveryStatus | null>(null);
+  const isOwner = useCompanyStore((state) => state.companies.find((item) => item.id === companyId)?.role === "owner");
 
   const load = useCallback(async () => {
     try {
       setData(await fetcherGet(`/api/companies/${companyId}/policies`));
+      setRecovery(await recoveryStatus(companyId).catch(() => null));
     } catch (error: any) {
       message.error(error?.message || "Could not load the policies");
     }
   }, [companyId]);
+
+  // Admin recovery: owners and admins can reset a member's master password.
+  const toggleRecovery = (on: boolean) =>
+    Modal.confirm({
+      title: on ? "Let owners and admins reset master passwords?" : "Turn off admin recovery?",
+      content: on
+        ? "Each member's vault key is also locked for the company's owners and admins, so they can set a temporary master password for a member who forgot theirs. Members see this in their Security settings. It works for each member once they've opened 2keevo after you turn it on."
+        : "Owners and admins can no longer reset master passwords. Members who forget theirs need their own recovery key.",
+      okText: on ? "Turn it on" : "Turn it off",
+      onOk: async () => {
+        try {
+          if (on) await enableRecovery(companyId);
+          else await disableRecovery(companyId);
+          setRecovery(await recoveryStatus(companyId));
+          message.success(on ? "Admin recovery is on" : "Admin recovery is off");
+        } catch (error: any) {
+          message.error(error?.message || "Could not change admin recovery");
+        }
+      },
+    });
 
   useEffect(() => {
     load();
@@ -149,6 +173,29 @@ const CompanyPoliciesSection = ({ companyId }: { companyId: number }) => {
           options={options([5, 15, 30, 60], (value) => (value === 60 ? "1 hour" : `${value} minutes`))}
         />
       </div>
+
+      {recovery && (
+        <div className="policy-row">
+          <span className="policy-icon">
+            <UnlockOutlined />
+          </span>
+          <div className="policy-main">
+            <strong>Admin recovery</strong>
+            <span>
+              Owners and admins can set a temporary master password for a member who forgot theirs.
+              {recovery.enabled && recovery.recoverable
+                ? ` Ready for ${recovery.recoverable.length} ${recovery.recoverable.length === 1 ? "person" : "people"}.`
+                : ""}
+            </span>
+          </div>
+          <Switch
+            checked={recovery.enabled}
+            disabled={!isOwner}
+            onChange={toggleRecovery}
+            aria-label="Admin recovery"
+          />
+        </div>
+      )}
 
       <div className="policy-row">
         <span className="policy-icon">

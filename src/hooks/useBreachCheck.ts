@@ -5,6 +5,7 @@ import type { Note } from "../store/noteStore";
 import { leakCounts } from "../utils/breachCheck";
 import { categoryKey } from "../utils/noteCategory";
 import { noteFields } from "../utils/noteFields";
+import { forgetBreachCache } from "../utils/vaultItems";
 
 // Leak lists grow, so everything is checked again after a week.
 const RECHECK_MS = 7 * 24 * 60 * 60 * 1000;
@@ -70,6 +71,8 @@ const useBreachCheck = (summary: Note[], active: boolean, onSaved: () => void) =
           count: Math.max(...passwordsOf(note).map((password) => counts.get(password) || 0)),
         }));
         await fetcherPost("/api/notes/health/breaches", { results });
+        // End-to-end vaults read the counts back to work out health.
+        forgetBreachCache();
         setCheckedAt(new Date().toISOString());
         onSaved();
       } catch (checkError: any) {

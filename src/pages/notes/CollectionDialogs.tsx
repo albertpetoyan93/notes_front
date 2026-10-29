@@ -14,6 +14,7 @@ import {
 } from "antd";
 import { useEffect, useRef, useState } from "react";
 import { CollectionItem, useNoteStore } from "../../store/noteStore";
+import { isPlanLimit, planAllows } from "../../store/billingStore";
 
 const { Text } = Typography;
 
@@ -110,6 +111,7 @@ const CollectionDialogs = ({
       onChanged();
       onClose();
     } catch (error: any) {
+      if (isPlanLimit(error)) return;
       message.error(error?.message || "Could not save collection");
     } finally {
       setSubmitting(false);
@@ -155,6 +157,7 @@ const CollectionDialogs = ({
         message.error(result.failed.map((item: any) => item.message).join("\n"));
       }
     } catch (error: any) {
+      if (isPlanLimit(error)) return;
       const failed = error?.failed as { message: string }[] | undefined;
       message.error(
         failed?.map((item) => item.message).join("\n") ||
@@ -266,9 +269,11 @@ const CollectionDialogs = ({
             <Select
               options={[
                 { value: "never", label: "Never" },
-                { value: "1", label: "In 1 day" },
-                { value: "7", label: "In 7 days" },
-                { value: "30", label: "In 30 days" },
+                ...["1", "7", "30"].map((days) => ({
+                  value: days,
+                  label: `In ${days} ${days === "1" ? "day" : "days"}${planAllows("shareExpiry") ? "" : " (Premium)"}`,
+                  disabled: !planAllows("shareExpiry"),
+                })),
               ]}
             />
           </Form.Item>

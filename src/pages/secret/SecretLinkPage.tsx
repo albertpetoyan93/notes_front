@@ -13,13 +13,14 @@ import { BrandLockup } from "../../components/header/LeftHeader";
 import { fetcherGet, fetcherPost } from "../../configs/axios";
 import dayjsExtra from "../../utils/dayjs";
 import { isSecretField } from "../../utils/secretField";
-import { passphraseMatches, unsealSecret, type SecretPayload } from "../../utils/secretLink";
+import { passphraseMatches, proofFor, unsealSecret, type SecretPayload } from "../../utils/secretLink";
 import "./SecretLinkPage.scss";
 
 interface Meta {
   expiresAt: string;
   viewsLeft: number;
-  passphrase: { salt: string; check: string } | null;
+  // `check`: links made before passphrase proofs.
+  passphrase: { salt: string; check?: string } | null;
 }
 
 type Phase = "loading" | "ready" | "opening" | "open" | "gone" | "broken";
@@ -54,16 +55,31 @@ const SecretLinkPage = () => {
     setError("");
     setPhase("opening");
     try {
-      // A wrong passphrase is caught here, before a view is used.
+      // Older links: a wrong passphrase is caught here, before a view is used.
       if (
-        meta.passphrase &&
+        meta.passphrase?.check &&
         !(await passphraseMatches(fragment, passphrase, meta.passphrase.salt, meta.passphrase.check))
       ) {
         setError("That passphrase isn't right. The link still works; try again.");
         setPhase("ready");
         return;
       }
-      const sealed = await fetcherPost(`/api/secrets/${encodeURIComponent(id)}/open`, {});
+      // Newer links: the server checks a proof of it, and counts wrong ones.
+      const proof =
+        meta.passphrase && !meta.passphrase.check
+          ? await proofFor(fragment, passphrase, meta.passphrase.salt)
+          : undefined;
+      let sealed;
+      try {
+        sealed = await fetcherPost(`/api/secrets/${encodeURIComponent(id)}/open`, proof ? { proof } : {});
+      } catch (openError: any) {
+        if (openError?.message?.includes("passphrase isn't right")) {
+          setError(openError.message);
+          setPhase("ready");
+          return;
+        }
+        throw openError;
+      }
       const payload = await unsealSecret(
         sealed,
         fragment,
@@ -76,7 +92,10 @@ const SecretLinkPage = () => {
       setViewsLeft(sealed.viewsLeft);
       setPhase("open");
     } catch (openError: any) {
-      if (openError?.message?.includes("no longer works")) setPhase("gone");
+      if (openError?.message?.includes("no longer works") || openError?.message?.includes("destroyed")) {
+        setError(openError.message.includes("destroyed") ? openError.message : "");
+        setPhase("gone");
+      }
       else {
         setError("This link is damaged and can't be opened. Ask the sender for a new one.");
         setPhase("ready");
@@ -115,7 +134,8 @@ const SecretLinkPage = () => {
         <p className="secret-text">
           {phase === "broken"
             ? "The link is incomplete. Ask the sender to send you the whole link."
-            : "It was already opened, it expired, or the sender cancelled it. Ask the sender for a new link if you still need it."}
+            : error ||
+              "It was already opened, it expired, or the sender cancelled it. Ask the sender for a new link if you still need it."}
         </p>
       </>
     );

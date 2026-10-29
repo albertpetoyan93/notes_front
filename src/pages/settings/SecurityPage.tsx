@@ -22,8 +22,10 @@ import { fetcherDelete, fetcherGet, fetcherPost } from "../../configs/axios";
 import { useAuthStore } from "../../store/authStore";
 import dayjsExtra from "../../utils/dayjs";
 import { browserAndOs, isPhoneAgent } from "../../utils/device";
+import { passwordProof } from "../../utils/vaultKeys";
 import "../company/CompanyPage.scss";
 import AutoLockSection from "./AutoLockSection";
+import EncryptionSection from "./EncryptionSection";
 import ClipboardSection from "./ClipboardSection";
 import PasskeysSection from "./PasskeysSection";
 import "./SecurityPage.scss";
@@ -216,7 +218,7 @@ const CodeModal = ({
     setBusy(true);
     try {
       if (mode === "disable") {
-        await fetcherPost("/api/auth/2fa/disable", { password, code });
+        await fetcherPost("/api/auth/2fa/disable", { password: await passwordProof(password), code });
         message.success("Two-factor authentication is off");
         onClose(true);
       } else {
@@ -407,6 +409,8 @@ const SecurityPage = () => {
       </section>
 
       <PasskeysSection />
+
+      <EncryptionSection />
 
       <AutoLockSection />
 

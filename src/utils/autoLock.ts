@@ -3,6 +3,7 @@
 // and keeps every open 2keevo tab in step.
 
 import { fetcherPost } from "../configs/axios";
+import { forgetVaultKeys } from "../store/keyStore";
 import { useLockStore } from "../store/lockStore";
 import { useNoteStore } from "../store/noteStore";
 import { useVaultStore } from "../store/vaultStore";
@@ -53,6 +54,8 @@ const announce = (state: "locked" | "unlocked") => {
 export const forgetVaultData = () => {
   useVaultStore.setState({ summary: [], collections: [], loaded: false });
   useNoteStore.setState({ notes: [] });
+  // End-to-end accounts: the open keys go too; unlocking re-derives them.
+  forgetVaultKeys();
 };
 
 export const showLocked = () => {
