@@ -15,13 +15,14 @@ import ActivityList from "../../components/activity/ActivityList";
 import axios from "../../configs/axios";
 import NotesPage from "../notes/NotesPage";
 import CompanyPoliciesSection from "./CompanyPoliciesSection";
+import GroupsPanel from "./GroupsPanel";
 import ResetMasterPassword from "./ResetMasterPassword";
 import { recoveryStatus } from "../../utils/companyRecovery";
 import { useNoteStore } from "../../store/noteStore";
 import { useCompanyStore } from "../../store/companyStore";
 import { useVaultStore } from "../../store/vaultStore";
 import { knownTitle } from "../../utils/itemTitles";
-import { collectionName, openCollectionNames } from "../../utils/vaultItems";
+import { collectionName, openCollectionNames, runKeyTasks } from "../../utils/vaultItems";
 import "./CompanyPage.scss";
 
 interface MemberRow {
@@ -88,19 +89,31 @@ interface CollectionShareRow {
   permission: "view" | "edit";
 }
 
-interface CompanyCollection {
+interface CollectionGroupRow {
+  groupId: number;
+  name: string;
+  permission: "view" | "edit";
+  members: number;
+}
+
+export interface CompanyCollection {
   id: number;
   name: string;
   noteCount: number;
   permission: "owner" | "view" | "edit";
   companyShare?: "view" | "edit" | null;
   shares?: CollectionShareRow[];
+  groups?: CollectionGroupRow[];
 }
 
 const viewerLabel = (collection: CompanyCollection) => {
   if (collection.companyShare) return "All members";
   const count = collection.shares?.length || 0;
-  return `${count} ${count === 1 ? "viewer" : "viewers"}`;
+  const groups = collection.groups || [];
+  const people = `${count} ${count === 1 ? "person" : "people"}`;
+  if (!groups.length) return people;
+  const groupText = groups.length === 1 ? groups[0].name : `${groups.length} groups`;
+  return count ? `${groupText} · ${people}` : groupText;
 };
 
 const roleLabel = {
@@ -136,7 +149,9 @@ const CompanyPage = () => {
   const [collectionName, setCollectionName] = useState("");
   const [sharingCollection, setSharingCollection] = useState<CompanyCollection | null>(null);
   const [accessCollection, setAccessCollection] = useState<CompanyCollection | null>(null);
-  const [shareAudience, setShareAudience] = useState<"members" | "all">("members");
+  const [shareAudience, setShareAudience] = useState<"members" | "all" | "group">("members");
+  const [shareGroupId, setShareGroupId] = useState<number | null>(null);
+  const [groupOptions, setGroupOptions] = useState<{ value: number; label: string }[]>([]);
   const [sharePermission, setSharePermission] = useState<"view" | "edit">("view");
   const [shareEmails, setShareEmails] = useState<string[]>([]);
   const [userOptions, setUserOptions] = useState<
@@ -147,10 +162,13 @@ const CompanyPage = () => {
   const searchTimer = useRef<number>();
   const [activityActor, setActivityActor] = useState<number | null>(null);
   const requestedTab = searchParams.get("tab") || "notes";
+  const inCompany = company?.memberStatus === "active" && company?.status !== "suspended";
   const companyTab =
     canManage && ["collections", "members", "settings", "activity"].includes(requestedTab)
       ? requestedTab
-      : "notes";
+      : inCompany && requestedTab === "groups"
+        ? "groups"
+        : "notes";
   const requestedShareId = Number(searchParams.get("share")) || null;
 
   useEffect(() => {
@@ -271,8 +289,57 @@ const CompanyPage = () => {
     }, 300);
   };
 
+  // The company's groups, for the share dialog.
+  useEffect(() => {
+    if (!sharingCollection || !canManage) return;
+    axios
+      .get(`/api/companies/${companyId}/groups`)
+      .then((response) =>
+        setGroupOptions((response.data?.groups || []).map((group: { id: number; name: string }) => ({ value: group.id, label: group.name })))
+      )
+      .catch(() => setGroupOptions([]));
+  }, [sharingCollection, canManage, companyId]);
+
+  const shareWithGroup = async () => {
+    if (!sharingCollection) return;
+    if (!shareGroupId) {
+      message.warning("Choose a group");
+      return;
+    }
+    setSaving(true);
+    try {
+      await axios.post(`/api/companies/${companyId}/collections/${sharingCollection.id}/groups`, {
+        groupId: shareGroupId,
+        permission: sharePermission,
+      });
+      message.success("Shared with the group");
+      // This browser hands the collection key to the group's members.
+      await runKeyTasks().catch(() => undefined);
+      await loadWorkspace();
+      refreshVault();
+      setSharingCollection(null);
+      setShareGroupId(null);
+    } catch (error: any) {
+      message.error(error?.message || "Could not share with the group");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const unshareGroup = async (groupId: number) => {
+    if (!sharingCollection) return;
+    await axios.delete(`/api/companies/${companyId}/collections/${sharingCollection.id}/groups/${groupId}`);
+    message.success("Group removed");
+    // People who no longer reach it: the collection key is replaced here.
+    await runKeyTasks().catch(() => undefined);
+    const rows = await loadWorkspace();
+    refreshVault();
+    setSharingCollection((current) => rows.find((item) => item.id === current?.id) || null);
+  };
+
   const shareCollection = async () => {
     if (!sharingCollection) return;
+    if (shareAudience === "group") return shareWithGroup();
     if (shareAudience === "members" && shareEmails.length === 0) {
       message.warning("Choose at least one person");
       return;
@@ -687,8 +754,23 @@ const CompanyPage = () => {
     </>
   );
 
+  const groupsPanel = (
+    <GroupsPanel
+      companyId={companyId}
+      companyName={company.name}
+      members={members}
+      collections={companyCollections}
+      onChanged={async () => {
+        await loadWorkspace().catch(() => undefined);
+        refreshVault();
+      }}
+    />
+  );
+
   const panel =
-    companyTab === "collections"
+    companyTab === "groups"
+      ? groupsPanel
+      : companyTab === "collections"
       ? collectionsPanel
       : companyTab === "members"
         ? membersPanel
@@ -791,7 +873,17 @@ const CompanyPage = () => {
           {accessCollection?.companyShare && (
             <div>All company members · {accessCollection.companyShare}</div>
           )}
-          {(accessCollection?.shares || []).length === 0 && !accessCollection?.companyShare ? (
+          {accessCollection?.groups?.map((group) => (
+            <div key={`group-${group.groupId}`}>
+              <div>
+                {group.name} <Typography.Text type="secondary">(group of {group.members})</Typography.Text>
+              </div>
+              <Typography.Text type="secondary">{group.permission}</Typography.Text>
+            </div>
+          ))}
+          {(accessCollection?.shares || []).length === 0 &&
+          !accessCollection?.companyShare &&
+          !(accessCollection?.groups || []).length ? (
             <Empty description="No one has access" />
           ) : (
             accessCollection?.shares?.map((person) => (
@@ -817,6 +909,7 @@ const CompanyPage = () => {
             onChange={setShareAudience}
             options={[
               { value: "members", label: "Selected people" },
+              { value: "group", label: "A group" },
               { value: "all", label: "All company members" },
             ]}
           />
@@ -849,9 +942,29 @@ const CompanyPage = () => {
               notFoundContent={null}
             />
           )}
+          {shareAudience === "group" && (
+            <Select
+              style={{ width: "100%" }}
+              value={shareGroupId ?? undefined}
+              onChange={setShareGroupId}
+              options={groupOptions}
+              placeholder={groupOptions.length ? "Choose a group" : "No groups yet: make one under Groups"}
+              notFoundContent={null}
+            />
+          )}
           <Button type="primary" loading={saving} onClick={shareCollection}>
-            {shareAudience === "all" ? "Share with everyone" : "Share"}
+            {shareAudience === "all" ? "Share with everyone" : shareAudience === "group" ? "Share with the group" : "Share"}
           </Button>
+          {sharingCollection?.groups?.map((group) => (
+            <div key={`group-${group.groupId}`} style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
+              <span>
+                {group.name} (group) · {group.permission}
+              </span>
+              <Button size="small" danger onClick={() => unshareGroup(group.groupId)}>
+                Remove
+              </Button>
+            </div>
+          ))}
           {sharingCollection?.companyShare && (
             <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
               <span>All members · {sharingCollection.companyShare}</span>

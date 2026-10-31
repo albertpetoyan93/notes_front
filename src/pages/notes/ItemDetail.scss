@@ -356,3 +356,71 @@
     display: none;
   }
 }
+
+/* Files: encrypted here, stored as ciphertext. */
+.attachments-card {
+  &.is-dragging {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 1px var(--primary);
+  }
+
+  .attachments-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 10px 12px 6px 16px;
+
+    .field-label {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+  }
+
+  .attachment-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-height: 52px;
+    padding: 6px 10px 6px 16px;
+    border-top: 1px solid var(--borderSubtle);
+  }
+
+  .attachment-icon {
+    display: grid;
+    place-items: center;
+    flex: none;
+    width: 32px;
+    height: 32px;
+    border-radius: 9px;
+    background: var(--surfaceMuted);
+    color: var(--textMuted);
+  }
+
+  .attachment-text {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    min-width: 0;
+
+    strong {
+      font-weight: 500;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    span {
+      font-size: 12.5px;
+      color: var(--textMuted);
+    }
+  }
+
+  .attachments-empty {
+    margin: 0;
+    padding: 4px 16px 14px;
+    font-size: 12.5px;
+    color: var(--textMuted);
+  }
+}

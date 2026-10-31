@@ -120,6 +120,9 @@ const keyFor = async (note: { e2eId?: string | null; itemKey?: string | null; e2
   return key;
 };
 
+/** An opened item's key, for its attachments (crypto/attachments.ts). */
+export const itemKeyOf = (note: { e2eId?: string | null; itemKey?: string | null; e2eKeys?: KeyPaths }) => keyFor(note);
+
 /** An item's key by id, fetching the item if its key isn't open yet. */
 const keyForId = async (noteId: number, e2eId: string) =>
   itemKeys.get(e2eId) || keyFor(await fetcherGet(`/api/notes/${noteId}`));

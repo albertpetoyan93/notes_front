@@ -65,6 +65,7 @@ import {
   recoverySummary,
 } from "../../utils/recoveryCodes";
 import { isTotpLabel, parseTotp } from "../../utils/totp";
+import AttachmentsCard from "./AttachmentsCard";
 import { canEditNote, isNoteOwner } from "./NoteActions";
 
 interface ItemDetailProps {
@@ -631,6 +632,10 @@ const ItemDetail = ({
           </div>
           <p>{body}</p>
         </section>
+      )}
+
+      {note.e2e && !trash && !decryptionFailed(note) && (
+        <AttachmentsCard key={note.id} note={note} editable={editable} />
       )}
 
       {note.comment && (

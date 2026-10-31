@@ -6,6 +6,8 @@ const SecurityPage = lazy(() => import("../pages/settings/SecurityPage"));
 const SecretLinksPage = lazy(() => import("../pages/settings/SecretLinksPage"));
 const BillingPage = lazy(() => import("../pages/settings/BillingPage"));
 const AdminPage = lazy(() => import("../pages/admin/AdminPage"));
+const EmergencyPage = lazy(() => import("../pages/emergency/EmergencyPage"));
+const EmergencyVaultPage = lazy(() => import("../pages/emergency/EmergencyVaultPage"));
 
 interface RouteConfig {
   path?: string;
@@ -40,6 +42,14 @@ const ProtectedRoutes: RouteConfig[] = [
   {
     path: "/links",
     element: <SecretLinksPage />,
+  },
+  {
+    path: "/emergency",
+    element: <EmergencyPage />,
+  },
+  {
+    path: "/emergency/:id",
+    element: <EmergencyVaultPage />,
   },
   {
     path: "/admin",

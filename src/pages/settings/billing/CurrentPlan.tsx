@@ -2,6 +2,7 @@ import { CheckOutlined, DownOutlined, MinusOutlined } from "@ant-design/icons";
 import { Button, Dropdown, Modal, Tag } from "antd";
 import { useBillingStore, type Billing } from "../../../store/billingStore";
 import { useVaultStore } from "../../../store/vaultStore";
+import { fileSize } from "../../../utils/fileSize";
 import { date, days, daysLeft, joinNames, monthlyCents, perPeriod, scrollToId, teamNames, useBusy, type PaidPlan } from "./format";
 
 /** The plan this person has now: what it costs, when it renews, and what it unlocks. */
@@ -116,6 +117,16 @@ const CurrentPlan = ({ billing }: { billing: Billing }) => {
     { label: limits.sharePeople === null ? "Unlimited sharing" : `Share with up to ${limits.sharePeople} people`, on: true },
     { label: "Share end dates", on: limits.shareExpiry },
     { label: "Password health", on: limits.passwordHealth },
+    { label: "Emergency access", on: !!limits.emergencyAccess },
+    ...(limits.storageBytes
+      ? [
+          {
+            label: `Files: ${fileSize(usage.storageBytes || 0)} of ${fileSize(limits.storageBytes)} used`,
+            on: true,
+            meter: Math.min(100, ((usage.storageBytes || 0) / limits.storageBytes) * 100),
+          },
+        ]
+      : []),
   ];
 
   return (

@@ -1,4 +1,5 @@
 import {
+  ApartmentOutlined,
   AppstoreOutlined,
   CloudSyncOutlined,
   DeleteOutlined,
@@ -89,6 +90,7 @@ const VaultSidebar = ({ companyId }: { companyId: number | null }) => {
     company.memberStatus === "active" &&
     company.status !== "suspended" &&
     (company.role === "owner" || company.role === "admin");
+  const inCompany = !!company && company.memberStatus === "active" && company.status !== "suspended";
   const [dialog, setDialog] = useState<{
     mode: "create" | "rename" | "add" | "share";
     collection: CollectionItem | null;
@@ -344,10 +346,28 @@ const VaultSidebar = ({ companyId }: { companyId: number | null }) => {
               onClick={() => nav.go({ tab: "members" })}
             />
             <NavItem
+              active={nav.tab === "groups"}
+              icon={<ApartmentOutlined />}
+              label="Groups"
+              onClick={() => nav.go({ tab: "groups" })}
+            />
+            <NavItem
               active={nav.tab === "settings"}
               icon={<SettingOutlined />}
               label="Settings"
               onClick={() => nav.go({ tab: "settings" })}
+            />
+          </>
+        )}
+
+        {!canManage && inCompany && (
+          <>
+            <Heading>Team</Heading>
+            <NavItem
+              active={nav.tab === "groups"}
+              icon={<ApartmentOutlined />}
+              label="Groups"
+              onClick={() => nav.go({ tab: "groups" })}
             />
           </>
         )}

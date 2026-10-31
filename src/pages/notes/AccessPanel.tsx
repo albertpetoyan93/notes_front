@@ -34,6 +34,8 @@ type Route =
       permission: "view" | "edit";
       role: "owner" | "admin" | "member";
       everyone: boolean;
+      /** Through one of their groups. */
+      group?: boolean;
     };
 
 interface Person {
@@ -67,7 +69,9 @@ const routeText = (route: Route) => {
       }
       return route.everyone
         ? `"${collectionName(route.collectionId, route.collectionName)}" is shared with everyone in the company`
-        : `"${collectionName(route.collectionId, route.collectionName)}" is shared with them`;
+        : route.group
+          ? `"${collectionName(route.collectionId, route.collectionName)}" is shared with a group they're in`
+          : `"${collectionName(route.collectionId, route.collectionName)}" is shared with them`;
   }
 };
 
@@ -99,7 +103,9 @@ const RouteChip = ({ route }: { route: Route }) => {
           ? `Company ${route.role}`
           : route.everyone
             ? `${route.collectionName} · everyone`
-            : route.collectionName;
+            : route.group
+              ? `${route.collectionName} · group`
+              : route.collectionName;
 
   return (
     <span className={`access-chip is-${route.type}`}>

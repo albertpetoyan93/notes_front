@@ -8,6 +8,8 @@ export interface PlanLimits {
   sharePeople: number | null;
   shareExpiry: boolean;
   passwordHealth: boolean;
+  emergencyAccess: boolean;
+  storageBytes: number;
 }
 
 export interface BillingSubscription {
@@ -88,7 +90,7 @@ export interface Billing {
   familyOrganizer: string | null;
   limits: PlanLimits;
   subscription: BillingSubscription | null;
-  usage: { collections: number };
+  usage: { collections: number; storageBytes?: number };
   trials: { premium: boolean; family: boolean };
   companies: BillingCompany[];
   family: FamilyInfo;

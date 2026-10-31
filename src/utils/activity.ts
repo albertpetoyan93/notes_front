@@ -157,6 +157,50 @@ export const describeActivity = (event: ActivityEvent, withTitle = true) => {
       const changed = Array.isArray(d.changed) ? (d.changed as string[]) : [];
       return changed.map((key) => names[key] || key).join(", ") || "changed the security policies";
     }
+    case "emergency_invited":
+      return "added an emergency contact";
+    case "emergency_accepted":
+      return "accepted being someone's emergency contact";
+    case "emergency_confirmed":
+      return "confirmed an emergency contact";
+    case "emergency_requested":
+      return "asked for emergency access";
+    case "emergency_approved":
+      return "approved an emergency access request";
+    case "emergency_refused":
+      return d.ended ? "ended someone's emergency access" : "refused an emergency access request";
+    case "emergency_removed":
+      return `removed ${target} as an emergency contact`;
+    case "emergency_left":
+      return `stopped being ${target}'s emergency contact`;
+    case "emergency_viewed":
+      return `opened ${target}'s vault with emergency access`;
+    case "attachment_added":
+      return `added a file to${item}`;
+    case "attachment_downloaded":
+      return `downloaded a file from${item}`;
+    case "attachment_deleted":
+      return `deleted a file from${item}`;
+    case "group_created":
+      return `created the group ${quote(d.group).replace("an item", "a group")}`;
+    case "group_renamed":
+      return `renamed a group to ${quote(d.group).replace("an item", "a group")}`;
+    case "group_deleted":
+      return `deleted the group ${quote(d.group).replace("an item", "a group")}`;
+    case "group_member_added":
+      return `added ${target} to ${quote(d.group).replace("an item", "a group")}`;
+    case "group_member_removed":
+      return `took ${target} out of ${quote(d.group).replace("an item", "a group")}`;
+    case "collection_group_shared":
+      return `shared ${collection} with ${quote(d.group).replace("an item", "a group")} (${d.permission === "edit" ? "can edit" : "can view"})`;
+    case "collection_group_unshared":
+      return `stopped sharing ${collection} with ${quote(d.group).replace("an item", "a group")}`;
+    case "group_join_requested":
+      return `asked to join ${quote(d.group).replace("an item", "a group")}`;
+    case "group_request_approved":
+      return `let ${target} join ${quote(d.group).replace("an item", "a group")}`;
+    case "group_request_declined":
+      return `declined ${target}'s request to join ${quote(d.group).replace("an item", "a group")}`;
     case "member_role_changed":
       return `made ${target} ${d.role === "admin" ? "an admin" : "a member"}`;
     default:
@@ -176,6 +220,9 @@ export const isNotableActivity = (action: string) =>
     "field_revealed",
     "field_copied",
     "vault_exported",
+    "emergency_requested",
+    "emergency_viewed",
+    "attachment_downloaded",
   ].includes(action);
 
 /**

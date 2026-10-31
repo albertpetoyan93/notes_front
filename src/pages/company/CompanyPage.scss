@@ -276,3 +276,88 @@
     }
   }
 }
+
+/* Groups */
+
+.groups-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.group-card {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.group-card-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.group-block {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-top: 12px;
+  border-top: 1px solid var(--borderSubtle);
+
+  h3 {
+    margin: 0 0 2px;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--textMuted);
+  }
+}
+
+.group-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.group-line-text {
+  display: flex;
+  flex: 1 1 200px;
+  flex-direction: column;
+  min-width: 0;
+
+  span {
+    overflow-wrap: anywhere;
+  }
+
+  small {
+    font-size: 12.5px;
+    color: var(--textMuted);
+    overflow-wrap: anywhere;
+  }
+}
+
+.group-add {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 4px;
+
+  > .ant-select:first-child {
+    flex: 1 1 220px;
+    min-width: 0;
+  }
+}
+
+.group-empty {
+  margin: 0;
+  font-size: 13px;
+  color: var(--textMuted);
+}
+
+.group-modal-note {
+  margin: 10px 0 0;
+  font-size: 12.5px;
+  color: var(--textMuted);
+}

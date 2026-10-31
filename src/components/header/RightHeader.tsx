@@ -6,6 +6,7 @@ import {
   LinkOutlined,
   LockOutlined,
   LogoutOutlined,
+  MedicineBoxOutlined,
   MoonOutlined,
   SafetyOutlined,
   SunOutlined,
@@ -178,6 +179,12 @@ const RightHeader = () => {
               key: "links",
               icon: <LinkOutlined />,
               onClick: () => navigate("/links"),
+            },
+            {
+              label: "Emergency access",
+              key: "emergency",
+              icon: <MedicineBoxOutlined />,
+              onClick: () => navigate("/emergency"),
             },
             // 2keevo's own admins (ADMIN_EMAILS on the server).
             ...(me?.isAdmin
