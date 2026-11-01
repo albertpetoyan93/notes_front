@@ -203,6 +203,11 @@ export const describeActivity = (event: ActivityEvent, withTitle = true) => {
       return `declined ${target}'s request to join ${quote(d.group).replace("an item", "a group")}`;
     case "member_role_changed":
       return `made ${target} ${d.role === "admin" ? "an admin" : "a member"}`;
+    case "support_action": {
+      // The server's words already start with "2keevo support"; the row starts with the person.
+      const what = String(d.what || "").replace(/^2keevo support:?\s*/i, "");
+      return `— 2keevo support: ${what || "changed something on the account."}`;
+    }
     default:
       return event.action.replace(/_/g, " ");
   }

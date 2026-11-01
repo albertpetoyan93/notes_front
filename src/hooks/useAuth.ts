@@ -9,7 +9,8 @@ import { masterKeysFor, openVault } from "../utils/vaultKeys";
 import { createAccountKeys } from "../crypto/account";
 import { useKeyStore } from "../store/keyStore";
 import { masterPasswordProblems } from "../utils/masterPassword";
-import { setNewAccountRecovery } from "../utils/newAccount";
+import { setNewAccountRecovery } from "../utils/newAccount";
+import { signupSource } from "../utils/signupSource";
 
 // Between the password step and the 2FA step, the master key waits here (memory only).
 let pendingMasterKey: Uint8Array | null = null;
@@ -19,6 +20,12 @@ export const endpoints = {
   register: "/api/auth/register",
   getMe: "/api/auth/me",
   verifyTwoFactor: "/api/auth/2fa/verify",
+};
+
+/** What signing out clears in this tab; the server side is separate. */
+export const forgetLocalSession = () => {
+  forgetVaultKeys();
+  useAuthStore.getState().setStore({ me: null });
 };
 
 /** Set when the password was right and the account has 2FA on. */
@@ -115,7 +122,11 @@ const useAuth = () => {
       const problems = await masterPasswordProblems(String(password || ""));
       if (problems.length) throw new Error(`Your master password needs ${problems.join(", and ")}.`);
       const made = await createAccountKeys(String(password));
-      await fetcherPost(endpoints.register, { ...newData, e2e: made.request });
+      await fetcherPost(endpoints.register, {
+        ...newData,
+        e2e: made.request,
+        signupSource: signupSource() ?? undefined,
+      });
       useKeyStore.getState().setKeys(made.unlocked);
       setNewAccountRecovery(made.recoveryKey, String(newData.email || ""));
       await getMe();
@@ -158,13 +169,12 @@ const useAuth = () => {
   };
 
   const logOut = async () => {
-    forgetVaultKeys();
     try {
       await fetcherPost("/api/auth/logout", {});
     } catch {
       // The cookies are cleared when the server can; still leave the app.
     }
-    setStore({ me: null });
+    forgetLocalSession();
     navigate("/auth/login");
     window.location.reload();
   };

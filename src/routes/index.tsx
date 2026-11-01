@@ -8,6 +8,7 @@ import ProtectedRoutes from "./ProtectedRoutes";
 import PublicRoutes from "./PublicRoutes";
 import KeevoConnectPage from "../pages/keevo/KeevoConnectPage";
 import SecretLinkPage from "../pages/secret/SecretLinkPage";
+import ConfirmSupportRequestPage from "../pages/auth/ConfirmSupportRequestPage";
 
 // Type for route structure
 interface RouteConfig {
@@ -51,6 +52,8 @@ const AppRoutes = () => {
       <Route path="/keevo" element={<KeevoConnectPage />} />
       {/* One-time secret links: open to anyone with the link, signed in or not. */}
       <Route path="/s/:id" element={<SecretLinkPage />} />
+      {/* Support's 2FA removal link: works signed in or not (PublicLayout would redirect). */}
+      <Route path="/auth/confirm-support" element={<ConfirmSupportRequestPage />} />
 
       {/* Protected routes - redirect to login if not authenticated */}
       <Route element={<ProtectedLayout />}>
