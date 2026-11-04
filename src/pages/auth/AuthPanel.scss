@@ -117,6 +117,31 @@
   .auth-submit.ant-btn:hover {
     background: linear-gradient(180deg, #7c6cf8 0%, #5b4cf0 100%) !important;
   }
+
+  // Six OTP cells must share the card width; fixed sizes clip or shift left on phones.
+  .ant-otp {
+    display: flex;
+    width: 100%;
+    justify-content: space-between;
+    gap: 6px;
+  }
+
+  .ant-otp .ant-otp-input-wrapper {
+    flex: 1 1 0;
+    min-width: 0;
+    max-width: 48px;
+  }
+
+  .ant-otp .ant-input {
+    width: 100% !important;
+    height: 48px !important;
+    min-width: 0;
+    padding: 0 !important;
+    border-radius: 12px !important;
+    text-align: center;
+    font-size: 18px;
+    font-weight: 600;
+  }
 }
 
 .auth-tabs {
@@ -288,5 +313,30 @@
 
   a {
     color: #a5b4fc;
+  }
+}
+
+@media (max-width: 420px) {
+  .auth-layout {
+    padding: 24px 12px;
+    align-items: flex-start;
+    padding-top: 48px;
+  }
+
+  .auth-card {
+    padding: 20px 16px 16px;
+
+    .ant-otp {
+      gap: 4px;
+    }
+
+    .ant-otp .ant-input {
+      height: 44px !important;
+      font-size: 16px;
+    }
+  }
+
+  .auth-title {
+    font-size: 20px;
   }
 }

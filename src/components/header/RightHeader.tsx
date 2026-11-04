@@ -112,6 +112,7 @@ const RightHeader = () => {
       <Dropdown
         trigger={["click"]}
         placement="bottomRight"
+        overlayClassName="notifications-dropdown"
         onOpenChange={(open) => {
           if (open) loadNotifications();
         }}

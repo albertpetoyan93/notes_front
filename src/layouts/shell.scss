@@ -218,15 +218,22 @@ kbd {
 
 .notifications-panel {
   width: 340px;
+  max-width: calc(100vw - 24px);
   max-height: 420px;
   overflow: auto;
   padding: 12px;
+  box-sizing: border-box;
 
   .notifications-head {
     display: flex;
     justify-content: space-between;
     align-items: center;
+    gap: 8px;
     margin-bottom: 8px;
+
+    strong {
+      min-width: 0;
+    }
   }
 
   .notification {
@@ -252,6 +259,22 @@ kbd {
       font-size: 12px;
       color: var(--textMuted);
     }
+  }
+}
+
+// Phones: a fixed 340px panel aligned to the bell hangs off the left edge.
+@media (max-width: 520px) {
+  .notifications-dropdown.ant-dropdown {
+    left: 12px !important;
+    right: 12px !important;
+    width: auto !important;
+    max-width: none;
+  }
+
+  .notifications-panel {
+    width: 100%;
+    max-width: none;
+    max-height: min(70vh, 420px);
   }
 }
 
