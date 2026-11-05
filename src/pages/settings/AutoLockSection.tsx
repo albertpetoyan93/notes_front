@@ -1,4 +1,4 @@
-import { LockOutlined } from "@ant-design/icons";
+import { ChromeOutlined, LockOutlined } from "@ant-design/icons";
 import { Button, Select, message } from "antd";
 import { useState } from "react";
 import axios from "../../configs/axios";
@@ -10,34 +10,67 @@ import {
   lockVault,
 } from "../../utils/autoLock";
 
-// How long the vault may sit idle before it locks. Saved on the account, so
-// it applies on every device.
+const DEFAULT_EXTENSION_AUTO_LOCK_MINUTES = 60;
+
+// How long the vault app and the browser extension may sit idle before they
+// lock. Saved on the account; a company can require a shorter time for both.
 const AutoLockSection = () => {
   const { me, setStore } = useAuthStore();
-  const minutes: number = me?.autoLockMinutes ?? DEFAULT_AUTO_LOCK_MINUTES;
-  // A company you belong to can require a shorter time.
+  const vaultMinutes: number = me?.autoLockMinutes ?? DEFAULT_AUTO_LOCK_MINUTES;
+  const extensionMinutes: number =
+    me?.extensionAutoLockMinutes ?? DEFAULT_EXTENSION_AUTO_LOCK_MINUTES;
   const limit: number | null = me?.autoLockLimit ?? null;
-  const [saving, setSaving] = useState(false);
+  const [saving, setSaving] = useState<"vault" | "extension" | null>(null);
 
-  const choose = async (value: number) => {
-    setSaving(true);
+  const choose = async (which: "vault" | "extension", value: number) => {
+    setSaving(which);
     try {
-      await axios.patch("/api/auth/settings", { autoLockMinutes: value });
-      setStore({ me: { ...me, autoLockMinutes: value } });
-      message.success(value ? `2keevo now locks ${autoLockLabel(value).toLowerCase()} without activity` : "Auto-lock is off");
+      const body =
+        which === "vault"
+          ? { autoLockMinutes: value }
+          : { extensionAutoLockMinutes: value };
+      const { data } = await axios.patch("/api/auth/settings", body);
+      setStore({
+        me: {
+          ...me,
+          autoLockMinutes: data.autoLockMinutes ?? me?.autoLockMinutes,
+          extensionAutoLockMinutes:
+            data.extensionAutoLockMinutes ?? me?.extensionAutoLockMinutes,
+        },
+      });
+      const label = autoLockLabel(value).toLowerCase();
+      message.success(
+        value
+          ? which === "vault"
+            ? `Vault app locks ${label} without activity`
+            : `Extension locks ${label} without activity`
+          : which === "vault"
+            ? "Vault app auto-lock is off"
+            : "Extension auto-lock is off"
+      );
     } catch (error: any) {
       message.error(error?.message || "Could not save the setting");
     } finally {
-      setSaving(false);
+      setSaving(null);
     }
   };
+
+  const options = AUTO_LOCK_CHOICES.map((value) => ({
+    value,
+    label: autoLockLabel(value),
+    disabled: !!limit && (value === 0 || value > limit),
+  }));
+
+  const companyNote = limit
+    ? ` Your company requires ${autoLockLabel(limit).replace("After ", "").toLowerCase()} or less.`
+    : "";
 
   return (
     <section className="security-section">
       <h2>Auto-lock</h2>
       <p className="security-section-note">
-        After a while without mouse, keyboard or touch, 2keevo locks and asks for your password
-        or a passkey. A closed laptop or tab counts too.
+        After a while without activity, 2keevo locks and asks for your password or a passkey.
+        The vault app and the browser extension can use different times.
       </p>
       <div className="manage-list">
         <div className="manage-row">
@@ -45,33 +78,52 @@ const AutoLockSection = () => {
             <LockOutlined />
           </span>
           <div className="manage-main">
-            <strong>Lock when idle</strong>
+            <strong>Vault app</strong>
             <span>
-              {minutes
-                ? `${autoLockLabel(minutes)} without activity, on every device.`
-                : "Off. 2keevo stays open until you sign out."}
-              {limit
-                ? ` Your company requires ${autoLockLabel(limit).replace("After ", "").toLowerCase()} or less.`
-                : ""}
+              {vaultMinutes
+                ? `${autoLockLabel(vaultMinutes)} without activity in the web app.`
+                : "Off. The vault app stays open until you sign out."}
+              {companyNote}
             </span>
           </div>
           <div className="manage-actions">
             <Select
-              value={minutes}
-              onChange={choose}
-              loading={saving}
-              disabled={saving}
+              value={vaultMinutes}
+              onChange={(value) => choose("vault", value)}
+              loading={saving === "vault"}
+              disabled={!!saving}
               style={{ width: 160 }}
-              aria-label="Lock when idle"
-              options={AUTO_LOCK_CHOICES.map((value) => ({
-                value,
-                label: autoLockLabel(value),
-                disabled: !!limit && (value === 0 || value > limit),
-              }))}
+              aria-label="Vault app lock when idle"
+              options={options}
             />
             <Button icon={<LockOutlined />} onClick={() => lockVault()}>
               Lock now
             </Button>
+          </div>
+        </div>
+        <div className="manage-row">
+          <span className="manage-icon">
+            <ChromeOutlined />
+          </span>
+          <div className="manage-main">
+            <strong>Browser extension</strong>
+            <span>
+              {extensionMinutes
+                ? `${autoLockLabel(extensionMinutes)} without activity in the browser.`
+                : "Off. The extension stays open until you sign out."}
+              {companyNote}
+            </span>
+          </div>
+          <div className="manage-actions">
+            <Select
+              value={extensionMinutes}
+              onChange={(value) => choose("extension", value)}
+              loading={saving === "extension"}
+              disabled={!!saving}
+              style={{ width: 160 }}
+              aria-label="Extension lock when idle"
+              options={options}
+            />
           </div>
         </div>
       </div>
