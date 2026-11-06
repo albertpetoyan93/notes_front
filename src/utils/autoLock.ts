@@ -9,13 +9,19 @@ import { useNoteStore } from "../store/noteStore";
 import { useVaultStore } from "../store/vaultStore";
 
 export const AUTO_LOCK_CHOICES = [5, 15, 30, 60, 0] as const;
+/** The browser extension may also stay open for 3 or 6 hours. */
+export const EXTENSION_AUTO_LOCK_CHOICES = [5, 15, 30, 60, 180, 360, 0] as const;
 export const DEFAULT_AUTO_LOCK_MINUTES = 15;
 
 const ACTIVITY_KEY = "keevo.lastActivity";
 const LOCK_EVENT_KEY = "keevo.lockEvent";
 
-export const autoLockLabel = (minutes: number) =>
-  minutes === 0 ? "Never" : minutes === 60 ? "After 1 hour" : `After ${minutes} minutes`;
+export const autoLockLabel = (minutes: number) => {
+  if (minutes === 0) return "Never";
+  if (minutes === 60) return "After 1 hour";
+  if (minutes > 60 && minutes % 60 === 0) return `After ${minutes / 60} hours`;
+  return `After ${minutes} minutes`;
+};
 
 let lastLocalActivity = Date.now();
 

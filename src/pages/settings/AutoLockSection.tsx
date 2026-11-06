@@ -6,6 +6,7 @@ import { useAuthStore } from "../../store/authStore";
 import {
   AUTO_LOCK_CHOICES,
   DEFAULT_AUTO_LOCK_MINUTES,
+  EXTENSION_AUTO_LOCK_CHOICES,
   autoLockLabel,
   lockVault,
 } from "../../utils/autoLock";
@@ -55,11 +56,14 @@ const AutoLockSection = () => {
     }
   };
 
-  const options = AUTO_LOCK_CHOICES.map((value) => ({
-    value,
-    label: autoLockLabel(value),
-    disabled: !!limit && (value === 0 || value > limit),
-  }));
+  const toOptions = (choices: readonly number[]) =>
+    choices.map((value) => ({
+      value,
+      label: autoLockLabel(value),
+      disabled: !!limit && (value === 0 || value > limit),
+    }));
+  const options = toOptions(AUTO_LOCK_CHOICES);
+  const extensionOptions = toOptions(EXTENSION_AUTO_LOCK_CHOICES);
 
   const companyNote = limit
     ? ` Your company requires ${autoLockLabel(limit).replace("After ", "").toLowerCase()} or less.`
@@ -122,7 +126,7 @@ const AutoLockSection = () => {
               disabled={!!saving}
               style={{ width: 160 }}
               aria-label="Extension lock when idle"
-              options={options}
+              options={extensionOptions}
             />
           </div>
         </div>

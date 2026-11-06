@@ -4,6 +4,7 @@ import { Button } from "antd";
 import { BrandLockup } from "../../components/header/LeftHeader";
 import { fetcherPost } from "../../configs/axios";
 import useAuth from "../../hooks/useAuth";
+import { findOpenVaultKeys } from "../../store/keyStore";
 
 type Phase = "checking" | "confirm" | "done" | "error";
 
@@ -76,6 +77,9 @@ const KeevoConnectPage = () => {
     setError("");
     try {
       const data = await fetcherPost("/api/auth/extension/connect", {});
+      // End-to-end accounts: hand over the vault keys this browser already has
+      // open, so the extension starts unlocked. None open: it asks to unlock.
+      const vaultKeys = data.user?.e2eEnabled ? await findOpenVaultKeys() : null;
       window.postMessage(
         {
           source: "keevo-web",
@@ -84,6 +88,7 @@ const KeevoConnectPage = () => {
           accessToken: data.accessToken,
           refreshToken: data.refreshToken,
           email: data.user?.email || email,
+          vaultKeys,
         },
         window.location.origin,
       );
