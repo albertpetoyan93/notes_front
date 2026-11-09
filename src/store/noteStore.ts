@@ -50,6 +50,10 @@ export interface Note {
   itemKey?: string | null;
   encData?: string | null;
   userId: number;
+  /** The company that owns this item; null or missing for a personal one. */
+  companyId?: number | null;
+  /** Client only: this new item goes into a company's collection (never sent). */
+  work?: boolean;
   createdAt: string;
   updatedAt: string;
   isOwner?: boolean;
@@ -79,6 +83,7 @@ export interface CollectionItem {
   isOwner: boolean;
   permission: "owner" | "view" | "edit";
   noteCount: number;
+  companyId?: number | null;
 }
 
 export interface NoteShare {
@@ -230,10 +235,10 @@ const assertNewName = async (name: string, exceptId?: number) => {
 const isE2EConflict = (error: any) => error?.code === "e2e_items";
 
 /** Create an item: sealed in end-to-end vaults, unless it goes into a shared or company collection. */
-const postNew = async (note: Partial<Note>) => {
+const postNew = async ({ work, ...note }: Partial<Note>) => {
   if (!e2eActive()) return (await axios.post("/api/notes", note)).data;
   // Sealed once: key copies the server asks for are made for this item key.
-  const sealed = await sealCreate(note);
+  const sealed = await sealCreate(note, { work: !!work });
   try {
     return (await withE2E((e2eKeys) => axios.post("/api/notes", { ...sealed, e2eKeys }))).data;
   } catch (error) {

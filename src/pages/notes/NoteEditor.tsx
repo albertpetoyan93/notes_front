@@ -8,7 +8,7 @@ import {
   ScanOutlined,
   SyncOutlined,
 } from "@ant-design/icons";
-import { Button, Form, Input, Select, Switch, Tooltip, message } from "antd";
+import { Button, Form, Input, Modal, Select, Switch, Tooltip, message } from "antd";
 import { useEffect, useMemo, useRef, useState, type ClipboardEvent } from "react";
 import ItemIcon from "../../components/itemIcon/ItemIcon";
 import TotpCode from "../../components/totp/TotpCode";
@@ -22,6 +22,7 @@ import {
 } from "../../utils/recoveryCodes";
 import { TOTP_FIELD_LABEL, isTotpLabel, readTotpQr } from "../../utils/totp";
 import { CollectionItem, Note, useNoteStore } from "../../store/noteStore";
+import { OWNERSHIP_MESSAGES, ownershipChange, ownershipMessage, personalCopy } from "../../utils/ownership";
 import {
   CARD_BRANDS,
   cardBrandFromFields,
@@ -119,12 +120,14 @@ interface NoteEditorProps {
   collections: CollectionItem[];
   requireCollection?: boolean;
   defaultCollectionId?: number;
+  /** The company whose vault this is (its collections belong to it). */
+  company?: { id: number; name: string } | null;
   // Fill the first password field with a fresh one (the "Change password" fix).
   freshPassword?: boolean;
   /** A company's minimum password length for its logins. */
   passwordRule?: { length: number; company: string } | null;
   onCancel: () => void;
-  onSaved: (note: Note) => void;
+  onSaved: (note: Note, options?: { copied?: boolean }) => void;
 }
 
 // Create or edit an item in place, in the detail pane.
@@ -134,6 +137,7 @@ const NoteEditor = ({
   collections,
   requireCollection,
   defaultCollectionId,
+  company,
   freshPassword,
   passwordRule,
   onCancel,
@@ -258,7 +262,22 @@ const NoteEditor = ({
     });
 
   const canChooseCollection = !note || !!note.isOwner;
-  const collectionOptions = collections
+  // In a company's vault every collection listed belongs to that company.
+  const owned = collections.map((collection) => ({
+    ...collection,
+    companyId: collection.companyId ?? company?.id ?? null,
+  }));
+  const companyOf = (id: number) =>
+    owned.find((collection) => collection.id === id)?.companyId ??
+    note?.collections?.find((item) => item.id === id)?.companyId ??
+    null;
+  // The company this item belongs to now (null = personal).
+  const currentCompanyId =
+    note?.companyId ?? note?.collections?.find((item) => item.companyId)?.companyId ?? note?.collection?.companyId ?? null;
+  const picked = (Form.useWatch("collectionIds", form) as number[] | undefined) || [];
+  // Once a company collection is chosen, only that company's collections stay selectable.
+  const lockedCompanyId = picked.map(companyOf).find((id) => id) ?? null;
+  const collectionOptions = owned
     .filter(
       (collection) =>
         collection.permission === "owner" ||
@@ -266,7 +285,27 @@ const NoteEditor = ({
         note?.collections?.some((item) => item.id === collection.id) ||
         collection.id === note?.collectionId
     )
-    .map((collection) => ({ value: collection.id, label: collection.name }));
+    .map((collection) => ({
+      value: collection.id,
+      label: collection.name,
+      disabled: !!lockedCompanyId && collection.companyId !== lockedCompanyId && !picked.includes(collection.id),
+    }));
+  // A blocked change: the server's wording, and a way to keep a personal copy.
+  const offerCopy = (text: string, payload: Record<string, unknown>) =>
+    Modal.confirm({
+      title: "This can't be saved here",
+      content: text,
+      okText: "Copy to my personal vault",
+      cancelText: "Close",
+      onOk: async () => {
+        try {
+          // A new personal item from the opened data: no collections.
+          onSaved(await createNote(personalCopy(payload) as Partial<Note>), { copied: true });
+        } catch {
+          // The axios interceptor reports the error.
+        }
+      },
+    });
 
   const save = async () => {
     let values;
@@ -289,12 +328,34 @@ const NoteEditor = ({
     if (canChooseCollection) payload.collectionIds = values.collectionIds || [];
     else delete payload.collectionIds;
 
+    if (canChooseCollection) {
+      const ids = (payload.collectionIds as number[]) || [];
+      const change = ownershipChange(
+        currentCompanyId,
+        ids.map((id) => ({ id, companyId: companyOf(id) }))
+      );
+      if (change !== "none" && change !== "to_company") {
+        offerCopy(OWNERSHIP_MESSAGES[change], payload);
+        return;
+      }
+      // A new item in a company collection is a work item: saved without a personal key copy.
+      if (!note && (change === "to_company" || lockedCompanyId)) payload.work = true;
+    }
+
+    // In a company's vault the company must be known: it decides whether a creator key copy is sent.
+    if (requireCollection && !company) {
+      message.error("The company hasn't loaded yet. Try again in a moment.");
+      return;
+    }
+
     setSaving(true);
     try {
       const saved = note ? await updateNote(note.id, payload) : await createNote(payload);
       onSaved(saved);
-    } catch {
-      // The axios interceptor reports the error.
+    } catch (error: any) {
+      // The axios interceptor reports the error; an ownership refusal also offers a copy.
+      const refused = ownershipMessage(error?.message || error?.response?.data?.message);
+      if (refused) offerCopy(refused, payload);
     } finally {
       setSaving(false);
     }

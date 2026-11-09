@@ -16,6 +16,7 @@ import axios from "../../configs/axios";
 import NotesPage from "../notes/NotesPage";
 import CompanyPoliciesSection from "./CompanyPoliciesSection";
 import GroupsPanel from "./GroupsPanel";
+import OffboardingPanel from "./OffboardingPanel";
 import ResetMasterPassword from "./ResetMasterPassword";
 import { recoveryStatus } from "../../utils/companyRecovery";
 import { useNoteStore } from "../../store/noteStore";
@@ -30,7 +31,7 @@ interface MemberRow {
   userId?: number | null;
   email: string;
   role: "owner" | "admin" | "member";
-  status: "invited" | "active" | "removed";
+  status: "invited" | "active" | "suspended" | "removed";
   expiresAt?: string | null;
 }
 
@@ -42,12 +43,18 @@ interface MemberAccess {
 // Shown before removing someone: what they could open, so it can be rotated.
 const MemberAccessSummary = ({ access }: { access: MemberAccess | null }) => {
   if (!access) {
-    return <p>They disappear from the list. Their personal notes stay theirs.</p>;
+    return (
+      <div className="member-access">
+        <p>They lose access to the company at once. Their personal notes stay theirs.</p>
+        <p>Access stops now. Anything they already saw or copied can't be taken back, so change those passwords at the source.</p>
+      </div>
+    );
   }
   const { collections, secretsAccessed } = access;
   return (
     <div className="member-access">
       <p>They lose access to the company at once. Their personal notes stay theirs.</p>
+      <p>Access stops now. Anything they already saw or copied can't be taken back, so change those passwords at the source.</p>
       {collections.length > 0 && (
         <>
           <strong>Collections they could open</strong>
@@ -164,7 +171,7 @@ const CompanyPage = () => {
   const requestedTab = searchParams.get("tab") || "notes";
   const inCompany = company?.memberStatus === "active" && company?.status !== "suspended";
   const companyTab =
-    canManage && ["collections", "members", "settings", "activity"].includes(requestedTab)
+    canManage && ["collections", "members", "offboarding", "settings", "activity"].includes(requestedTab)
       ? requestedTab
       : inCompany && requestedTab === "groups"
         ? "groups"
@@ -463,7 +470,13 @@ const CompanyPage = () => {
         ) : (
           "They disappear from the list. You can invite them again later. Their personal notes stay theirs."
         ),
-      okText: deleting ? "Delete" : member.status === "invited" ? "Cancel invite" : "Remove",
+      okText: deleting
+        ? "Delete"
+        : member.status === "invited"
+          ? "Cancel invite"
+          : member.status === "active"
+            ? "Remove and start offboarding"
+            : "Remove",
       okButtonProps: { danger: true },
       onOk: async () => {
         await axios.delete(`/api/companies/${companyId}/members/${member.id}`);
@@ -472,7 +485,9 @@ const CompanyPage = () => {
             ? "Deleted"
             : member.status === "invited"
               ? "Invite cancelled"
-              : "Member removed"
+              : member.status === "active"
+                ? "Offboarding started"
+                : "Member removed"
         );
         await loadMembers();
       },
@@ -609,6 +624,7 @@ const CompanyPage = () => {
           </p>
         </div>
         <Space wrap>
+          <Button onClick={() => openTab("offboarding")}>Offboarding</Button>
           <Button icon={<HistoryOutlined />} onClick={() => openTab("activity")}>
             Activity log
           </Button>
@@ -626,11 +642,12 @@ const CompanyPage = () => {
       ) : (
         <ul className="manage-list">
           {members.map((member) => {
+            const suspended = member.status === "suspended";
             const canChangeRole =
-              company.role === "owner" && member.role !== "owner" && member.status !== "removed";
+              company.role === "owner" && member.role !== "owner" && member.status !== "removed" && !suspended;
             const canManageMember =
               member.role !== "owner" && (company.role === "owner" || member.role === "member");
-            const canRemove = canManageMember && member.status !== "removed";
+            const canRemove = canManageMember && member.status !== "removed" && !suspended;
             const canDelete = canManageMember && member.status === "removed";
             const removeLabel = canDelete
               ? "Delete"
@@ -647,7 +664,9 @@ const CompanyPage = () => {
                       ? "Active"
                       : member.status === "invited"
                         ? "Invite sent"
-                        : "Removed"}
+                        : member.status === "suspended"
+                          ? "Suspended"
+                          : "Removed"}
                   </span>
                 </div>
                 <div className="manage-actions">
@@ -679,6 +698,11 @@ const CompanyPage = () => {
                   )}
                   {canManageMember && member.status === "active" && member.userId && recoverable.has(member.userId) && (
                     <ResetMasterPassword companyId={companyId} userId={member.userId} email={member.email} />
+                  )}
+                  {suspended && canManageMember && (
+                    <Button size="small" type="link" onClick={() => openTab("offboarding")}>
+                      View offboarding
+                    </Button>
                   )}
                   {(canRemove || canDelete) && (
                     <Tooltip title={removeLabel}>
@@ -770,7 +794,9 @@ const CompanyPage = () => {
   const panel =
     companyTab === "groups"
       ? groupsPanel
-      : companyTab === "collections"
+      : companyTab === "offboarding"
+        ? <OffboardingPanel companyId={companyId} companyName={company.name} />
+        : companyTab === "collections"
       ? collectionsPanel
       : companyTab === "members"
         ? membersPanel

@@ -201,6 +201,14 @@ export const describeActivity = (event: ActivityEvent, withTitle = true) => {
       return `let ${target} join ${quote(d.group).replace("an item", "a group")}`;
     case "group_request_declined":
       return `declined ${target}'s request to join ${quote(d.group).replace("an item", "a group")}`;
+    case "offboarding_started":
+      return `started offboarding ${target}`;
+    case "offboarding_completed":
+      return `finished offboarding ${target}`;
+    case "offboarding_task_updated":
+      return `updated an offboarding task for${item}`;
+    case "item_moved_to_company":
+      return `moved${item} to the company`;
     case "member_role_changed":
       return `made ${target} ${d.role === "admin" ? "an admin" : "a member"}`;
     case "support_action": {

@@ -181,13 +181,18 @@ const withoutSealedFields = (note: Partial<Note>) => {
   return rest;
 };
 
-/** The request body for a new item, sealed. Readable fields are left out. */
-export const sealCreate = async (note: Partial<Note>) => {
+/**
+ * The request body for a new item, sealed. Readable fields are left out.
+ * A work item is sent without the creator's key copy (the server refuses it):
+ * the key stays in the cache here so collection copies can still be made.
+ */
+export const sealCreate = async (note: Partial<Note>, { work = false }: { work?: boolean } = {}) => {
   const payload = payloadOf(note);
   const { sealed, key } = await sealNewItem(userKey(), payload);
   itemKeys.set(sealed.e2eId, key);
   const version = await sealVersion(key, sealed.e2eId, { ...versionStateOf(payload), changes: ["Created"] });
-  return { ...withoutSealedFields(note), category: payload.category, e2e: sealed, version };
+  const { itemKey: _creatorCopy, ...sealedWork } = sealed;
+  return { ...withoutSealedFields(note), category: payload.category, e2e: work ? sealedWork : sealed, version };
 };
 
 /**

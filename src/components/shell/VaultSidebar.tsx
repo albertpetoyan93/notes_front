@@ -196,6 +196,12 @@ const VaultSidebar = ({ companyId }: { companyId: number | null }) => {
     }
   };
 
+  // A company collection: editors can bring their own items in (they move into the company).
+  const companyCollectionMenu = (collection: CollectionItem) =>
+    inCompany && (collection.permission === "owner" || collection.permission === "edit")
+      ? [{ key: "add", icon: <FileAddOutlined />, label: "Add my items", onClick: () => setDialog({ mode: "add", collection }) }]
+      : [];
+
   const collectionMenu = (collection: CollectionItem) => {
     const canEdit = collection.permission === "owner" || collection.permission === "edit";
     return [
@@ -293,7 +299,7 @@ const VaultSidebar = ({ companyId }: { companyId: number | null }) => {
           </p>
         )}
         {collections.map((collection) => {
-          const menu = companyId ? [] : collectionMenu(collection);
+          const menu = companyId ? companyCollectionMenu(collection) : collectionMenu(collection);
           return (
             <div key={collection.id} className="nav-row">
               <NavItem
@@ -493,6 +499,7 @@ const VaultSidebar = ({ companyId }: { companyId: number | null }) => {
       <CollectionDialogs
         mode={dialog?.mode || null}
         collection={dialog?.collection}
+        companyName={companyId ? company?.name || null : null}
         onClose={() => setDialog(null)}
         onChanged={changed}
       />

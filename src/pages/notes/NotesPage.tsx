@@ -540,6 +540,7 @@ const NotesPage = ({ companyId }: { companyId?: number }) => {
           key={`new-${nav.newCategory}`}
           initialCategory={nav.newCategory}
           collections={collections}
+          company={company}
           requireCollection={!!companyId}
           passwordRule={passwordRule}
           defaultCollectionId={
@@ -550,10 +551,10 @@ const NotesPage = ({ companyId }: { companyId?: number }) => {
               : undefined
           }
           onCancel={() => nav.update({ new: null })}
-          onSaved={(note) => {
+          onSaved={(note, options) => {
             nav.update({ new: null, item: String(note.id) });
             afterChange();
-            message.success(`“${note.title}” created`);
+            message.success(options?.copied ? "Copied to your personal vault" : `“${note.title}” created`);
           }}
         />
       );
@@ -575,14 +576,17 @@ const NotesPage = ({ companyId }: { companyId?: number }) => {
           note={selected}
           freshPassword={editing.freshPassword}
           collections={collections}
+          company={company}
           requireCollection={!!companyId}
           passwordRule={passwordRule}
           onCancel={() => setEditing(null)}
-          onSaved={() => {
+          onSaved={(_saved, options) => {
             const fixed = editing.freshPassword;
             setEditing(null);
             afterChange();
-            message.success(fixed ? "Password changed" : "Changes saved");
+            message.success(
+              options?.copied ? "Copied to your personal vault" : fixed ? "Password changed" : "Changes saved"
+            );
           }}
         />
       );

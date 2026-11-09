@@ -15,12 +15,15 @@ import {
 import { useEffect, useRef, useState } from "react";
 import { CollectionItem, useNoteStore } from "../../store/noteStore";
 import { isPlanLimit, planAllows } from "../../store/billingStore";
+import { moveToCompanyText } from "../../utils/ownership";
 
 const { Text } = Typography;
 
 interface CollectionDialogsProps {
   mode: "create" | "rename" | "add" | "share" | null;
   collection?: CollectionItem | null;
+  /** Set when the collection belongs to this company: adding moves the items into it. */
+  companyName?: string | null;
   onClose: () => void;
   onChanged: () => void;
 }
@@ -28,6 +31,7 @@ interface CollectionDialogsProps {
 const CollectionDialogs = ({
   mode,
   collection,
+  companyName,
   onClose,
   onChanged,
 }: CollectionDialogsProps) => {
@@ -118,9 +122,21 @@ const CollectionDialogs = ({
     }
   };
 
+  // Your items added to a company collection become the company's: asked once for all of them.
+  const confirmMove = (name: string) =>
+    new Promise<boolean>((resolve) =>
+      Modal.confirm({
+        title: moveToCompanyText(name),
+        okText: "Move",
+        onOk: () => resolve(true),
+        onCancel: () => resolve(false),
+      })
+    );
+
   const handleAdd = async () => {
     if (!collection) return;
     const values = await form.validateFields();
+    if (companyName && !(await confirmMove(companyName))) return;
     setSubmitting(true);
     try {
       const result = await addNotesToCollection(collection.id, values.noteIds);
