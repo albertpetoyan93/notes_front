@@ -23,6 +23,8 @@ export interface NoteContent {
     value: string;
   }>;
   decryptionFailed?: boolean;
+  /** Not openable yet: the collection key is still to be handed over by an owner or admin. */
+  awaitingKey?: boolean;
 }
 
 export interface Note {
@@ -122,6 +124,11 @@ interface NoteStore {
     companyId?: number;
   }) => Promise<void>;
   getNote: (id: number) => Promise<Note>;
+  /**
+   * Items in the list still waiting for their key: fetched and opened again,
+   * quietly (no loading state). Returns how many open now.
+   */
+  recheckAwaitingKeys: () => Promise<number>;
   createNote: (note: Partial<Note>) => Promise<Note>;
   updateNote: (id: number, note: Partial<Note>) => Promise<Note>;
   deleteNote: (id: number) => Promise<void>;
@@ -151,7 +158,8 @@ interface NoteStore {
   ) => Promise<{ imported: number; failed: { title: string; message: string }[] }>;
   fetchCollections: () => Promise<CollectionItem[]>;
   createCollection: (name: string) => Promise<CollectionItem>;
-  renameCollection: (id: number, name: string) => Promise<CollectionItem>;
+  /** companyId: the collection is that company's (its list holds the encrypted name). */
+  renameCollection: (id: number, name: string, companyId?: number | null) => Promise<CollectionItem>;
   deleteCollection: (id: number) => Promise<void>;
   addNotesToCollection: (
     id: number,
@@ -220,14 +228,18 @@ const openBackup = async (input: any): Promise<VaultBackup> => {
 };
 
 /** The person's collections, names opened. */
-const myCollections = async (): Promise<(CollectionItem & { encName?: string; nameKey?: string; e2eKey?: string })[]> =>
-  openCollectionNames((await axios.get("/api/collections")).data);
+/** The personal collections, or a company's when companyId is given. */
+const myCollections = async (
+  companyId?: number | null
+): Promise<(CollectionItem & { encName?: string; nameKey?: string; e2eKey?: string })[]> =>
+  openCollectionNames((await axios.get(companyId ? `/api/companies/${companyId}/collections` : "/api/collections")).data);
 
 /** The server can't compare encrypted names, so a duplicate is caught here. */
-const assertNewName = async (name: string, exceptId?: number) => {
+const assertNewName = async (name: string, exceptId?: number, companyId?: number | null) => {
   const wanted = name.trim().toLowerCase();
-  const taken = (await myCollections()).some(
-    (item) => item.isOwner && item.id !== exceptId && item.name.trim().toLowerCase() === wanted
+  // Company collections are the company's, not anyone's own: all of them count.
+  const taken = (await myCollections(companyId)).some(
+    (item) => (companyId || item.isOwner) && item.id !== exceptId && item.name.trim().toLowerCase() === wanted
   );
   if (taken) throw new Error(`You already have a collection named "${name.trim()}"`);
 };
@@ -348,6 +360,23 @@ export const useNoteStore = create<NoteStore>((set, get) => ({
     } catch (error: any) {
       set({ error: error.message, loading: false });
     }
+  },
+
+  recheckAwaitingKeys: async () => {
+    const waiting = get().notes.filter((note) => (note.content as NoteContent | null)?.awaitingKey);
+    const opened = new Map<number, Note>();
+    for (const note of waiting) {
+      try {
+        const fresh = await openNote((await axios.get(`/api/notes/${note.id}`)).data);
+        if (!(fresh.content as NoteContent | null)?.awaitingKey) opened.set(note.id, fresh);
+      } catch {
+        // Gone or unreachable now: the next list load sorts it out.
+      }
+    }
+    if (opened.size) {
+      set((state) => ({ notes: state.notes.map((note) => opened.get(note.id) || note) }));
+    }
+    return opened.size;
   },
 
   getNote: async (id) => {
@@ -530,10 +559,10 @@ export const useNoteStore = create<NoteStore>((set, get) => ({
     return (await openCollectionNames([response.data]))[0];
   },
 
-  renameCollection: async (id: number, name: string) => {
-    const current = e2eActive() ? (await myCollections()).find((item) => item.id === id) : undefined;
+  renameCollection: async (id: number, name: string, companyId?: number | null) => {
+    const current = e2eActive() ? (await myCollections(companyId)).find((item) => item.id === id) : undefined;
     if (!current?.encName) return (await axios.put(`/api/collections/${id}`, { name })).data;
-    await assertNewName(name, id);
+    await assertNewName(name, id, companyId);
     const response = await axios.put(`/api/collections/${id}`, await sealRenamedCollection(current, name.trim()));
     return (await openCollectionNames([response.data]))[0];
   },

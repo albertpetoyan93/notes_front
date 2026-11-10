@@ -23,6 +23,13 @@ import { migrateItems, runKeyTasks } from "../utils/vaultItems";
 import { runRecoveryTasks } from "../utils/companyRecovery";
 import { MasterPasswordModal } from "../pages/settings/EncryptionSection";
 
+// How often an open vault checks for key work (grant, replace) in the background.
+// Owners and admins of a company do most of it (people who just joined wait for
+// them), so they check often; the check is one request, the work only runs when
+// there is some.
+const KEY_TASKS_MANAGER_EVERY_MS = 20 * 1000;
+const KEY_TASKS_EVERY_MS = 2 * 60 * 1000;
+
 // The signed-in app: top bar, vault sidebar and the page. On phones the sidebar is a drawer.
 const ProtectedLayout: React.FC = () => {
   const navigate = useNavigate();
@@ -129,6 +136,39 @@ const ProtectedLayout: React.FC = () => {
       useVaultStore.getState().bumpList();
     })();
   }, [me?.e2eEnabled, vaultKeys, locked, refreshVault]);
+
+  // While the vault is open: the key work again every few minutes and when the
+  // tab comes back, so someone who just accepted an invite gets the collection
+  // key, and keys a removed person held are replaced, without anyone reloading.
+  // Only owners and admins get tasks; for everyone else the list is empty.
+  const managesCompany = useCompanyStore((state) =>
+    state.companies.some(
+      (company) =>
+        company.memberStatus === "active" &&
+        company.status !== "suspended" &&
+        (company.role === "owner" || company.role === "admin")
+    )
+  );
+  useEffect(() => {
+    if (!me?.e2eEnabled || !vaultKeys || locked) return;
+    // Also from a background tab: that's where an owner's 2keevo usually is when
+    // someone joins (browsers slow background timers down, which keeps it cheap).
+    const run = () => {
+      runKeyTasks()
+        .then((granted) => {
+          if (!granted) return;
+          message.success(granted === 1 ? "1 person can now open shared items" : `${granted} people can now open shared items`);
+          refreshVault();
+        })
+        .catch(() => undefined);
+    };
+    const timer = window.setInterval(run, managesCompany ? KEY_TASKS_MANAGER_EVERY_MS : KEY_TASKS_EVERY_MS);
+    document.addEventListener("visibilitychange", run);
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", run);
+    };
+  }, [me?.e2eEnabled, vaultKeys, locked, refreshVault, managesCompany]);
 
   useEffect(() => {
     setScope(companyId);

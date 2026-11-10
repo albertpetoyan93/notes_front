@@ -20,9 +20,11 @@ import { categoryPlural } from "../../utils/noteCategory";
 import {
   healthIssues,
   searchText,
+  awaitingKey,
   HEALTH_KINDS,
   type HealthKind,
 } from "../../utils/noteFields";
+import { defaultNewItemCollection } from "../../utils/companyCollections";
 import CollectionDialogs from "./CollectionDialogs";
 import useBreachCheck from "../../hooks/useBreachCheck";
 import ItemDetail from "./ItemDetail";
@@ -33,6 +35,8 @@ import ShareModal from "./ShareModal";
 import "./NotesPage.scss";
 
 const PHONE = "(max-width: 820px)";
+// How often items waiting for their collection key are checked again.
+const AWAITING_KEY_RECHECK_MS = 20 * 1000;
 
 const usePhone = () => {
   const [phone, setPhone] = useState(() => window.matchMedia(PHONE).matches);
@@ -168,6 +172,29 @@ const NotesPage = ({ companyId }: { companyId?: number }) => {
     await fetchList();
     refreshVault();
   }, [fetchList, refreshVault]);
+
+  // Items waiting for their key (just given access): checked again quietly,
+  // so they open by themselves once an owner's or admin's app hands it over.
+  const recheckAwaitingKeys = useNoteStore((state) => state.recheckAwaitingKeys);
+  const waitingForKey = notes.some(awaitingKey);
+  useEffect(() => {
+    if (!waitingForKey) return;
+    const check = () => {
+      if (document.visibilityState !== "visible") return;
+      recheckAwaitingKeys()
+        .then((opened) => {
+          // Collection names open with the same key: the sidebar too.
+          if (opened) refreshVault();
+        })
+        .catch(() => undefined);
+    };
+    const timer = window.setInterval(check, AWAITING_KEY_RECHECK_MS);
+    document.addEventListener("visibilitychange", check);
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", check);
+    };
+  }, [waitingForKey, recheckAwaitingKeys, refreshVault]);
 
   const healthCounts = useMemo(() => {
     const counts: Record<HealthKind, number> = { breached: 0, weak: 0, reused: 0, stale: 0 };
@@ -543,13 +570,11 @@ const NotesPage = ({ companyId }: { companyId?: number }) => {
           company={company}
           requireCollection={!!companyId}
           passwordRule={passwordRule}
-          defaultCollectionId={
-            activeCollection &&
-            (activeCollection.permission === "owner" ||
-              activeCollection.permission === "edit")
-              ? activeCollection.id
-              : undefined
-          }
+          defaultCollectionId={defaultNewItemCollection({
+            active: activeCollection,
+            collections,
+            inCompany: !!companyId,
+          })}
           onCancel={() => nav.update({ new: null })}
           onSaved={(note, options) => {
             nav.update({ new: null, item: String(note.id) });

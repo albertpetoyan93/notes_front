@@ -10,7 +10,7 @@ import {
 } from "antd";
 import { useCallback, useEffect, useRef, useState } from "react";
 import axios from "../../configs/axios";
-import { openNote } from "../../utils/vaultItems";
+import { openNote, runKeyTasks } from "../../utils/vaultItems";
 import {
   offboardingProgress,
   type TaskCounts,
@@ -64,13 +64,24 @@ const OffboardingList = ({
   const [rows, setRows] = useState<Offboarding[] | null>(null);
 
   useEffect(() => {
-    axios
-      .get(`/api/companies/${companyId}/offboardings`)
-      .then((response) => setRows(response.data))
-      .catch((error: any) => {
-        message.error(error?.message || "Could not load offboardings");
-        setRows([]);
-      });
+    let active = true;
+    const load = () =>
+      axios
+        .get(`/api/companies/${companyId}/offboardings`)
+        .then((response) => active && setRows(response.data))
+        .catch((error: any) => {
+          if (!active) return;
+          message.error(error?.message || "Could not load offboardings");
+          setRows([]);
+        });
+    load();
+    // Replace the keys removed people still hold, here and now, then show it.
+    runKeyTasks()
+      .catch(() => undefined)
+      .then(() => active && load());
+    return () => {
+      active = false;
+    };
   }, [companyId]);
 
   if (!rows) {
@@ -96,6 +107,7 @@ const OffboardingList = ({
               <span>
                 Started {new Date(item.startedAt).toLocaleDateString()} ·{" "}
                 {progress.label}
+                {progress.keys ? ` · ${progress.keys}` : ""}
               </span>
               <Progress
                 percent={progress.percent}
@@ -182,6 +194,19 @@ const OffboardingDetail = ({
     load();
   }, [load]);
 
+  // Replace the keys this person still holds now, then refresh the keys note.
+  useEffect(() => {
+    let active = true;
+    runKeyTasks()
+      .catch(() => undefined)
+      .then(() => axios.get(base, { params: { page: 1 } }))
+      .then((response) => active && response?.data?.offboarding && setCurrent(response.data.offboarding))
+      .catch(() => undefined);
+    return () => {
+      active = false;
+    };
+  }, [base]);
+
   const update = async (
     taskIds: number[],
     status: TaskStatus,
@@ -224,6 +249,7 @@ const OffboardingDetail = ({
           <p>
             Started {new Date(current.startedAt).toLocaleDateString()} ·{" "}
             {progress.label}
+            {progress.keys ? ` · ${progress.keys}` : ""}
           </p>
           <Progress
             percent={progress.percent}

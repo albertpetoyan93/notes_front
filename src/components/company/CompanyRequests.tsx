@@ -1,11 +1,9 @@
 import { Button, Space, message } from "antd";
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
 import axios from "../../configs/axios";
 import { useCompanyStore } from "../../store/companyStore";
 
 const CompanyRequests = ({ compact = false }: { compact?: boolean }) => {
-  const navigate = useNavigate();
   const companies = useCompanyStore((state) => state.companies);
   const load = useCompanyStore((state) => state.load);
   const invites = companies.filter((company) => company.memberStatus === "invited");
@@ -13,13 +11,14 @@ const CompanyRequests = ({ compact = false }: { compact?: boolean }) => {
 
   if (!invites.length) return null;
 
-  const respond = async (companyId: number, action: "accept" | "decline") => {
+  // Joining needs the link from the invite email (its token proves the inbox);
+  // declining works here.
+  const decline = async (companyId: number) => {
     setBusyId(companyId);
     try {
-      await axios.post(`/api/companies/${companyId}/${action}`);
+      await axios.post(`/api/companies/${companyId}/decline`);
       await load();
-      message.success(action === "accept" ? "Joined the company" : "Invite declined");
-      if (action === "accept") navigate(`/company/${companyId}`);
+      message.success("Invite declined");
     } catch (error: any) {
       message.error(error?.message || "Could not update the invite");
     } finally {
@@ -33,22 +32,14 @@ const CompanyRequests = ({ compact = false }: { compact?: boolean }) => {
         <div key={company.id} className="company-request">
           <div className="company-request-copy">
             <strong>{company.name}</strong>
-            <span>You are invited to this company.</span>
+            <span>You are invited to this company. To join, open the link in your invitation email.</span>
           </div>
           <Space size={8}>
             <Button
-              type="primary"
-              size="small"
-              loading={busyId === company.id}
-              onClick={() => respond(company.id, "accept")}
-            >
-              Accept
-            </Button>
-            <Button
               size="small"
               danger
-              disabled={busyId === company.id}
-              onClick={() => respond(company.id, "decline")}
+              loading={busyId === company.id}
+              onClick={() => decline(company.id)}
             >
               Decline
             </Button>

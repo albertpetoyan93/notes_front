@@ -11,31 +11,34 @@ const counts = (part: Partial<TaskCounts>): TaskCounts => ({
 });
 
 describe("offboardingProgress", () => {
-  it("everything done and keys rotated -> Complete", () => {
+  it("everything done and keys replaced -> Complete, keys replaced", () => {
     expect(offboardingProgress(counts({ done: 3, not_required: 1 }), true)).toEqual({
       percent: 100,
       label: "Complete",
       complete: true,
+      keys: "Keys replaced",
     });
   });
 
-  it("no tasks at all and keys rotated -> Complete", () => {
-    expect(offboardingProgress(counts({}), true)).toEqual({ percent: 100, label: "Complete", complete: true });
+  it("no tasks at all -> Complete", () => {
+    expect(offboardingProgress(counts({}), true)).toEqual({ percent: 100, label: "Complete", complete: true, keys: "Keys replaced" });
   });
 
-  it("tasks finished but the person still holds company keys -> waiting for an admin", () => {
+  it("tasks finished while the person still holds company keys -> still Complete; keys only noted", () => {
     expect(offboardingProgress(counts({ done: 2 }), false)).toEqual({
       percent: 100,
-      label: "Waiting for an admin to open 2keevo (vault keys)",
-      complete: false,
+      label: "Complete",
+      complete: true,
+      keys: "Keys being replaced",
     });
   });
 
-  it("open tasks -> '{n} to do' counting pending and in progress", () => {
-    expect(offboardingProgress(counts({ pending: 2, in_progress: 1, done: 1, not_required: 1 }), true)).toEqual({
+  it("open tasks -> '{n} to do' counting pending and in progress, no keys note yet", () => {
+    expect(offboardingProgress(counts({ pending: 2, in_progress: 1, done: 1, not_required: 1 }), false)).toEqual({
       percent: 40,
       label: "3 to do",
       complete: false,
+      keys: null,
     });
   });
 
@@ -44,6 +47,7 @@ describe("offboardingProgress", () => {
       percent: 25,
       label: "2 failed",
       complete: false,
+      keys: null,
     });
   });
 

@@ -135,6 +135,15 @@ export const EnableModal = ({
   const checkCurrent = async () => {
     setError("");
     setStep("working");
+    // Checked with the server first: a wrong password must not get as far as a
+    // recovery key, which would then never work.
+    try {
+      await fetcherPost("/api/auth/e2e/check-password", { password: current });
+    } catch (checkError: any) {
+      setError(checkError?.message || "Your current password isn't right.");
+      setStep("password");
+      return;
+    }
     const found = await masterPasswordProblems(current);
     if (found.length) {
       setProblems(found);
@@ -168,8 +177,13 @@ export const EnableModal = ({
       message.success("End-to-end encryption is on. Your password is now your master password.");
       onClose();
     } catch (enableError: any) {
-      setError(enableError?.message || "Could not turn it on.");
-      setStep("recovery");
+      // Nothing was saved, so this recovery key will never work: start again with new keys.
+      setError(
+        `${enableError?.message || "Could not turn it on."} Nothing was changed, and the recovery key shown won't work: you'll get a new one.`
+      );
+      setCreated(null);
+      setConfirmed(false);
+      setStep("password");
     }
   };
 

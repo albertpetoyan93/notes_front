@@ -19,11 +19,46 @@ import { moveToCompanyText } from "../../utils/ownership";
 
 const { Text } = Typography;
 
+/**
+ * Ask, then delete a collection. Deleting drops its sharing for good. A company
+ * collection is refused while it is the only company collection of an item; the
+ * server's reason is shown.
+ */
+export const confirmDeleteCollection = ({
+  collection,
+  inCompany,
+  onDeleted,
+}: {
+  collection: { id: number; name: string };
+  inCompany: boolean;
+  onDeleted: () => void;
+}) =>
+  Modal.confirm({
+    title: `Delete "${collection.name}"?`,
+    content: inCompany
+      ? "Everyone loses access through this collection. Company items in it must also be in another company collection; if one isn't, the collection isn't deleted."
+      : "Notes in this collection stay in your list, without a collection.",
+    okText: "Delete",
+    okButtonProps: { danger: true },
+    onOk: async () => {
+      try {
+        await useNoteStore.getState().deleteCollection(collection.id);
+      } catch (error: any) {
+        message.error(error?.message || "Could not delete the collection");
+        return;
+      }
+      message.success("Collection deleted");
+      onDeleted();
+    },
+  });
+
 interface CollectionDialogsProps {
   mode: "create" | "rename" | "add" | "share" | null;
   collection?: CollectionItem | null;
   /** Set when the collection belongs to this company: adding moves the items into it. */
   companyName?: string | null;
+  /** Set for a company collection, so a rename finds its (possibly encrypted) name. */
+  companyId?: number | null;
   onClose: () => void;
   onChanged: () => void;
 }
@@ -32,6 +67,7 @@ const CollectionDialogs = ({
   mode,
   collection,
   companyName,
+  companyId,
   onClose,
   onChanged,
 }: CollectionDialogsProps) => {
@@ -109,7 +145,7 @@ const CollectionDialogs = ({
         await createCollection(values.name);
         message.success("Collection created");
       } else if (collection) {
-        await renameCollection(collection.id, values.name);
+        await renameCollection(collection.id, values.name, companyId);
         message.success("Collection renamed");
       }
       onChanged();

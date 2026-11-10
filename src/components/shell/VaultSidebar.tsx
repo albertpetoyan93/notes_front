@@ -25,13 +25,14 @@ import { Dropdown, Modal, Tooltip, message } from "antd";
 import { fetcherPost } from "../../configs/axios";
 import { useRef, useState, type ReactNode } from "react";
 import useVaultNav from "../../hooks/useVaultNav";
-import CollectionDialogs from "../../pages/notes/CollectionDialogs";
+import CollectionDialogs, { confirmDeleteCollection } from "../../pages/notes/CollectionDialogs";
 import { useCompanyStore } from "../../store/companyStore";
 import { CollectionItem, useNoteStore } from "../../store/noteStore";
 import { useVaultStore } from "../../store/vaultStore";
 import { useBillingStore } from "../../store/billingStore";
 import { CATEGORY_ORDER, categoryClass, categoryKey, categoryPlural } from "../../utils/noteCategory";
 import { healthIssues } from "../../utils/noteFields";
+import { companyCollectionActions } from "../../utils/companyCollections";
 import VaultSwitcher from "./VaultSwitcher";
 
 const TAG_PREVIEW = 6;
@@ -81,7 +82,7 @@ const VaultSidebar = ({ companyId }: { companyId: number | null }) => {
   const openUpgrade = useBillingStore((state) => state.openUpgrade);
   const { summary, collections, refresh, bumpList, setImportOpen, setAuthenticatorImportOpen } =
     useVaultStore();
-  const { deleteCollection, exportNotes, importNotes } = useNoteStore();
+  const { exportNotes, importNotes } = useNoteStore();
   const company = useCompanyStore((state) =>
     state.companies.find((item) => item.id === companyId)
   );
@@ -118,20 +119,15 @@ const VaultSidebar = ({ companyId }: { companyId: number | null }) => {
   };
 
   // Deleting a collection drops its sharing for good, so this one asks first.
-  const removeCollection = (collection: CollectionItem) => {
-    Modal.confirm({
-      title: `Delete "${collection.name}"?`,
-      content: "Notes in this collection stay in your list, without a collection.",
-      okText: "Delete",
-      okButtonProps: { danger: true },
-      onOk: async () => {
-        await deleteCollection(collection.id);
+  const removeCollection = (collection: CollectionItem) =>
+    confirmDeleteCollection({
+      collection,
+      inCompany: !!companyId,
+      onDeleted: () => {
         if (nav.collection === String(collection.id)) nav.go();
         changed();
-        message.success("Collection deleted");
       },
     });
-  };
 
   // A collection someone shared with you: stop seeing it and all its items.
   const leaveCollection = (collection: CollectionItem) => {
@@ -196,11 +192,31 @@ const VaultSidebar = ({ companyId }: { companyId: number | null }) => {
     }
   };
 
-  // A company collection: editors can bring their own items in (they move into the company).
-  const companyCollectionMenu = (collection: CollectionItem) =>
-    inCompany && (collection.permission === "owner" || collection.permission === "edit")
-      ? [{ key: "add", icon: <FileAddOutlined />, label: "Add my items", onClick: () => setDialog({ mode: "add", collection }) }]
-      : [];
+  // A company collection: editors can bring their own items in (they move into the company);
+  // owners and admins can also rename or delete it.
+  const companyCollectionMenu = (collection: CollectionItem) => {
+    const actions = companyCollectionActions(collection.permission, { inCompany, canManage });
+    return [
+      ...(actions.includes("add")
+        ? [{ key: "add", icon: <FileAddOutlined />, label: "Add my items", onClick: () => setDialog({ mode: "add", collection }) }]
+        : []),
+      ...(actions.includes("rename")
+        ? [{ key: "rename", icon: <EditOutlined />, label: "Rename", onClick: () => setDialog({ mode: "rename", collection }) }]
+        : []),
+      ...(actions.includes("delete")
+        ? [
+            { type: "divider" as const },
+            {
+              key: "delete",
+              icon: <DeleteOutlined />,
+              label: "Delete",
+              danger: true,
+              onClick: () => removeCollection(collection),
+            },
+          ]
+        : []),
+    ];
+  };
 
   const collectionMenu = (collection: CollectionItem) => {
     const canEdit = collection.permission === "owner" || collection.permission === "edit";
@@ -500,6 +516,7 @@ const VaultSidebar = ({ companyId }: { companyId: number | null }) => {
         mode={dialog?.mode || null}
         collection={dialog?.collection}
         companyName={companyId ? company?.name || null : null}
+        companyId={companyId}
         onClose={() => setDialog(null)}
         onChanged={changed}
       />

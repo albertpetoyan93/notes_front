@@ -535,6 +535,15 @@
       color: var(--staleText);
     }
   }
+
+  // Access given, key on its way: not an error.
+  &.is-waiting {
+    background: var(--primarySoft);
+
+    .alert-icon {
+      color: var(--primaryText);
+    }
+  }
 }
 
 .fields-card {

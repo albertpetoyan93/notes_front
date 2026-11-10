@@ -2,6 +2,7 @@ import React, { lazy } from "react";
 
 const NotesPage = lazy(() => import("../pages/notes/NotesPage"));
 const CompanyPage = lazy(() => import("../pages/company/CompanyPage"));
+const InvitePage = lazy(() => import("../pages/company/InvitePage"));
 const SecurityPage = lazy(() => import("../pages/settings/SecurityPage"));
 const SecretLinksPage = lazy(() => import("../pages/settings/SecretLinksPage"));
 const BillingPage = lazy(() => import("../pages/settings/BillingPage"));
@@ -30,6 +31,11 @@ const ProtectedRoutes: RouteConfig[] = [
   {
     path: "/company/:id",
     element: <CompanyPage />,
+  },
+  {
+    // The link in a company invite email: joining needs its token.
+    path: "/invite",
+    element: <InvitePage />,
   },
   {
     path: "/settings/security",

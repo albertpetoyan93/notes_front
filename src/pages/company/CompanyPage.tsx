@@ -1,8 +1,11 @@
 import {
   DeleteOutlined,
   DownOutlined,
+  EditOutlined,
+  FileAddOutlined,
   FolderOutlined,
   HistoryOutlined,
+  MoreOutlined,
   PlusOutlined,
   ShareAltOutlined,
   TeamOutlined,
@@ -14,6 +17,7 @@ import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import ActivityList from "../../components/activity/ActivityList";
 import axios from "../../configs/axios";
 import NotesPage from "../notes/NotesPage";
+import CollectionDialogs, { confirmDeleteCollection } from "../notes/CollectionDialogs";
 import CompanyPoliciesSection from "./CompanyPoliciesSection";
 import GroupsPanel from "./GroupsPanel";
 import OffboardingPanel from "./OffboardingPanel";
@@ -113,6 +117,9 @@ export interface CompanyCollection {
   groups?: CollectionGroupRow[];
 }
 
+// How often the Members list is checked again while an invite is open.
+const MEMBERS_RECHECK_MS = 30 * 1000;
+
 const viewerLabel = (collection: CompanyCollection) => {
   if (collection.companyShare) return "All members";
   const count = collection.shares?.length || 0;
@@ -154,6 +161,11 @@ const CompanyPage = () => {
   const [companyCollections, setCompanyCollections] = useState<CompanyCollection[]>([]);
   const [collectionOpen, setCollectionOpen] = useState(false);
   const [collectionName, setCollectionName] = useState("");
+  // Rename or "Add my items" for one company collection (the shared collection dialogs).
+  const [collectionDialog, setCollectionDialog] = useState<{
+    mode: "rename" | "add";
+    collection: CompanyCollection;
+  } | null>(null);
   const [sharingCollection, setSharingCollection] = useState<CompanyCollection | null>(null);
   const [accessCollection, setAccessCollection] = useState<CompanyCollection | null>(null);
   const [shareAudience, setShareAudience] = useState<"members" | "all" | "group">("members");
@@ -195,18 +207,19 @@ const CompanyPage = () => {
     setCompanyName(company?.name || "");
   }, [company?.name]);
 
-  const loadMembers = async () => {
+  // quiet: a background re-check, without the loading state or an error message.
+  const loadMembers = async (quiet = false) => {
     if (!canManage) return;
-    setMembersLoading(true);
+    if (!quiet) setMembersLoading(true);
     try {
       const response = await axios.get(`/api/companies/${companyId}/members`);
       setMembers(response.data || []);
       const recovery = await recoveryStatus(companyId).catch(() => null);
       setRecoverable(new Set(recovery?.canRecover ? recovery.recoverable || [] : []));
     } catch (error: any) {
-      message.error(error?.message || "Could not load members");
+      if (!quiet) message.error(error?.message || "Could not load members");
     } finally {
-      setMembersLoading(false);
+      if (!quiet) setMembersLoading(false);
     }
   };
 
@@ -216,6 +229,37 @@ const CompanyPage = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [companyId, canManage]);
 
+  // Someone still has an open invite: the list is checked again, so an accept
+  // (done on their own device) shows here without leaving the page.
+  const invitePending = members.some((member) => member.status === "invited");
+  useEffect(() => {
+    if (!canManage || companyTab !== "members" || !invitePending) return;
+    const check = () => {
+      if (document.visibilityState === "visible") loadMembers(true);
+    };
+    const timer = window.setInterval(check, MEMBERS_RECHECK_MS);
+    document.addEventListener("visibilitychange", check);
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", check);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [canManage, companyTab, invitePending, companyId]);
+
+  // An owner or admin opening the company (or its Members tab): the key work is
+  // done now, so people who just joined can open items and keys removed people
+  // held are replaced, without waiting for the next sign-in.
+  useEffect(() => {
+    if (!canManage) return;
+    if (companyTab !== "notes" && companyTab !== "members") return;
+    runKeyTasks()
+      .then((granted) => {
+        if (granted) refreshVault();
+      })
+      .catch(() => undefined);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [companyId, canManage, companyTab]);
+
   const loadWorkspace = async () => {
     const collectionResponse = await axios.get(`/api/companies/${companyId}/collections`);
     // Encrypted names are opened here.
@@ -224,13 +268,22 @@ const CompanyPage = () => {
     return collections as CompanyCollection[];
   };
 
+  // A collection renamed, deleted or filled here: this list and the sidebar both reload.
+  const collectionsChanged = () => {
+    loadWorkspace().catch(() => undefined);
+    refreshVault();
+  };
+
+  // The sidebar's collections changed (renamed or deleted there): reload this list too.
+  const vaultCollections = useVaultStore((state) => state.collections);
+
   useEffect(() => {
     if (company?.memberStatus !== "active") return;
     loadWorkspace().catch(() => {
       setCompanyCollections([]);
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [companyId, company?.memberStatus, companyTab]);
+  }, [companyId, company?.memberStatus, companyTab, vaultCollections]);
 
   useEffect(() => {
     if (companyTab !== "collections" || !requestedShareId) return;
@@ -414,11 +467,37 @@ const CompanyPage = () => {
       setEmail("");
       setInviteRole("member");
       setInviteOpen(false);
-      message.success(
-        response.data?.emailSent
-          ? "Invite sent"
-          : "Invite saved. Email is not set up yet, so it was not delivered."
-      );
+      const inviteLink: string | undefined = response.data?.inviteLink;
+      if (response.data?.emailSent || !inviteLink) {
+        message.success(response.data?.emailSent ? "Invite sent" : "Invite saved");
+      } else {
+        // Email isn't set up: the inviter sends the (single-use) link themselves.
+        Modal.info({
+          title: `Send ${trimmed} this invite link`,
+          width: 520,
+          okText: "Done",
+          content: (
+            <div className="invite-link">
+              <p>
+                Email isn't set up, so the invite wasn't delivered. Send this link to {trimmed} yourself. It works once,
+                only for the account with that email, and expires in 14 days.
+              </p>
+              <Input readOnly value={inviteLink} onFocus={(event) => event.target.select()} />
+              <Button
+                style={{ marginTop: 8 }}
+                onClick={() =>
+                  navigator.clipboard
+                    .writeText(inviteLink)
+                    .then(() => message.success("Link copied"))
+                    .catch(() => message.error("Could not copy. Select the link and copy it."))
+                }
+              >
+                Copy invite link
+              </Button>
+            </div>
+          ),
+        });
+      }
       await loadMembers();
     } catch (error: any) {
       message.error(error?.message || "Could not send the invite");
@@ -490,6 +569,8 @@ const CompanyPage = () => {
                 : "Member removed"
         );
         await loadMembers();
+        // Their collection keys are replaced here and now, not at the next sign-in.
+        if (member.status === "active") runKeyTasks().catch(() => undefined);
       },
     });
   };
@@ -575,7 +656,14 @@ const CompanyPage = () => {
                 <FolderOutlined />
               </span>
               <div className="manage-main">
-                <strong>{collection.name}</strong>
+                <button
+                  type="button"
+                  className="manage-title-link"
+                  onClick={() => openCollectionNotes(collection)}
+                  aria-label={`Open ${collection.name}`}
+                >
+                  <strong>{collection.name}</strong>
+                </button>
                 <span>
                   {collection.noteCount} {collection.noteCount === 1 ? "item" : "items"} · {viewerLabel(collection)}
                 </span>
@@ -603,9 +691,42 @@ const CompanyPage = () => {
                 >
                   Share
                 </Button>
-                <Button size="small" onClick={() => openCollectionNotes(collection)}>
-                  Open
-                </Button>
+                <Dropdown
+                  trigger={["click"]}
+                  placement="bottomRight"
+                  menu={{
+                    items: [
+                      {
+                        key: "add",
+                        icon: <FileAddOutlined />,
+                        label: "Add my items",
+                        onClick: () => setCollectionDialog({ mode: "add", collection }),
+                      },
+                      {
+                        key: "rename",
+                        icon: <EditOutlined />,
+                        label: "Rename",
+                        onClick: () => setCollectionDialog({ mode: "rename", collection }),
+                      },
+                      { type: "divider" },
+                      {
+                        key: "delete",
+                        icon: <DeleteOutlined />,
+                        label: "Delete",
+                        danger: true,
+                        onClick: () =>
+                          confirmDeleteCollection({ collection, inCompany: true, onDeleted: collectionsChanged }),
+                      },
+                    ],
+                  }}
+                >
+                  <Button
+                    type="text"
+                    className="icon-btn"
+                    icon={<MoreOutlined />}
+                    aria-label={`${collection.name} options`}
+                  />
+                </Dropdown>
               </div>
             </li>
           ))}
@@ -868,6 +989,14 @@ const CompanyPage = () => {
           ]}
         />
       </Modal>
+      <CollectionDialogs
+        mode={collectionDialog?.mode || null}
+        collection={collectionDialog ? { ...collectionDialog.collection, isOwner: false } : null}
+        companyName={company.name}
+        companyId={companyId}
+        onClose={() => setCollectionDialog(null)}
+        onChanged={collectionsChanged}
+      />
       <Modal
         title="New collection"
         open={collectionOpen}

@@ -35,6 +35,8 @@ import {
   isAmexBrand,
 } from "../../utils/cardField";
 import { CATEGORY_ORDER, categoryKey, categoryLabel } from "../../utils/noteCategory";
+import { secretChanged } from "../../utils/secretChange";
+import { fetcherPost } from "../../configs/axios";
 import {
   isSecretField,
   noteBody,
@@ -351,6 +353,14 @@ const NoteEditor = ({
     setSaving(true);
     try {
       const saved = note ? await updateNote(note.id, payload) : await createNote(payload);
+      // A company item got a new password: its open offboarding tasks are done.
+      if (note && currentCompanyId && secretChanged(noteFields(note), fields)) {
+        fetcherPost(`/api/notes/${note.id}/events`, { action: "password_changed" })
+          .then((result: { tasksDone?: number }) => {
+            if (result?.tasksDone) message.success("Offboarding: “change this password” marked done");
+          })
+          .catch(() => undefined);
+      }
       onSaved(saved);
     } catch (error: any) {
       // The axios interceptor reports the error; an ownership refusal also offers a copy.

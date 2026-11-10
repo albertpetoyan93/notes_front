@@ -160,12 +160,15 @@ export const openNote = async <T extends Partial<RawNote>>(note: T): Promise<T> 
     };
   } catch (error) {
     // Shown like any item that can't be read; it can't be edited either.
-    const title = !useAuthStore.getState().me?.e2eEnabled
+    const e2eOn = !!useAuthStore.getState().me?.e2eEnabled;
+    // Access is there but the key isn't yet: an owner's or admin's browser hands it over.
+    const awaitingKey = e2eOn && error instanceof NoKeyError;
+    const title = !e2eOn
       ? "Turn on end-to-end encryption to open this item"
-      : error instanceof NoKeyError
+      : awaitingKey
         ? "Waiting for an owner or admin to give you access"
         : "Item can't be opened";
-    return { ...note, title, content: { mainContent: "", customFields: [], decryptionFailed: true } };
+    return { ...note, title, content: { mainContent: "", customFields: [], decryptionFailed: true, awaitingKey } };
   }
 };
 

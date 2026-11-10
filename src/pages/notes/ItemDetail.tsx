@@ -5,6 +5,7 @@ import {
   DeleteOutlined,
   EditOutlined,
   ExclamationCircleOutlined,
+  LoadingOutlined,
   ExportOutlined,
   EyeInvisibleOutlined,
   EyeOutlined,
@@ -47,6 +48,7 @@ import { categoryClass, categoryLabel } from "../../utils/noteCategory";
 import {
   HEALTH_HELP,
   HEALTH_TITLE,
+  awaitingKey,
   decryptionFailed,
   displayValue,
   healthIssues,
@@ -500,7 +502,18 @@ const ItemDetail = ({
         </div>
       </div>
 
-      {decryptionFailed(note) && (
+      {awaitingKey(note) ? (
+        <div className="alert is-waiting" role="status">
+          <LoadingOutlined className="alert-icon" spin />
+          <div className="alert-copy">
+            <strong>Getting access…</strong>
+            <span>
+              An owner's or admin's 2keevo is sharing the key with you, usually within a minute or two while one
+              of them is online. This item opens by itself; you don't need to reload.
+            </span>
+          </div>
+        </div>
+      ) : decryptionFailed(note) && (
         <div className="alert is-weak" role="alert">
           <ExclamationCircleOutlined className="alert-icon" />
           <div className="alert-copy">

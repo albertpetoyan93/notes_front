@@ -45,6 +45,10 @@ export const notePasskeys = (note: Pick<Note, "content">): NotePasskey[] => {
 export const decryptionFailed = (note: Pick<Note, "content">) =>
   !!(note.content as { decryptionFailed?: boolean } | null)?.decryptionFailed;
 
+/** Can't be opened yet only because the collection key hasn't been handed over (not broken). */
+export const awaitingKey = (note: Pick<Note, "content">) =>
+  !!(note.content as { awaitingKey?: boolean } | null)?.awaitingKey;
+
 const find = (fields: NoteField[], pattern: RegExp) =>
   fields.find((field) => pattern.test(field.label) && field.value.trim())?.value.trim() || "";
 
