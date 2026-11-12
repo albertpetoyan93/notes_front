@@ -43,6 +43,7 @@ axiosServices.interceptors.response.use(
       url.includes("/api/auth/unlock") ||
       // These answer 401 for a wrong master password or recovery key.
       url.includes("/api/auth/e2e/check-password") ||
+      url.includes("/api/auth/e2e/reset-account") ||
       url.includes("/api/auth/e2e/enable") ||
       url.includes("/api/auth/e2e/master-password") ||
       url.includes("/api/auth/e2e/recovery-key") ||

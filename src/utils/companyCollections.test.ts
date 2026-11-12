@@ -24,8 +24,13 @@ describe("defaultNewItemCollection", () => {
 });
 
 describe("companyCollectionActions", () => {
-  it("gives owners and admins add, rename and delete", () => {
+  it("gives owners and admins with access add, rename and delete", () => {
+    expect(companyCollectionActions("edit", { inCompany: true, canManage: true })).toEqual(["add", "rename", "delete"]);
     expect(companyCollectionActions("owner", { inCompany: true, canManage: true })).toEqual(["add", "rename", "delete"]);
+  });
+
+  it("gives an admin without access nothing (ADR-002: managing isn't opening)", () => {
+    expect(companyCollectionActions(null, { inCompany: true, canManage: true })).toEqual([]);
   });
 
   it("gives an editor only add", () => {
@@ -38,5 +43,20 @@ describe("companyCollectionActions", () => {
 
   it("gives nothing outside an active company (suspended, or not a member)", () => {
     expect(companyCollectionActions("owner", { inCompany: false, canManage: false })).toEqual([]);
+  });
+});
+
+describe("openableVaults", () => {
+  it("the sidebar lists only vaults with access (an admin sees the rest on the company page)", async () => {
+    const { openableVaults } = await import("./companyCollections");
+    expect(openableVaults([{ id: 1, permission: "edit" }, { id: 2, permission: null }, { id: 3, permission: "view" }]).map((row) => row.id)).toEqual([1, 3]);
+  });
+});
+
+describe("managesAnyVault", () => {
+  it("a member who manages a vault gets the Collections page for it", async () => {
+    const { managesAnyVault } = await import("./companyCollections");
+    expect(managesAnyVault([{ manages: false }, { manages: true }])).toBe(true);
+    expect(managesAnyVault([{ manages: false }, {}])).toBe(false);
   });
 });

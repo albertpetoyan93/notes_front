@@ -5,9 +5,7 @@ import { fetcherPost } from "../../configs/axios";
 import { createAccountKeys, relockForPassword, replaceRecovery } from "../../crypto/account";
 import { fingerprint } from "../../crypto/e2e";
 import { useAuthStore } from "../../store/authStore";
-import { useCompanyStore } from "../../store/companyStore";
 import { useKeyStore } from "../../store/keyStore";
-import { recoveryStatus } from "../../utils/companyRecovery";
 import dayjsExtra from "../../utils/dayjs";
 import { masterPasswordProblems } from "../../utils/masterPassword";
 import { masterKeysFor } from "../../utils/vaultKeys";
@@ -405,22 +403,6 @@ const EncryptionSection = () => {
   const [mode, setMode] = useState<"password" | "recovery" | null>(null);
   const [print, setPrint] = useState("");
   const publicKey = keys?.publicKey || me?.publicKey;
-  // Companies whose owners and admins can reset this person's master password.
-  const companies = useCompanyStore((state) => state.companies);
-  const [recoveryCompanies, setRecoveryCompanies] = useState<string[]>([]);
-
-  useEffect(() => {
-    let cancelled = false;
-    Promise.all(
-      companies.map(async (company) => ((await recoveryStatus(company.id).catch(() => null))?.enabled ? company.name : null))
-    ).then((names) => {
-      if (!cancelled) setRecoveryCompanies(names.filter((name): name is string => !!name));
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [companies]);
-
   useEffect(() => {
     if (publicKey) fingerprint(publicKey).then(setPrint).catch(() => setPrint(""));
   }, [publicKey]);
@@ -445,8 +427,7 @@ const EncryptionSection = () => {
               {me?.e2eEnabled
                 ? `On since ${dayjsExtra(me.e2eSince).format("D MMM YYYY")}. Your password is your master password.`
                 : "Your items get encrypted in your browser. Your password becomes your master password, and you get a recovery key."}
-              {recoveryCompanies.length > 0 &&
-                ` Owners and admins of ${recoveryCompanies.join(", ")} can also reset it (a company policy).`}
+              {me?.e2eEnabled && " Nobody else can reset it, your company included: your recovery key is the only way back."}
             </span>
           </div>
           <div className="manage-actions">

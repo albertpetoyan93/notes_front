@@ -23,15 +23,22 @@ export const defaultNewItemCollection = ({
 };
 
 /**
- * A company collection's menu in the sidebar. Owners and admins get
- * permission "owner" on every company collection and may rename or delete it;
- * editors can only bring their own items in.
+ * A company vault's menu. ADR-002: owners and admins open a vault only
+ * through a grant; with access they may also rename or delete it. Editors can
+ * only bring their own items in; without access there's nothing to do here.
  */
 export const companyCollectionActions = (
-  permission: Permission,
+  permission: Permission | null | undefined,
   { inCompany, canManage }: { inCompany: boolean; canManage: boolean }
 ): ("add" | "rename" | "delete")[] => {
-  if (!inCompany) return [];
-  if (permission === "owner" && canManage) return ["add", "rename", "delete"];
-  return permission === "owner" || permission === "edit" ? ["add"] : [];
+  if (!inCompany || !permission) return [];
+  const editor = canEdit(permission);
+  if (canManage && editor) return ["add", "rename", "delete"];
+  return editor ? ["add"] : [];
 };
+
+/** Vaults the person can open (ADR-002: owners and admins get the others listed too, with no access). */
+export const openableVaults = <T extends { permission?: string | null }>(rows: T[]) => rows.filter((row) => !!row.permission);
+
+/** A vault manager who isn't an admin still gets the Collections page, for the vaults they manage (ADR-002). */
+export const managesAnyVault = (rows: { manages?: boolean }[]) => rows.some((row) => !!row.manages);

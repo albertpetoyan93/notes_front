@@ -35,8 +35,10 @@ const ForgotPasswordPage = () => {
           </p>
           <p className="auth-note">
             Your account uses a master password (end-to-end encryption)?{" "}
-            <NavLink to="/auth/recover">Use your recovery key</NavLink> instead. 2keevo can't
-            open your vault, so it can't reset a master password by email.
+            <NavLink to="/auth/recover">Use your recovery key</NavLink> instead: nothing is lost.
+            2keevo can't open your vault, so it can't reset a master password. Lost your recovery
+            key too? Enter your email here: we'll send a link to reset your account, which deletes
+            your personal items.
           </p>
           <Form.Item
             name="email"

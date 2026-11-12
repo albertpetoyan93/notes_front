@@ -80,7 +80,8 @@ const openKeys = () => {
 };
 
 /** A collection key this person holds (sealed to them), opened. */
-const collectionKeyFor = async (collectionId: number, keyVersion: number, sealed?: string | null) => {
+/** A collection key, opened with this person's sealed copy (cached). Also used by vault recovery. */
+export const collectionKeyFor = async (collectionId: number, keyVersion: number, sealed?: string | null) => {
   const name = `${collectionId}:${keyVersion}`;
   const cached = collectionKeys.get(name);
   if (cached) return cached;
@@ -380,7 +381,9 @@ export const openCollectionNames = async <T extends NamedCollection>(list: T[]):
         collectionNames.set(collection.id, name);
         return { ...collection, name };
       } catch {
-        return { ...collection, name: "Collection" };
+        // Not openable here (no key yet, or no access): its number tells vaults apart and
+        // matches what recovery notices say ("vault #id").
+        return { ...collection, name: `Encrypted vault #${collection.id}`, nameLocked: true };
       }
     })
   );

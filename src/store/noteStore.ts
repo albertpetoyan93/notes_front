@@ -86,6 +86,8 @@ export interface CollectionItem {
   permission: "owner" | "view" | "edit";
   noteCount: number;
   companyId?: number | null;
+  /** A company vault this person manages (ADR-002). */
+  manages?: boolean;
 }
 
 export interface NoteShare {

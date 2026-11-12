@@ -32,7 +32,7 @@ import { useVaultStore } from "../../store/vaultStore";
 import { useBillingStore } from "../../store/billingStore";
 import { CATEGORY_ORDER, categoryClass, categoryKey, categoryPlural } from "../../utils/noteCategory";
 import { healthIssues } from "../../utils/noteFields";
-import { companyCollectionActions } from "../../utils/companyCollections";
+import { managesAnyVault, companyCollectionActions } from "../../utils/companyCollections";
 import VaultSwitcher from "./VaultSwitcher";
 
 const TAG_PREVIEW = 6;
@@ -352,6 +352,17 @@ const VaultSidebar = ({ companyId }: { companyId: number | null }) => {
           </button>
         )}
 
+        {!canManage && inCompany && managesAnyVault(collections) && (
+          <>
+            <Heading>Team</Heading>
+            <NavItem
+              active={nav.tab === "collections"}
+              icon={<FolderOutlined />}
+              label="Vaults I manage"
+              onClick={() => nav.go({ tab: "collections" })}
+            />
+          </>
+        )}
         {canManage && (
           <>
             <Heading>Team</Heading>

@@ -1,3 +1,4 @@
+import { openableVaults } from "../utils/companyCollections";
 import { create } from "zustand";
 import axios from "../configs/axios";
 import type { CollectionItem, Note } from "./noteStore";
@@ -55,7 +56,8 @@ export const useVaultStore = create<VaultStore>((set, get) => ({
       ]);
       // End-to-end names and items are opened here (names first: items show
       // their collections' names); health is worked out here too.
-      const opened = await openCollectionNames((collections.data || []) as CollectionItem[]);
+      // Only vaults this person can open; an admin manages the rest on the company page.
+      const opened = await openCollectionNames(openableVaults((collections.data || []) as CollectionItem[]));
       const prepared = await prepareNotes(notes.data || []);
       // The password health report is part of paid plans (worked out here for
       // end-to-end items, so the plan is checked here too).

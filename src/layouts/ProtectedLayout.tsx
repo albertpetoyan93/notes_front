@@ -4,6 +4,7 @@ import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import LockScreen from "../components/lock/LockScreen";
 import { E2EBanner, E2EGate } from "../components/lock/E2EDeadline";
 import OfflineScreen from "../components/pwa/OfflineScreen";
+import ConfirmEmailBanner from "../components/shell/ConfirmEmailBanner";
 import CommandPalette from "../components/shell/CommandPalette";
 import AuthenticatorImportModal from "../components/shell/AuthenticatorImportModal";
 import ImportPasswordsModal from "../components/shell/ImportPasswordsModal";
@@ -125,7 +126,7 @@ const ProtectedLayout: React.FC = () => {
         console.error("Could not finish key work:", error?.message || error);
       }
       if (granted) message.success(granted === 1 ? "1 person can now open shared items" : `${granted} people can now open shared items`);
-      // Company admin recovery: this person's copy for their companies, and owner/admin work.
+      // Vault recovery: custodians' key work, and recovery copies of the vault keys this person holds.
       await runRecoveryTasks().catch((error) => console.error("Could not finish recovery work:", error?.message || error));
       const moved = await migrateItems().catch((error) => {
         console.error("Could not encrypt items:", error?.message || error);
@@ -160,6 +161,9 @@ const ProtectedLayout: React.FC = () => {
           message.success(granted === 1 ? "1 person can now open shared items" : `${granted} people can now open shared items`);
           refreshVault();
         })
+        .catch(() => undefined)
+        // Vault recovery copies follow vault keys that were just made or replaced.
+        .then(() => runRecoveryTasks())
         .catch(() => undefined);
     };
     const timer = window.setInterval(run, managesCompany ? KEY_TASKS_MANAGER_EVERY_MS : KEY_TASKS_EVERY_MS);
@@ -214,6 +218,7 @@ const ProtectedLayout: React.FC = () => {
   return (
     <div className="app-shell">
       {e2eDeadline && <E2EBanner deadline={e2eDeadline} />}
+      <ConfirmEmailBanner />
       {/* A company admin set a temporary master password: the person chooses their own first. */}
       {me?.mustChangeMasterPassword && vaultKeys && <MasterPasswordModal mode="password" forced onClose={() => undefined} />}
       <TopBar

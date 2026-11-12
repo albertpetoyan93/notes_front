@@ -110,7 +110,7 @@ const RecoverPage = () => {
           Reset master password
         </Button>
         <p className="auth-switch">
-          <NavLink to="/auth/login">Back to sign in</NavLink>
+          <NavLink to="/auth/forgot">I don't have my recovery key</NavLink> · <NavLink to="/auth/login">Back to sign in</NavLink>
         </p>
       </Form>
     </AuthFrame>

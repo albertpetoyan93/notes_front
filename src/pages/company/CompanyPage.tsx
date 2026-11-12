@@ -11,7 +11,7 @@ import {
   TeamOutlined,
   UserAddOutlined,
 } from "@ant-design/icons";
-import { Button, Drawer, Dropdown, Empty, Input, Modal, Select, Space, Spin, Tooltip, Typography, message } from "antd";
+import { Button, Checkbox, Drawer, Dropdown, Empty, Input, Modal, Select, Space, Spin, Tag, Tooltip, Typography, message } from "antd";
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import ActivityList from "../../components/activity/ActivityList";
@@ -21,13 +21,14 @@ import CollectionDialogs, { confirmDeleteCollection } from "../notes/CollectionD
 import CompanyPoliciesSection from "./CompanyPoliciesSection";
 import GroupsPanel from "./GroupsPanel";
 import OffboardingPanel from "./OffboardingPanel";
-import ResetMasterPassword from "./ResetMasterPassword";
-import { recoveryStatus } from "../../utils/companyRecovery";
+import VaultRecoverySection from "./VaultRecoverySection";
 import { useNoteStore } from "../../store/noteStore";
 import { useCompanyStore } from "../../store/companyStore";
 import { useVaultStore } from "../../store/vaultStore";
 import { knownTitle } from "../../utils/itemTitles";
 import { collectionName, openCollectionNames, runKeyTasks } from "../../utils/vaultItems";
+import { vaultAccessLabel } from "./vaultAccessLabel";
+import { companyCollectionActions, managesAnyVault } from "../../utils/companyCollections";
 import "./CompanyPage.scss";
 
 interface MemberRow {
@@ -37,6 +38,8 @@ interface MemberRow {
   role: "owner" | "admin" | "member";
   status: "invited" | "active" | "suspended" | "removed";
   expiresAt?: string | null;
+  /** Has end-to-end encryption on (can receive vault keys). */
+  e2eEnabled?: boolean;
 }
 
 interface MemberAccess {
@@ -98,7 +101,16 @@ interface CollectionShareRow {
   email: string;
   name: string;
   permission: "view" | "edit";
+  /** A vault manager: shares it and hands its key to newcomers (ADR-002). */
+  manages?: boolean;
+  source?: "direct" | "admin_legacy" | "self" | "recovery";
 }
+
+const GRANT_SOURCE: Record<string, string> = {
+  admin_legacy: "Access as admin (from before roles)",
+  self: "Gave themselves access",
+  recovery: "Through recovery",
+};
 
 interface CollectionGroupRow {
   groupId: number;
@@ -110,8 +122,12 @@ interface CollectionGroupRow {
 export interface CompanyCollection {
   id: number;
   name: string;
-  noteCount: number;
-  permission: "owner" | "view" | "edit";
+  nameLocked?: boolean;
+  /** Null when there's no access (ADR-002: owners and admins see every vault, open only granted ones). */
+  noteCount: number | null;
+  permission: "owner" | "view" | "edit" | null;
+  manages?: boolean;
+  noManager?: boolean;
   companyShare?: "view" | "edit" | null;
   shares?: CollectionShareRow[];
   groups?: CollectionGroupRow[];
@@ -148,8 +164,6 @@ const CompanyPage = () => {
   // A suspended company can't be managed (only reopened or exported, from Billing).
   const canManage = company?.status !== "suspended" && (company?.role === "owner" || company?.role === "admin");
   const [members, setMembers] = useState<MemberRow[]>([]);
-  // Admin recovery: whose master password this viewer can reset.
-  const [recoverable, setRecoverable] = useState<Set<number>>(new Set());
   const [membersLoading, setMembersLoading] = useState(false);
   const [roleSavingId, setRoleSavingId] = useState<number | null>(null);
   const inviteOpen = useCompanyStore((state) => state.inviteOpen);
@@ -173,6 +187,7 @@ const CompanyPage = () => {
   const [groupOptions, setGroupOptions] = useState<{ value: number; label: string }[]>([]);
   const [sharePermission, setSharePermission] = useState<"view" | "edit">("view");
   const [shareEmails, setShareEmails] = useState<string[]>([]);
+  const [shareManages, setShareManages] = useState(false);
   const [userOptions, setUserOptions] = useState<
     { value: string; label: string; name: string; email: string }[]
   >([]);
@@ -182,12 +197,17 @@ const CompanyPage = () => {
   const [activityActor, setActivityActor] = useState<number | null>(null);
   const requestedTab = searchParams.get("tab") || "notes";
   const inCompany = company?.memberStatus === "active" && company?.status !== "suspended";
+  // A vault manager who isn't an admin gets the Collections page for the vaults they manage.
+  const sidebarVaults = useVaultStore((state) => state.collections);
+  const managesVaults = inCompany && managesAnyVault(sidebarVaults);
   const companyTab =
     canManage && ["collections", "members", "offboarding", "settings", "activity"].includes(requestedTab)
       ? requestedTab
       : inCompany && requestedTab === "groups"
         ? "groups"
-        : "notes";
+        : managesVaults && requestedTab === "collections"
+          ? "collections"
+          : "notes";
   const requestedShareId = Number(searchParams.get("share")) || null;
 
   useEffect(() => {
@@ -214,8 +234,6 @@ const CompanyPage = () => {
     try {
       const response = await axios.get(`/api/companies/${companyId}/members`);
       setMembers(response.data || []);
-      const recovery = await recoveryStatus(companyId).catch(() => null);
-      setRecoverable(new Set(recovery?.canRecover ? recovery.recoverable || [] : []));
     } catch (error: any) {
       if (!quiet) message.error(error?.message || "Could not load members");
     } finally {
@@ -250,15 +268,16 @@ const CompanyPage = () => {
   // done now, so people who just joined can open items and keys removed people
   // held are replaced, without waiting for the next sign-in.
   useEffect(() => {
-    if (!canManage) return;
-    if (companyTab !== "notes" && companyTab !== "members") return;
+    // Owners/admins, and vault managers (ADR-002: they hand their vaults' keys on).
+    if (!canManage && !managesVaults) return;
+    if (companyTab !== "notes" && companyTab !== "members" && companyTab !== "collections") return;
     runKeyTasks()
       .then((granted) => {
         if (granted) refreshVault();
       })
       .catch(() => undefined);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [companyId, canManage, companyTab]);
+  }, [companyId, canManage, managesVaults, companyTab]);
 
   const loadWorkspace = async () => {
     const collectionResponse = await axios.get(`/api/companies/${companyId}/collections`);
@@ -412,6 +431,7 @@ const CompanyPage = () => {
           audience: shareAudience,
           permission: sharePermission,
           emails: shareEmails,
+          ...(shareAudience === "members" ? { manages: shareManages } : {}),
         }
       );
       const failed = response.data?.failed || [];
@@ -443,13 +463,49 @@ const CompanyPage = () => {
   const unshareCollection = async (target: { all?: boolean; userId?: number }) => {
     if (!sharingCollection) return;
     const params = target.all ? "all=1" : `userId=${target.userId}`;
-    await axios.delete(
-      `/api/companies/${companyId}/collections/${sharingCollection.id}/share?${params}`
-    );
+    try {
+      await axios.delete(`/api/companies/${companyId}/collections/${sharingCollection.id}/share?${params}`);
+    } catch (error: any) {
+      // e.g. 409 "A vault needs at least one manager."
+      message.error(error?.message || "Could not remove access");
+      return;
+    }
     message.success(target.all ? "Stopped sharing with everyone" : "Access removed");
+    // People who no longer reach it: the vault key is replaced here (if this browser manages it).
+    await runKeyTasks().catch(() => undefined);
     const rows = await loadWorkspace();
     refreshVault();
     setSharingCollection((current) => rows.find((item) => item.id === current?.id) || null);
+  };
+
+  /** ADR-002: an owner or admin gives themselves access; logged, and the vault's managers are told. */
+  const giveMeAccess = (collection: CompanyCollection) =>
+    Modal.confirm({
+      title: `Give yourself access to ${vaultAccessLabel(collection).title}?`,
+      content: "This is logged and the vault's managers are told. The key arrives from a manager's open 2keevo.",
+      okText: "Give me access",
+      onOk: async () => {
+        try {
+          await axios.post(`/api/companies/${companyId}/collections/${collection.id}/self-grant`, { permission: "edit" });
+          message.success("Access given. The vault opens once a manager's 2keevo hands you its key.");
+          await loadWorkspace();
+          refreshVault();
+        } catch (error: any) {
+          message.error(error?.message || "Could not give access");
+        }
+      },
+    });
+
+  const setManager = async (collection: CompanyCollection, userId: number, manages: boolean) => {
+    try {
+      await axios.put(`/api/companies/${companyId}/collections/${collection.id}/managers/${userId}`, { manages });
+      message.success(manages ? "Now a vault manager" : "No longer a vault manager");
+      const rows = await loadWorkspace();
+      setAccessCollection((current) => rows.find((item) => item.id === current?.id) || null);
+      setSharingCollection((current) => (current ? rows.find((item) => item.id === current.id) || null : null));
+    } catch (error: any) {
+      message.error(error?.message || "Could not change the manager");
+    }
   };
 
   const invite = async () => {
@@ -642,33 +698,64 @@ const CompanyPage = () => {
           <h1 className="display-font">Collections</h1>
           <p>Every item in {company.name} lives in a collection. Share a collection to give people access to it.</p>
         </div>
-        <Button type="primary" icon={<PlusOutlined />} onClick={() => setCollectionOpen(true)}>
-          New collection
-        </Button>
+        {canManage && (
+          <Button type="primary" icon={<PlusOutlined />} onClick={() => setCollectionOpen(true)}>
+            New collection
+          </Button>
+        )}
       </div>
       {companyCollections.length === 0 ? (
         <div className="manage-empty">No collections yet.</div>
       ) : (
         <ul className="manage-list">
-          {companyCollections.map((collection) => (
+          {companyCollections.map((collection) => {
+            const label = vaultAccessLabel(collection);
+            const actions = companyCollectionActions(collection.permission, { inCompany: true, canManage });
+            const canShare = canManage || label.manager;
+            return (
             <li key={collection.id} className="manage-row">
               <span className="manage-icon">
                 <FolderOutlined />
               </span>
               <div className="manage-main">
-                <button
-                  type="button"
-                  className="manage-title-link"
-                  onClick={() => openCollectionNotes(collection)}
-                  aria-label={`Open ${collection.name}`}
-                >
-                  <strong>{collection.name}</strong>
-                </button>
+                {label.tag === "no-access" ? (
+                  <strong>{label.title}</strong>
+                ) : (
+                  <button
+                    type="button"
+                    className="manage-title-link"
+                    onClick={() => openCollectionNotes(collection)}
+                    aria-label={`Open ${label.title}`}
+                  >
+                    <strong>{label.title}</strong>
+                  </button>
+                )}
                 <span>
-                  {collection.noteCount} {collection.noteCount === 1 ? "item" : "items"} · {viewerLabel(collection)}
+                  {collection.noteCount != null && (
+                    <>
+                      {collection.noteCount} {collection.noteCount === 1 ? "item" : "items"} ·{" "}
+                    </>
+                  )}
+                  {viewerLabel(collection)}
+                </span>
+                <span>
+                  <Tag color={label.tag === "no-access" ? "default" : label.tag === "edit" ? "blue" : "green"}>
+                    {label.tag === "no-access" ? "No access" : label.tag === "edit" ? "Edit" : "View"}
+                  </Tag>
+                  {label.manager && <Tag color="purple">Vault manager</Tag>}
+                  {label.noManager && canManage && (
+                    <Tooltip title="Nobody active can hand this vault's key to newcomers. Make someone manager (or use vault recovery if nobody holds the key).">
+                      <Tag color="warning">No manager</Tag>
+                    </Tooltip>
+                  )}
                 </span>
               </div>
               <div className="manage-actions">
+                {label.tag === "no-access" && canManage && (
+                  <Button size="small" onClick={() => giveMeAccess(collection)}>
+                    Give me access
+                  </Button>
+                )}
                 <Tooltip title="Who has access">
                   <Button
                     type="text"
@@ -678,58 +765,76 @@ const CompanyPage = () => {
                     onClick={() => setAccessCollection(collection)}
                   />
                 </Tooltip>
-                <Button
-                  size="small"
-                  icon={<ShareAltOutlined />}
-                  onClick={() => {
-                    setSharingCollection(collection);
-                    setShareAudience(collection.companyShare ? "all" : "members");
-                    setSharePermission(collection.companyShare || "view");
-                    setShareEmails([]);
-                    setUserOptions([]);
-                  }}
-                >
-                  Share
-                </Button>
-                <Dropdown
-                  trigger={["click"]}
-                  placement="bottomRight"
-                  menu={{
-                    items: [
-                      {
-                        key: "add",
-                        icon: <FileAddOutlined />,
-                        label: "Add my items",
-                        onClick: () => setCollectionDialog({ mode: "add", collection }),
-                      },
-                      {
-                        key: "rename",
-                        icon: <EditOutlined />,
-                        label: "Rename",
-                        onClick: () => setCollectionDialog({ mode: "rename", collection }),
-                      },
-                      { type: "divider" },
-                      {
-                        key: "delete",
-                        icon: <DeleteOutlined />,
-                        label: "Delete",
-                        danger: true,
-                        onClick: () =>
-                          confirmDeleteCollection({ collection, inCompany: true, onDeleted: collectionsChanged }),
-                      },
-                    ],
-                  }}
-                >
+                {canShare && (
                   <Button
-                    type="text"
-                    className="icon-btn"
-                    icon={<MoreOutlined />}
-                    aria-label={`${collection.name} options`}
-                  />
-                </Dropdown>
+                    size="small"
+                    icon={<ShareAltOutlined />}
+                    onClick={() => {
+                      setSharingCollection(collection);
+                      setShareAudience(collection.companyShare ? "all" : "members");
+                      setSharePermission(collection.companyShare || "view");
+                      setShareEmails([]);
+                      setShareManages(false);
+                      setUserOptions([]);
+                    }}
+                  >
+                    Share
+                  </Button>
+                )}
+                {actions.length > 0 && (
+                  <Dropdown
+                    trigger={["click"]}
+                    placement="bottomRight"
+                    menu={{
+                      items: [
+                        ...(actions.includes("add")
+                          ? [
+                              {
+                                key: "add",
+                                icon: <FileAddOutlined />,
+                                label: "Add my items",
+                                onClick: () => setCollectionDialog({ mode: "add", collection }),
+                              },
+                            ]
+                          : []),
+                        ...(actions.includes("rename")
+                          ? [
+                              {
+                                key: "rename",
+                                icon: <EditOutlined />,
+                                label: "Rename",
+                                onClick: () => setCollectionDialog({ mode: "rename", collection }),
+                              },
+                            ]
+                          : []),
+                        ...(actions.includes("delete")
+                          ? [
+                              { type: "divider" as const },
+                              {
+                                key: "delete",
+                                icon: <DeleteOutlined />,
+                                label: "Delete",
+                                danger: true,
+                                onClick: () =>
+                                  confirmDeleteCollection({ collection, inCompany: true, onDeleted: collectionsChanged }),
+                              },
+                            ]
+                          : []),
+                      ],
+                    }}
+                  >
+                    <Button
+                      type="text"
+                      className="icon-btn"
+                      icon={<MoreOutlined />}
+                      aria-label={`${label.title} options`}
+                    />
+                  </Dropdown>
+                )}
               </div>
             </li>
-          ))}
+            );
+          })}
         </ul>
       )}
     </>
@@ -817,9 +922,6 @@ const CompanyPage = () => {
                   ) : (
                     <span className={`company-role ${member.role}`}>{roleLabel[member.role]}</span>
                   )}
-                  {canManageMember && member.status === "active" && member.userId && recoverable.has(member.userId) && (
-                    <ResetMasterPassword companyId={companyId} userId={member.userId} email={member.email} />
-                  )}
                   {suspended && canManageMember && (
                     <Button size="small" type="link" onClick={() => openTab("offboarding")}>
                       View offboarding
@@ -896,6 +998,14 @@ const CompanyPage = () => {
         </div>
       </section>
       <CompanyPoliciesSection companyId={companyId} />
+      <VaultRecoverySection
+        companyId={companyId}
+        isOwner={company.role === "owner"}
+        collections={companyCollections.map((collection) => ({ id: collection.id, name: collection.name }))}
+        members={members
+          .filter((member) => member.status === "active" && member.userId)
+          .map((member) => ({ userId: member.userId as number, email: member.email, e2eEnabled: !!member.e2eEnabled }))}
+      />
     </>
   );
 
@@ -991,7 +1101,17 @@ const CompanyPage = () => {
       </Modal>
       <CollectionDialogs
         mode={collectionDialog?.mode || null}
-        collection={collectionDialog ? { ...collectionDialog.collection, isOwner: false } : null}
+        // Dialogs open only for vaults with access (the menu needs it).
+        collection={
+          collectionDialog
+            ? {
+                ...collectionDialog.collection,
+                isOwner: false,
+                permission: collectionDialog.collection.permission || "edit",
+                noteCount: collectionDialog.collection.noteCount ?? 0,
+              }
+            : null
+        }
         companyName={company.name}
         companyId={companyId}
         onClose={() => setCollectionDialog(null)}
@@ -1019,7 +1139,7 @@ const CompanyPage = () => {
         />
       </Modal>
       <Drawer
-        title={accessCollection ? accessCollection.name : "Access"}
+        title={accessCollection ? vaultAccessLabel(accessCollection).title : "Access"}
         open={!!accessCollection}
         onClose={() => setAccessCollection(null)}
         width={360}
@@ -1044,14 +1164,25 @@ const CompanyPage = () => {
             accessCollection?.shares?.map((person) => (
               <div key={person.userId}>
                 <div>{person.email}</div>
-                <Typography.Text type="secondary">{person.permission}</Typography.Text>
+                <Typography.Text type="secondary">
+                  {person.permission}
+                  {person.manages ? " · Vault manager" : ""}
+                  {person.source && GRANT_SOURCE[person.source] ? ` · ${GRANT_SOURCE[person.source]}` : ""}
+                </Typography.Text>
+                {(canManage || accessCollection.manages) && (
+                  <div>
+                    <Button size="small" type="link" onClick={() => setManager(accessCollection, person.userId, !person.manages)}>
+                      {person.manages ? "Stop managing" : "Make manager"}
+                    </Button>
+                  </div>
+                )}
               </div>
             ))
           )}
         </Space>
       </Drawer>
       <Modal
-        title={sharingCollection ? `Share ${sharingCollection.name}` : "Share"}
+        title={sharingCollection ? `Share ${vaultAccessLabel(sharingCollection).title}` : "Share"}
         open={!!sharingCollection}
         footer={null}
         onCancel={() => setSharingCollection(null)}
@@ -1064,7 +1195,8 @@ const CompanyPage = () => {
             onChange={setShareAudience}
             options={[
               { value: "members", label: "Selected people" },
-              { value: "group", label: "A group" },
+              // Groups are an owner/admin tool.
+              ...(canManage ? [{ value: "group", label: "A group" }] : []),
               { value: "all", label: "All company members" },
             ]}
           />
@@ -1096,6 +1228,11 @@ const CompanyPage = () => {
               placeholder="Search by name or email"
               notFoundContent={null}
             />
+          )}
+          {shareAudience === "members" && (
+            <Checkbox checked={shareManages} onChange={(event) => setShareManages(event.target.checked)}>
+              Can manage (vault manager): shares this vault and hands its key to newcomers
+            </Checkbox>
           )}
           {shareAudience === "group" && (
             <Select
@@ -1135,6 +1272,8 @@ const CompanyPage = () => {
             >
               <span>
                 {person.name || person.email} · {person.permission}
+                {person.manages ? " · Vault manager" : ""}
+                {person.source && GRANT_SOURCE[person.source] ? ` · ${GRANT_SOURCE[person.source]}` : ""}
               </span>
               <Button size="small" danger onClick={() => unshareCollection({ userId: person.userId })}>
                 Remove

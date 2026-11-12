@@ -2,6 +2,7 @@ import { Outlet } from "react-router-dom";
 import ForgotPasswordPage from "../pages/auth/ForgotPasswordPage";
 import RecoverPage from "../pages/auth/RecoverPage";
 import RecoveryKeyPage from "../pages/auth/RecoveryKeyPage";
+import ResetAccountPage from "../pages/auth/ResetAccountPage";
 import ResetPasswordPage from "../pages/auth/ResetPasswordPage";
 import LoginPage from "../pages/login/LoginPage";
 import RegisterPage from "../pages/register/RegisterPage";
@@ -37,6 +38,12 @@ const PublicRoutes = [
         path: "recovery-key",
         element: <RecoveryKeyPage />,
       },
+      {
+        // From the "forgot password" email of an end-to-end account, without a recovery key.
+        path: "reset-account",
+        element: <ResetAccountPage />,
+      },
+
     ],
   },
 ];

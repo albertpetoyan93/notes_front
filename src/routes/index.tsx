@@ -1,4 +1,5 @@
 import { Route, Routes } from "react-router-dom";
+import ConfirmEmailPage from "../pages/auth/ConfirmEmailPage";
 import PublicLayout from "../layouts/PublicLayout";
 import ProtectedLayout from "../layouts/ProtectedLayout";
 import { Outlet } from "react-router-dom";
@@ -54,6 +55,8 @@ const AppRoutes = () => {
       <Route path="/s/:id" element={<SecretLinkPage />} />
       {/* Support's 2FA removal link: works signed in or not (PublicLayout would redirect). */}
       <Route path="/auth/confirm-support" element={<ConfirmSupportRequestPage />} />
+      {/* The email confirmation link (F15): usually opened while signed in, so outside PublicLayout's redirect. */}
+      <Route path="/auth/confirm-email" element={<ConfirmEmailPage />} />
 
       {/* Protected routes - redirect to login if not authenticated */}
       <Route element={<ProtectedLayout />}>
