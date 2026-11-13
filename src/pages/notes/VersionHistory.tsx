@@ -6,9 +6,9 @@ import {
 } from "@ant-design/icons";
 import { Button, Empty, Modal, Spin, Tag, Tooltip, message } from "antd";
 import { useCallback, useEffect, useState } from "react";
-import { fetcherGet, fetcherPost } from "../../configs/axios";
+import { fetcherGet } from "../../configs/axios";
 import { useNoteStore, type Note } from "../../store/noteStore";
-import { openVersions } from "../../utils/vaultItems";
+import { canOpenVersion, openVersions } from "../../utils/vaultItems";
 import dayjsExtra from "../../utils/dayjs";
 import { categoryLabel } from "../../utils/noteCategory";
 import { isSecretField, maskValue, noteBody, noteFields, type NoteField } from "../../utils/noteFields";
@@ -60,10 +60,15 @@ const VersionHistory = ({
   }, [load]);
 
   const openVersion = async (row: VersionRow) => {
+    // A version that couldn't be opened here (or an old readable one) has nothing to show or restore.
+    if (!canOpenVersion(row as never)) {
+      message.error("This version can't be opened.");
+      return;
+    }
     setLoadingId(row.id);
     try {
-      // An end-to-end version was opened with the list already.
-      setOpen(note.e2e ? (row as unknown as VersionDetail) : await fetcherGet(`/api/notes/${note.id}/versions/${row.id}`));
+      // Versions are sealed: opened with the list already.
+      setOpen(row as unknown as VersionDetail);
       setShown(new Set());
     } catch (openError: any) {
       message.error(openError?.message || "Could not open that version");
@@ -81,17 +86,13 @@ const VersionHistory = ({
       okText: "Restore",
       onOk: async () => {
         try {
-          if (note.e2e) {
-            // Saved like an edit, sealed here: the server can't read the version.
-            await useNoteStore.getState().updateNote(note.id, {
-              title: version.title,
-              content: version.content,
-              tags: version.tags,
-              category: version.category as Note["category"],
-            });
-          } else {
-            await fetcherPost(`/api/notes/${note.id}/versions/${version.id}/restore`, {});
-          }
+          // Saved like an edit, sealed here: the server can't read the version.
+          await useNoteStore.getState().updateNote(note.id, {
+            title: version.title,
+            content: version.content,
+            tags: version.tags,
+            category: version.category as Note["category"],
+          });
           message.success("Version restored");
           setOpen(null);
           await load();
@@ -179,7 +180,7 @@ const VersionHistory = ({
             <dt>Category</dt>
             <dd>{categoryLabel(open.category)}</dd>
           </div>
-          {open.tags.length > 0 && (
+          {(open.tags || []).length > 0 && (
             <div>
               <dt>Tags</dt>
               <dd>{open.tags.map((tag) => `#${tag}`).join(" ")}</dd>

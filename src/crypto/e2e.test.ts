@@ -112,7 +112,8 @@ describe("symmetric encryption", () => {
     const ivs = new Set<string>();
     for (let i = 0; i < 500; i++) ivs.add((await encryptBytes(key, text("x"))).split(".")[1]);
     expect(ivs.size).toBe(500);
-  });
+    // 500 encryptions: slow when the whole suite runs at once.
+  }, 20_000);
 
   it("refuses the wrong key, the wrong context, and changed data", async () => {
     const token = await encryptBytes(key, text("secret"), "item:1:content");

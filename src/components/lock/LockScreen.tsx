@@ -19,7 +19,8 @@ const LockScreen = ({ onUnlocked }: { onUnlocked: () => void }) => {
   const [busy, setBusy] = useState<"password" | "passkey" | null>(null);
   const [error, setError] = useState("");
   // End-to-end accounts open their keys here, from the master password.
-  const masterPassword = !!me?.e2eEnabled;
+  // Every account unlocks with its master password (stage 10.6).
+  const masterPassword = true;
 
   const done = () => {
     setPassword("");

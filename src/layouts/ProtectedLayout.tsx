@@ -2,7 +2,6 @@ import { Spin, message } from "antd";
 import React, { Suspense, useEffect, useState } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import LockScreen from "../components/lock/LockScreen";
-import { E2EBanner, E2EGate } from "../components/lock/E2EDeadline";
 import OfflineScreen from "../components/pwa/OfflineScreen";
 import ConfirmEmailBanner from "../components/shell/ConfirmEmailBanner";
 import CommandPalette from "../components/shell/CommandPalette";
@@ -20,7 +19,7 @@ import { useKeyStore } from "../store/keyStore";
 import { useLockStore } from "../store/lockStore";
 import { useVaultStore } from "../store/vaultStore";
 import { forgetVaultData } from "../utils/autoLock";
-import { migrateItems, runKeyTasks } from "../utils/vaultItems";
+import { runKeyTasks } from "../utils/vaultItems";
 import { runRecoveryTasks } from "../utils/companyRecovery";
 import { MasterPasswordModal } from "../pages/settings/EncryptionSection";
 
@@ -128,11 +127,7 @@ const ProtectedLayout: React.FC = () => {
       if (granted) message.success(granted === 1 ? "1 person can now open shared items" : `${granted} people can now open shared items`);
       // Vault recovery: custodians' key work, and recovery copies of the vault keys this person holds.
       await runRecoveryTasks().catch((error) => console.error("Could not finish recovery work:", error?.message || error));
-      const moved = await migrateItems().catch((error) => {
-        console.error("Could not encrypt items:", error?.message || error);
-        return 0;
-      });
-      if (!moved && !granted) return;
+      if (!granted) return;
       refreshVault();
       useVaultStore.getState().bumpList();
     })();
@@ -198,12 +193,6 @@ const ProtectedLayout: React.FC = () => {
     return <OfflineScreen onRetry={() => setAttempt((value) => value + 1)} />;
   }
 
-  // Accounts without end-to-end encryption: a reminder before the deadline, a gate after it.
-  const e2eDeadline: string | null = !me?.e2eEnabled && me?.e2eDeadline ? me.e2eDeadline : null;
-  if (me && e2eDeadline && new Date(e2eDeadline).getTime() <= Date.now()) {
-    return <E2EGate deadline={e2eDeadline} />;
-  }
-
   if (me && (locked || needsKeys)) {
     return (
       <LockScreen
@@ -217,7 +206,6 @@ const ProtectedLayout: React.FC = () => {
 
   return (
     <div className="app-shell">
-      {e2eDeadline && <E2EBanner deadline={e2eDeadline} />}
       <ConfirmEmailBanner />
       {/* A company admin set a temporary master password: the person chooses their own first. */}
       {me?.mustChangeMasterPassword && vaultKeys && <MasterPasswordModal mode="password" forced onClose={() => undefined} />}

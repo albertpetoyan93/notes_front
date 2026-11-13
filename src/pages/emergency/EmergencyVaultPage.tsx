@@ -97,15 +97,6 @@ const openVault = async (id: number, data: VaultResponse, mine: { privateKey: Ui
   const items: Item[] = await Promise.all(
     data.items.map(async (raw, index) => {
       const base = { key: String(index), category: raw.category, collectionIds: raw.collectionIds || [] };
-      if (!raw.e2e) {
-        return {
-          ...base,
-          title: raw.title || "Untitled",
-          content: (raw.content as Item["content"]) ?? "",
-          tags: raw.tags || [],
-          failed: false,
-        };
-      }
       try {
         const key = await openItemKey(userKey, String(raw.e2eId), String(raw.itemKey));
         const payload = await openItemData(key, String(raw.e2eId), String(raw.encData));

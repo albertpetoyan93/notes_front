@@ -29,7 +29,6 @@ export interface Note {
   category: NoteCategory;
   tags?: string[];
   isFavorite: boolean;
-  isEncrypted: boolean;
   userId: number;
   createdAt: Date;
   updatedAt: Date;

@@ -35,3 +35,12 @@ describe("sealCreate", () => {
     expect((body.e2e as { itemKey?: string }).itemKey).toBeTruthy();
   });
 });
+
+describe("stage 10.6 final review: versions that can't be opened", () => {
+  it("only a sealed version that opened can be shown or restored", async () => {
+    const { canOpenVersion } = await import("./vaultItems");
+    expect(canOpenVersion({ e2e: true, title: "Bank", content: {}, tags: [], changes: [] } as never)).toBe(true);
+    expect(canOpenVersion({ e2e: true, encData: "x", title: "Version can't be opened", changes: [] } as never)).toBe(false);
+    expect(canOpenVersion({ title: "Old", changes: [] } as never)).toBe(false);
+  });
+});

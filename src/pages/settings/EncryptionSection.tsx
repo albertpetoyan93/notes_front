@@ -1,8 +1,8 @@
 import { CopyOutlined, DownloadOutlined, LockOutlined, SafetyOutlined } from "@ant-design/icons";
-import { Alert, Button, Checkbox, Input, Modal, Spin, Tag, message } from "antd";
+import { Alert, Button, Checkbox, Input, Modal, Tag, message } from "antd";
 import { useEffect, useState } from "react";
 import { fetcherPost } from "../../configs/axios";
-import { createAccountKeys, relockForPassword, replaceRecovery } from "../../crypto/account";
+import { relockForPassword, replaceRecovery } from "../../crypto/account";
 import { fingerprint } from "../../crypto/e2e";
 import { useAuthStore } from "../../store/authStore";
 import { useKeyStore } from "../../store/keyStore";
@@ -80,193 +80,6 @@ export const RecoveryKeyStep = ({
         />
       </label>
     </div>
-  );
-};
-
-type EnableStep = "password" | "choose" | "working" | "recovery" | "saving";
-
-// Switching on end-to-end encryption.
-export const EnableModal = ({
-  open,
-  onClose,
-  zIndex,
-}: {
-  open: boolean;
-  onClose: () => void;
-  /** Above full-screen layers (the end-to-end deadline gate). */
-  zIndex?: number;
-}) => {
-  const { me, setStore } = useAuthStore();
-  const setKeys = useKeyStore((state) => state.setKeys);
-  const [step, setStep] = useState<EnableStep>("password");
-  const [current, setCurrent] = useState("");
-  const [problems, setProblems] = useState<string[]>([]);
-  const [next, setNext] = useState("");
-  const [repeat, setRepeat] = useState("");
-  const [error, setError] = useState("");
-  const [created, setCreated] = useState<Awaited<ReturnType<typeof createAccountKeys>> | null>(null);
-  const [confirmed, setConfirmed] = useState(false);
-
-  useEffect(() => {
-    if (!open) return;
-    setStep("password");
-    setCurrent("");
-    setProblems([]);
-    setNext("");
-    setRepeat("");
-    setError("");
-    setCreated(null);
-    setConfirmed(false);
-  }, [open]);
-
-  const makeKeys = async (masterPassword: string) => {
-    setStep("working");
-    try {
-      setCreated(await createAccountKeys(masterPassword));
-      setStep("recovery");
-    } catch {
-      setError("Could not create your keys in this browser.");
-      setStep("password");
-    }
-  };
-
-  const checkCurrent = async () => {
-    setError("");
-    setStep("working");
-    // Checked with the server first: a wrong password must not get as far as a
-    // recovery key, which would then never work.
-    try {
-      await fetcherPost("/api/auth/e2e/check-password", { password: current });
-    } catch (checkError: any) {
-      setError(checkError?.message || "Your current password isn't right.");
-      setStep("password");
-      return;
-    }
-    const found = await masterPasswordProblems(current);
-    if (found.length) {
-      setProblems(found);
-      setStep("choose");
-      return;
-    }
-    makeKeys(current);
-  };
-
-  const chooseNew = async () => {
-    setError("");
-    if (next !== repeat) {
-      setError("The two passwords don't match.");
-      return;
-    }
-    const found = await masterPasswordProblems(next);
-    if (found.length) {
-      setError(`Your master password needs ${found.join(", and ")}.`);
-      return;
-    }
-    makeKeys(next);
-  };
-
-  const finish = async () => {
-    if (!created) return;
-    setStep("saving");
-    try {
-      await fetcherPost("/api/auth/e2e/enable", { ...created.request, password: current });
-      setKeys(created.unlocked);
-      setStore({ me: { ...me, e2eEnabled: true, e2eSince: new Date().toISOString() } });
-      message.success("End-to-end encryption is on. Your password is now your master password.");
-      onClose();
-    } catch (enableError: any) {
-      // Nothing was saved, so this recovery key will never work: start again with new keys.
-      setError(
-        `${enableError?.message || "Could not turn it on."} Nothing was changed, and the recovery key shown won't work: you'll get a new one.`
-      );
-      setCreated(null);
-      setConfirmed(false);
-      setStep("password");
-    }
-  };
-
-  const footer =
-    step === "password" ? (
-      <Button type="primary" disabled={!current} onClick={checkCurrent}>
-        Continue
-      </Button>
-    ) : step === "choose" ? (
-      <Button type="primary" disabled={!next || !repeat} onClick={chooseNew}>
-        Continue
-      </Button>
-    ) : step === "recovery" || step === "saving" ? (
-      <Button type="primary" disabled={!confirmed} loading={step === "saving"} onClick={finish}>
-        Turn on end-to-end encryption
-      </Button>
-    ) : null;
-
-  return (
-    <Modal
-      open={open}
-      zIndex={zIndex}
-      onCancel={step === "saving" ? undefined : onClose}
-      title="Turn on end-to-end encryption"
-      footer={footer}
-      destroyOnHidden
-      maskClosable={false}
-      width={520}
-    >
-      {step === "password" && (
-        <div className="e2e-step">
-          <p>
-            Your 2keevo password becomes your <strong>master password</strong>: your browser makes
-            your encryption keys from it, and it never leaves this device again.
-          </p>
-          <Alert
-            type="warning"
-            showIcon
-            message="If you forget your master password, only your recovery key can get you back in."
-          />
-          <label className="e2e-field">
-            <span>Your current password</span>
-            <Input.Password
-              autoFocus
-              value={current}
-              autoComplete="current-password"
-              onChange={(event) => setCurrent(event.target.value)}
-              onPressEnter={() => current && checkCurrent()}
-            />
-          </label>
-          {error && <p className="e2e-error">{error}</p>}
-        </div>
-      )}
-      {step === "choose" && (
-        <div className="e2e-step">
-          <Alert
-            type="info"
-            showIcon
-            message="Choose a stronger master password"
-            description={`It will protect your whole vault, so it needs ${problems.join(", and ")}.`}
-          />
-          <label className="e2e-field">
-            <span>New master password</span>
-            <Input.Password autoFocus value={next} autoComplete="new-password" onChange={(event) => setNext(event.target.value)} />
-          </label>
-          <label className="e2e-field">
-            <span>Type it again</span>
-            <Input.Password value={repeat} autoComplete="new-password" onChange={(event) => setRepeat(event.target.value)} />
-          </label>
-          {error && <p className="e2e-error">{error}</p>}
-        </div>
-      )}
-      {step === "working" && (
-        <div className="e2e-working">
-          <Spin />
-          <span>Creating your keys in this browser…</span>
-        </div>
-      )}
-      {(step === "recovery" || step === "saving") && created && (
-        <>
-          <RecoveryKeyStep recoveryKey={created.recoveryKey} email={me?.email || ""} onConfirmed={setConfirmed} />
-          {error && <p className="e2e-error">{error}</p>}
-        </>
-      )}
-    </Modal>
   );
 };
 
@@ -399,7 +212,6 @@ export const MasterPasswordModal = ({
 const EncryptionSection = () => {
   const { me } = useAuthStore();
   const keys = useKeyStore((state) => state.keys);
-  const [enableOpen, setEnableOpen] = useState(false);
   const [mode, setMode] = useState<"password" | "recovery" | null>(null);
   const [print, setPrint] = useState("");
   const publicKey = keys?.publicKey || me?.publicKey;
@@ -421,29 +233,19 @@ const EncryptionSection = () => {
           </span>
           <div className="manage-main">
             <strong>
-              Master password {me?.e2eEnabled ? <Tag color="green">On</Tag> : <Tag>Beta</Tag>}
+              Master password <Tag color="green">On</Tag>
             </strong>
             <span>
-              {me?.e2eEnabled
-                ? `On since ${dayjsExtra(me.e2eSince).format("D MMM YYYY")}. Your password is your master password.`
-                : "Your items get encrypted in your browser. Your password becomes your master password, and you get a recovery key."}
-              {me?.e2eEnabled && " Nobody else can reset it, your company included: your recovery key is the only way back."}
+              {me?.e2eSince ? `On since ${dayjsExtra(me.e2eSince).format("D MMM YYYY")}. ` : ""}
+              Nobody else can reset it, your company included: your recovery key is the only way back.
             </span>
           </div>
           <div className="manage-actions">
-            {me?.e2eEnabled ? (
-              <>
-                <Button onClick={() => setMode("password")}>Change master password</Button>
-                <Button onClick={() => setMode("recovery")}>New recovery key</Button>
-              </>
-            ) : (
-              <Button type="primary" icon={<LockOutlined />} onClick={() => setEnableOpen(true)}>
-                Turn on
-              </Button>
-            )}
+            <Button onClick={() => setMode("password")}>Change master password</Button>
+            <Button onClick={() => setMode("recovery")}>New recovery key</Button>
           </div>
         </div>
-        {me?.e2eEnabled && print && (
+        {print && (
           <div className="manage-row">
             <span className="manage-icon">
               <LockOutlined />
@@ -458,7 +260,6 @@ const EncryptionSection = () => {
           </div>
         )}
       </div>
-      <EnableModal open={enableOpen} onClose={() => setEnableOpen(false)} />
       <MasterPasswordModal mode={mode} onClose={() => setMode(null)} />
     </section>
   );

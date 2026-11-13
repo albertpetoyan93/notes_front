@@ -9,7 +9,8 @@ import { masterKeysFor, openVault } from "../utils/vaultKeys";
 import { createAccountKeys } from "../crypto/account";
 import { useKeyStore } from "../store/keyStore";
 import { masterPasswordProblems } from "../utils/masterPassword";
-import { setNewAccountRecovery } from "../utils/newAccount";
+import { setNewAccountRecovery } from "../utils/newAccount";
+
 import { signupSource } from "../utils/signupSource";
 
 // Between the password step and the 2FA step, the master key waits here (memory only).
@@ -57,7 +58,9 @@ const useAuth = () => {
       // End-to-end accounts: the password never leaves this browser. It becomes
       // a master key (slow on purpose), and only a derived sign-in key is sent.
       const keys = await masterKeysFor(String(newData.email || ""), String(newData.password || ""));
-      const body = keys ? { email: newData.email, authKey: keys.authKey } : newData;
+      // Every account is end-to-end (stage 10.6): the typed password is never sent.
+      if (!keys) throw new Error("Could not sign in. Check your email and try again.");
+      const body = { email: newData.email, authKey: keys.authKey };
       pendingMasterKey = keys?.masterKey || null;
       const data = await fetcherPost(endpoints.login, body);
       if (data?.twoFactorRequired) {
@@ -154,20 +157,6 @@ const useAuth = () => {
     }
   };
 
-  const resetPassword = async (token: string, password: string) => {
-    setStore({ loading: true });
-    try {
-      await fetcherPost("/api/auth/reset-password", { token, password });
-      message.success("Password updated. Sign in with the new password.");
-      navigate("/auth/login");
-    } catch (err: any) {
-      message.error(err.message || "Could not reset the password");
-      throw err;
-    } finally {
-      setStore({ loading: false });
-    }
-  };
-
   const logOut = async () => {
     try {
       await fetcherPost("/api/auth/logout", {});
@@ -186,7 +175,6 @@ const useAuth = () => {
     verifyTwoFactor,
     register,
     requestPasswordReset,
-    resetPassword,
     getMe,
   };
 };

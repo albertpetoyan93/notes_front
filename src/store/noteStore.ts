@@ -12,7 +12,6 @@ import {
   prepareNotes,
   sealCreate,
   sealUpdate,
-  unsealItems,
   withE2E,
 } from "../utils/vaultItems";
 
@@ -45,7 +44,6 @@ export interface Note {
   project?: string;
   tags?: string[];
   isFavorite: boolean;
-  isEncrypted: boolean;
   /** Encrypted in the browser (end-to-end); opened by utils/vaultItems. */
   e2e?: boolean;
   e2eId?: string | null;
@@ -143,7 +141,6 @@ interface NoteStore {
   >;
   toggleFavorite: (id: number) => Promise<void>;
   getNoteStats: () => Promise<any>;
-  getProjects: () => Promise<string[]>;
   shareNote: (
     noteId: number,
     identifier: string | string[],
@@ -246,41 +243,31 @@ const assertNewName = async (name: string, exceptId?: number, companyId?: number
   if (taken) throw new Error(`You already have a collection named "${name.trim()}"`);
 };
 
-const isE2EConflict = (error: any) => error?.code === "e2e_items";
+/** Items are only ever sent sealed (stage 10.6): with the vault locked, nothing is sent. */
+const requireOpenVault = () => {
+  if (!e2eActive()) throw new Error("Unlock your vault and try again.");
+};
 
-/** Create an item: sealed in end-to-end vaults, unless it goes into a shared or company collection. */
+/** Create an item, sealed here. */
 const postNew = async ({ work, ...note }: Partial<Note>) => {
-  if (!e2eActive()) return (await axios.post("/api/notes", note)).data;
+  requireOpenVault();
   // Sealed once: key copies the server asks for are made for this item key.
   const sealed = await sealCreate(note, { work: !!work });
-  try {
-    return (await withE2E((e2eKeys) => axios.post("/api/notes", { ...sealed, e2eKeys }))).data;
-  } catch (error) {
-    // Someone with access to a target collection has no keys: saved readable.
-    if (!isE2EConflict(error)) throw error;
-    return (await axios.post("/api/notes", note)).data;
-  }
+  return (await withE2E((e2eKeys) => axios.post("/api/notes", { ...sealed, e2eKeys }))).data;
 };
 
 /**
  * Save changes to an item. End-to-end items are sealed first; moving one into
  * a shared collection makes it readable, then saves the changes as usual.
  */
-const saveChanges = async (id: number, changes: Partial<Note>, known: Note[]) => {
-  const listed = known.find((note) => note.id === id);
-  if ((listed && !listed.e2e) || !e2eActive()) return (await axios.put(`/api/notes/${id}`, changes)).data;
+const saveChanges = async (id: number, changes: Partial<Note>) => {
+  requireOpenVault();
   // Sealed items are saved whole: start from the server's latest copy, not
   // the list in memory, so a change made elsewhere meanwhile isn't undone.
   const current = await openNote((await axios.get(`/api/notes/${id}`)).data);
-  if (!current.e2e) return (await axios.put(`/api/notes/${id}`, changes)).data;
+  if (!current.e2e) throw new Error("This item isn't end-to-end encrypted, so it can't be changed.");
   const body = await sealUpdate(current, changes);
-  try {
-    return (await withE2E((e2eKeys) => axios.put(`/api/notes/${id}`, { ...body, e2eKeys }), { unseal: false })).data;
-  } catch (error) {
-    if (!isE2EConflict(error)) throw error;
-    await unsealItems([id]);
-    return (await axios.put(`/api/notes/${id}`, changes)).data;
-  }
+  return (await withE2E((e2eKeys) => axios.put(`/api/notes/${id}`, { ...body, e2eKeys }))).data;
 };
 
 /** Import into an end-to-end vault: collections by name, each item sealed here. */
@@ -411,7 +398,7 @@ export const useNoteStore = create<NoteStore>((set, get) => ({
   updateNote: async (id, note) => {
     set({ loading: true, error: null });
     try {
-      const saved = await openNote(await saveChanges(id, note, get().notes));
+      const saved = await openNote(await saveChanges(id, note));
       set((state) => ({
         notes: state.notes.map((n) => (n.id === id ? saved : n)),
         loading: false,
@@ -498,17 +485,6 @@ export const useNoteStore = create<NoteStore>((set, get) => ({
     }
   },
 
-  getProjects: async () => {
-    try {
-      const response = await axios.get("/api/notes/projects");
-      set({ projects: response.data });
-      return response.data;
-    } catch (error: any) {
-      set({ error: error.message });
-      throw error;
-    }
-  },
-
   shareNote: async (noteId, identifier, permission = "view", expiresIn = "never") => {
     const identifiers = Array.isArray(identifier) ? identifier : [identifier];
     const response = await withE2E((e2eKeys) =>
@@ -542,10 +518,9 @@ export const useNoteStore = create<NoteStore>((set, get) => ({
   },
 
   importNotes: async (notes) => {
-    // End-to-end vaults encrypt each item here: a readable copy never reaches the server.
-    if (e2eActive()) return importSealed(notes);
-    const response = await axios.post("/api/notes/import", { notes });
-    return response.data;
+    // Each item is encrypted here: a readable copy never reaches the server.
+    requireOpenVault();
+    return importSealed(notes);
   },
 
   fetchCollections: async () => {
@@ -555,7 +530,7 @@ export const useNoteStore = create<NoteStore>((set, get) => ({
 
   // End-to-end accounts: the name is encrypted here, so the duplicate check is too.
   createCollection: async (name: string) => {
-    if (!e2eActive()) return (await axios.post("/api/collections", { name })).data;
+    requireOpenVault();
     await assertNewName(name);
     const response = await axios.post("/api/collections", await sealNewCollectionName(name.trim()));
     return (await openCollectionNames([response.data]))[0];

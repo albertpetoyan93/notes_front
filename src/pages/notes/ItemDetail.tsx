@@ -664,7 +664,6 @@ const ItemDetail = ({
         </Tooltip>
         {" · "}
         <time dateTime={created.toISOString()}>Created {created.format("D MMM YYYY")}</time>
-        {note.isEncrypted && " · Encrypted"}
       </p>
 
       <Drawer

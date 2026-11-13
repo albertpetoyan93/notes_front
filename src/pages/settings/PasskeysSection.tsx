@@ -63,7 +63,7 @@ const AddPasskeyModal = ({
           in to 2keevo without your password.
         </p>
         <label htmlFor="passkey-password">
-          {useAuthStore.getState().me?.e2eEnabled ? "Your master password" : "Your 2keevo password"}
+          Your master password
         </label>
         <Input.Password
           id="passkey-password"

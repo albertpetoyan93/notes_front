@@ -27,7 +27,6 @@ export const masterKeysFor = async (email: string, password: string) => {
  */
 export const passwordProof = async (password: string) => {
   const me = useAuthStore.getState().me;
-  if (!me?.e2eEnabled) return password;
   const keys = await masterKeysFor(String(me.email || ""), password);
   return keys ? keys.authKey : password;
 };

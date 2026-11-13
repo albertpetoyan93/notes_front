@@ -239,6 +239,10 @@ export interface OpenedVersion extends Partial<VersionPayload> {
   encData?: string;
 }
 
+/** A version that opened here: only those are shown in full or restored (stage 10.6). */
+export const canOpenVersion = (version: { e2e?: boolean; content?: unknown; title?: string }) =>
+  !!version.e2e && version.content !== undefined;
+
 /** A version list or a single version, opened if sealed. */
 export const openVersions = async <T extends OpenedVersion>(note: Partial<RawNote>, versions: T[]): Promise<T[]> => {
   if (!note.e2e) return versions;
@@ -425,40 +429,6 @@ export const prepareNotes = async (notes: RawNote[], filters?: ClientFilters): P
   return applyClientFilters(await withHealth(opened), filters);
 };
 
-// ---------------------------------------------------------------- unsealing to share
-
-/**
- * Make end-to-end items readable again, so they can be shared (until stage
- * 10.4 brings shared keys). Versions come along, opened.
- */
-export const unsealItems = async (noteIds: number[]) => {
-  const items = [];
-  for (const id of noteIds) {
-    const note: RawNote = await fetcherGet(`/api/notes/${id}`);
-    if (!note?.e2e) continue;
-    const opened = await openNote(note);
-    if ((opened.content as { decryptionFailed?: boolean })?.decryptionFailed) {
-      throw new Error(`"${note.title || "An item"}" can't be opened, so it can't be shared.`);
-    }
-    const versions = await openVersions(note, (await fetcherGet(`/api/notes/${id}/versions`)) as OpenedVersion[]);
-    items.push({
-      id,
-      ...payloadOf(opened),
-      versions: versions
-        .filter((version) => version.content !== undefined)
-        .map(({ id: versionId, title, content, tags, category, changes }) => ({
-          id: versionId,
-          title,
-          content,
-          tags,
-          category,
-          changes,
-        })),
-    });
-  }
-  if (items.length) await fetcherPost("/api/notes/e2e/unseal", { items });
-};
-
 // ---------------------------------------------------------------- key copies the server asks for
 
 export interface KeyNeeds {
@@ -524,13 +494,10 @@ export const fulfillNeeds = async (needs: KeyNeeds) => {
 
 /**
  * Runs an action that may need end-to-end keys. If the server asks for key
- * copies, they're made here and the action is sent again with them; if
- * someone involved has no keys, those items are made readable first.
+ * copies, they're made here and the action is sent again with them. Items are
+ * never made readable (stage 10.6).
  */
-export const withE2E = async <T>(
-  action: (e2eKeys?: unknown) => Promise<T>,
-  { unseal = true }: { unseal?: boolean } = {}
-): Promise<T> => {
+export const withE2E = async <T>(action: (e2eKeys?: unknown) => Promise<T>): Promise<T> => {
   let e2eKeys: unknown;
   for (let attempt = 0; ; attempt += 1) {
     try {
@@ -541,10 +508,7 @@ export const withE2E = async <T>(
         e2eKeys = await fulfillNeeds(error.needs);
         continue;
       }
-      const ids: number[] = error?.code === "e2e_items" ? error.noteIds || [] : [];
-      if (!ids.length || !unseal) throw error;
-      await unsealItems(ids);
-      e2eKeys = undefined;
+      throw error;
     }
   }
 };
@@ -644,70 +608,4 @@ export const runKeyTasks = () => {
   return tasksRunning;
 };
 
-// ---------------------------------------------------------------- moving existing items
 
-let migrating: Promise<number> | null = null;
-
-/**
- * Encrypt the account's existing items here, then delete the server's
- * readable copies (with their history). Shared items get key copies for the
- * people and collections that reach them. Runs after the vault opens; an item
- * that can't move yet stays as it was and is tried again next time.
- */
-export const migrateItems = () => {
-  if (!migrating) {
-    migrating = (async () => {
-      let moved = 0;
-      for (let round = 0; round < 100 && e2eActive(); round += 1) {
-        const { items, remaining } = await fetcherGet("/api/notes/e2e/pending");
-        if (!items?.length) break;
-        const sealed = [];
-        for (const item of items) {
-          const payload = payloadOf(item);
-          const { sealed: parts, key } = await sealNewItem(userKey(), payload);
-          const versions = await Promise.all(
-            (item.versions || []).map(async (version: VersionPayload & { id: number }) => ({
-              id: version.id,
-              encData: await sealVersion(key, parts.e2eId, {
-                title: String(version.title ?? ""),
-                content: version.content,
-                tags: Array.isArray(version.tags) ? version.tags : [],
-                category: String(version.category || payload.category),
-                changes: Array.isArray(version.changes) ? version.changes : [],
-              }),
-            }))
-          );
-          const needs = item.needs || { shares: [], collections: [] };
-          const shares = await Promise.all(
-            (needs.shares || []).map(async (share: { userId: number; publicKey: string }) => ({
-              userId: share.userId,
-              wrappedKey: await shareItemKey(share.publicKey, parts.e2eId, key),
-            }))
-          );
-          const collections = await Promise.all(
-            (needs.collections || []).map(async (entry: { collectionId: number; keyVersion: number; myKey?: string }) => ({
-              collectionId: entry.collectionId,
-              keyVersion: entry.keyVersion,
-              wrappedKey: await wrapForCollection(
-                await collectionKeyFor(entry.collectionId, entry.keyVersion, entry.myKey),
-                entry.collectionId,
-                parts.e2eId,
-                key
-              ),
-            }))
-          );
-          // updatedAt: the server skips the item if it changed since (tried again next time).
-          sealed.push({ id: item.id, updatedAt: item.updatedAt, ...parts, versions, shares, collections });
-        }
-        const result = await fetcherPost("/api/notes/e2e/migrate", { items: sealed });
-        moved += result?.moved || 0;
-        // Nothing moved this round: stop rather than loop on the same items.
-        if (!result?.moved || !remaining) break;
-      }
-      return moved;
-    })().finally(() => {
-      migrating = null;
-    });
-  }
-  return migrating;
-};

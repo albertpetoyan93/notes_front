@@ -1,9 +1,8 @@
-import { Outlet } from "react-router-dom";
+import { Navigate, Outlet } from "react-router-dom";
 import ForgotPasswordPage from "../pages/auth/ForgotPasswordPage";
 import RecoverPage from "../pages/auth/RecoverPage";
 import RecoveryKeyPage from "../pages/auth/RecoveryKeyPage";
 import ResetAccountPage from "../pages/auth/ResetAccountPage";
-import ResetPasswordPage from "../pages/auth/ResetPasswordPage";
 import LoginPage from "../pages/login/LoginPage";
 import RegisterPage from "../pages/register/RegisterPage";
 
@@ -27,8 +26,9 @@ const PublicRoutes = [
         element: <ForgotPasswordPage />,
       },
       {
+        // Old password-reset links (before every account was end-to-end): ask for a new one.
         path: "reset",
-        element: <ResetPasswordPage />,
+        element: <Navigate to="/auth/forgot" replace />,
       },
       {
         path: "recover",
