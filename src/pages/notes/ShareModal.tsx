@@ -197,7 +197,7 @@ const ShareModal = ({ visible, note, onClose }: ShareModalProps) => {
           extra={
             note?.collection?.companyId
               ? "Only people in this company. Type at least 2 characters, then pick a user."
-              : "Type at least 2 characters, then pick a user"
+              : "Type their full email or username, then pick them"
           }
         >
           <Select

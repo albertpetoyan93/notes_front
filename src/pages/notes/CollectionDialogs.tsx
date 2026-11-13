@@ -303,7 +303,7 @@ const CollectionDialogs = ({
                   <span style={{ fontSize: 12, opacity: 0.7 }}>{option.data.email}</span>
                 </div>
               )}
-              placeholder="Search by email or username"
+              placeholder="Their full email or username"
               suffixIcon={<UserAddOutlined />}
               popupMatchSelectWidth={false}
               dropdownStyle={{ minWidth: 320 }}
