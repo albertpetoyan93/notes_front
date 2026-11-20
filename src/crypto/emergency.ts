@@ -70,3 +70,21 @@ export const openNameFromEmergency = async (emergencyKey: Uint8Array, collection
   const { name } = await decryptJson<{ name: string }>(emergencyKey, token, nameContext(collectionId, version));
   return String(name || "");
 };
+
+// ------------------------------------------------ the contact's key, as the owner checked it
+
+const pinContext = (ownerId: number, contactRowId: number) => `emergency-contact-key:${ownerId}:${contactRowId}`;
+
+/**
+ * The contact's public key as the owner checked it (fingerprint, at confirm) or first
+ * saw it (contacts confirmed before the emergency key), kept under the owner's user key.
+ * A new emergency key is sealed only to this key, so a changed key on the server
+ * can't redirect it.
+ */
+export const pinContactKey = (userKey: Uint8Array, ownerId: number, contactRowId: number, publicKey: string) =>
+  encryptJson(userKey, { publicKey }, pinContext(ownerId, contactRowId));
+
+export const openPinnedContactKey = async (userKey: Uint8Array, ownerId: number, contactRowId: number, token: string) => {
+  const { publicKey } = await decryptJson<{ publicKey: string }>(userKey, token, pinContext(ownerId, contactRowId));
+  return String(publicKey || "");
+};

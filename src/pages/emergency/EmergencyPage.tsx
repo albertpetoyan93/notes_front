@@ -4,7 +4,8 @@ import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { fetcherDelete, fetcherGet, fetcherPost, fetcherPut } from "../../configs/axios";
 import { fingerprint } from "../../crypto/e2e";
-import { sealEmergencyKeyFor } from "../../crypto/emergency";
+import { pinContactKey, sealEmergencyKeyFor } from "../../crypto/emergency";
+import { useAuthStore } from "../../store/authStore";
 import { useBillingStore } from "../../store/billingStore";
 import { useKeyStore } from "../../store/keyStore";
 import dayjsExtra from "../../utils/dayjs";
@@ -89,8 +90,12 @@ const ConfirmModal = ({ contact, onClose, onDone }: { contact: Contact | null; o
       await runEmergencyTasks();
       const current = await currentEmergencyKey();
       if (!current) throw new Error("Could not prepare emergency access. Try again in a moment.");
+      const me = useAuthStore.getState().me;
+      if (!me?.id) throw new Error("Sign in again and try again.");
       const sealedEmergencyKey = await sealEmergencyKeyFor(contact.publicKey, contact.id, current.version, current.key);
-      await fetcherPost(`/api/emergency/${contact.id}/confirm`, { sealedEmergencyKey, keyVersion: current.version });
+      // The key just checked by fingerprint: new emergency keys are only ever sealed to it.
+      const pinnedKey = await pinContactKey(keys.userKey, me.id, contact.id, contact.publicKey);
+      await fetcherPost(`/api/emergency/${contact.id}/confirm`, { sealedEmergencyKey, keyVersion: current.version, pinnedKey });
       message.success(`${contact.name || contact.email} is now your emergency contact.`);
       onDone();
     } catch (error: any) {
