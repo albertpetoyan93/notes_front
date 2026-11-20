@@ -67,7 +67,7 @@ describe("F18: being signed out after 12 hours away", () => {
 describe("F18 review fixes", () => {
   it("only a refused refresh signs out; offline or a server error doesn't", () => {
     expect(endsSignIn({ response: { status: 401 } })).toBe(true);
-    expect(endsSignIn({ message: "Network Error" })).toBe(false);
+    expect(endsSignIn({ message: "Network Error" } as never)).toBe(false);
     expect(endsSignIn({ response: { status: 502 } })).toBe(false);
   });
 

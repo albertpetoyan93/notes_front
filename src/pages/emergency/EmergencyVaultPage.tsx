@@ -8,7 +8,7 @@ import { useKeyStore } from "../../store/keyStore";
 import dayjsExtra from "../../utils/dayjs";
 import { categoryLabel } from "../../utils/noteCategory";
 import { openEmergencyVault, waitingNotice, type Item, type VaultResponse } from "../../utils/emergencyVault";
-import { displayValue, maskValue, noteBody, noteFields, type NoteField } from "../../utils/noteFields";
+import { displayValue, maskValue, noteBody, noteFields } from "../../utils/noteFields";
 import { isSecretField } from "../../utils/secretField";
 import "../company/CompanyPage.scss";
 import "../settings/SecurityPage.scss";
