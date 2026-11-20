@@ -1059,11 +1059,14 @@ const CompanyPage = () => {
       {company.blocked === "2fa" && !panel && (
         <div className="company-blocked" role="alert">
           <div className="company-blocked-text">
-            <strong>{company.name} requires two-factor authentication</strong>
-            <span>Turn it on for your account to see the company's items.</span>
+            <strong>{company.name} requires two-factor sign-in</strong>
+            <span>
+              Set up an authenticator app or a passkey in Security settings. Then the company's items
+              open for you, once a vault manager's 2keevo hands you the keys.
+            </span>
           </div>
           <Button type="primary" onClick={() => navigate("/settings/security")}>
-            Set up two-factor authentication
+            Set up two-factor sign-in
           </Button>
         </div>
       )}

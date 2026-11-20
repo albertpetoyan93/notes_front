@@ -7,6 +7,7 @@ import { forgetVaultKeys } from "../store/keyStore";
 import { useLockStore } from "../store/lockStore";
 import { useNoteStore } from "../store/noteStore";
 import { useVaultStore } from "../store/vaultStore";
+import { LOCK_EVENT_KEY, SIGNED_OUT_PREFIX } from "./signOut";
 
 export const AUTO_LOCK_CHOICES = [5, 15, 30, 60, 0] as const;
 /** The browser extension may also stay open for 3 or 6 hours. */
@@ -14,7 +15,6 @@ export const EXTENSION_AUTO_LOCK_CHOICES = [5, 15, 30, 60, 180, 360, 0] as const
 export const DEFAULT_AUTO_LOCK_MINUTES = 15;
 
 const ACTIVITY_KEY = "keevo.lastActivity";
-const LOCK_EVENT_KEY = "keevo.lockEvent";
 
 export const autoLockLabel = (minutes: number) => {
   if (minutes === 0) return "Never";
@@ -87,10 +87,18 @@ export const afterUnlock = () => {
   announce("unlocked");
 };
 
-/** Another tab locked or unlocked. */
-export const onLockEvent = (value: string | null) => {
+const goToSignIn = () => {
+  window.location.href = "/auth/login";
+};
+
+/** Another tab locked, unlocked or signed out. */
+export const onLockEvent = (value: string | null, leave: () => void = goToSignIn) => {
   if (!value) return;
-  if (value.startsWith("locked:")) showLocked();
+  if (value.startsWith(SIGNED_OUT_PREFIX)) {
+    // Signed out elsewhere: nothing readable may stay in this tab.
+    forgetVaultData();
+    leave();
+  } else if (value.startsWith("locked:")) showLocked();
   else if (value.startsWith("unlocked:")) {
     lastLocalActivity = Date.now();
     useLockStore.getState().setLocked(false);

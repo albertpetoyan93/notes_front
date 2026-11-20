@@ -4,10 +4,11 @@ import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { fetcherDelete, fetcherGet, fetcherPost, fetcherPut } from "../../configs/axios";
 import { fingerprint } from "../../crypto/e2e";
-import { sealUserKeyForContact } from "../../crypto/emergency";
+import { sealEmergencyKeyFor } from "../../crypto/emergency";
 import { useBillingStore } from "../../store/billingStore";
 import { useKeyStore } from "../../store/keyStore";
 import dayjsExtra from "../../utils/dayjs";
+import { currentEmergencyKey, runEmergencyTasks } from "../../utils/emergencyKey";
 import "../company/CompanyPage.scss";
 import "../settings/SecurityPage.scss";
 import "./EmergencyPage.scss";
@@ -65,7 +66,7 @@ const TRUST_STATUS: Record<Status, { text: string; color?: string }> = {
   granted: { text: "Access", color: "green" },
 };
 
-/** The owner checks the contact's key fingerprint, then their browser seals the user key to it. */
+/** The owner checks the contact's key fingerprint, then their browser seals the emergency key to it. */
 const ConfirmModal = ({ contact, onClose, onDone }: { contact: Contact | null; onClose: () => void; onDone: () => void }) => {
   const keys = useKeyStore((state) => state.keys);
   const [print, setPrint] = useState("");
@@ -84,8 +85,12 @@ const ConfirmModal = ({ contact, onClose, onDone }: { contact: Contact | null; o
     }
     setBusy(true);
     try {
-      const sealedUserKey = await sealUserKeyForContact(contact.publicKey, contact.id, keys.userKey);
-      await fetcherPost(`/api/emergency/${contact.id}/confirm`, { sealedUserKey });
+      // The emergency key opens only personal items: made (or brought up to date) first.
+      await runEmergencyTasks();
+      const current = await currentEmergencyKey();
+      if (!current) throw new Error("Could not prepare emergency access. Try again in a moment.");
+      const sealedEmergencyKey = await sealEmergencyKeyFor(contact.publicKey, contact.id, current.version, current.key);
+      await fetcherPost(`/api/emergency/${contact.id}/confirm`, { sealedEmergencyKey, keyVersion: current.version });
       message.success(`${contact.name || contact.email} is now your emergency contact.`);
       onDone();
     } catch (error: any) {
@@ -108,7 +113,8 @@ const ConfirmModal = ({ contact, onClose, onDone }: { contact: Contact | null; o
       {contact && (
         <div className="emergency-confirm">
           <p>
-            {contact.name || contact.email} accepted. Before giving them a key to your vault, check it's really
+            {contact.name || contact.email} accepted. They'll get a key that opens only your personal items, never
+            company vaults or items others shared with you. Before giving it to them, check it's really
             their key: ask them to read the fingerprint in their <strong>Security</strong> settings (End-to-end
             encryption), by phone or in person.
           </p>

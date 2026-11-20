@@ -1,6 +1,7 @@
 import axios from "axios";
 import { useBillingStore } from "../store/billingStore";
 import { useLockStore } from "../store/lockStore";
+import { afterRefusedRefresh, endsSignIn } from "../utils/signOut";
 
 const axiosServices = axios.create({
   baseURL: import.meta.env.VITE_APP_API_URL || "http://localhost:9000/",
@@ -20,14 +21,11 @@ localStorage.removeItem("refresh_token");
 
 let refreshPromise: Promise<void> | null = null;
 
-function redirectToLogin() {
-  if (window.location.pathname.startsWith("/keevo")) {
-    const next = window.location.pathname + window.location.search;
-    window.location.href = `/auth/login?next=${encodeURIComponent(next)}`;
-    return;
-  }
-  if (window.location.pathname.startsWith("/auth/")) return;
-  window.location.href = "/auth/login";
+/** The sign-in ended (refresh refused): forget this tab's keys, tell the other tabs, go to sign-in. */
+function redirectToLogin(reason?: string) {
+  afterRefusedRefresh(window.location.pathname, window.location.search, reason, (target) => {
+    window.location.href = target;
+  });
 }
 
 axiosServices.interceptors.response.use(
@@ -77,7 +75,8 @@ axiosServices.interceptors.response.use(
         console.warn(
           `Session refresh refused (${refreshError?.response?.data?.reason || refreshError?.message || "unknown"}) while calling ${url}`
         );
-        redirectToLogin();
+        // Offline (a laptop waking up) or a server error: still signed in, just fail this request.
+        if (endsSignIn(refreshError)) redirectToLogin(refreshError?.response?.data?.reason);
       }
     }
 

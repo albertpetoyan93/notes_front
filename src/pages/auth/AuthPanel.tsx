@@ -1,5 +1,5 @@
 import { KeyOutlined, MoonOutlined, SunOutlined } from "@ant-design/icons";
-import { Button, Form, Input } from "antd";
+import { Alert, Button, Form, Input } from "antd";
 import { useEffect, useState, type ReactNode } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 import { BrandLockup } from "../../components/header/LeftHeader";
@@ -11,6 +11,7 @@ import {
   passkeyAutofillSupported,
   passkeysSupported,
 } from "../../utils/passkeys";
+import { loginNotice } from "../../utils/signOut";
 import TwoFactorStep from "./TwoFactorStep";
 import "./AuthPanel.scss";
 
@@ -46,6 +47,8 @@ const AuthPanel = ({ mode }: { mode: AuthMode }) => {
   const [challengeToken, setChallengeToken] = useState<string | null>(null);
   const [passkeyBusy, setPasskeyBusy] = useState(false);
   const passkeyLogin = mode === "login" && !challengeToken;
+  // Why the sign-in page is showing (signed out after 12 hours away, F18).
+  const notice = mode === "login" ? loginNotice(new URLSearchParams(location.search).get("ended")) : null;
 
   // Offer saved passkeys in the email field's suggestions, where the browser can.
   const listenForAutofill = () =>
@@ -116,6 +119,8 @@ const AuthPanel = ({ mode }: { mode: AuthMode }) => {
             Create Account
           </NavLink>
         </div>
+
+        {notice && <Alert className="auth-notice" type="info" showIcon message={notice} />}
 
         {mode === "login" ? (
           <Form

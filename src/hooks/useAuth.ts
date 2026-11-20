@@ -12,6 +12,7 @@ import { masterPasswordProblems } from "../utils/masterPassword";
 import { setNewAccountRecovery } from "../utils/newAccount";
 
 import { signupSource } from "../utils/signupSource";
+import { announceSignedOut } from "../utils/signOut";
 
 // Between the password step and the 2FA step, the master key waits here (memory only).
 let pendingMasterKey: Uint8Array | null = null;
@@ -163,6 +164,8 @@ const useAuth = () => {
     } catch {
       // The cookies are cleared when the server can; still leave the app.
     }
+    // The other open tabs sign out too (F18).
+    announceSignedOut();
     forgetLocalSession();
     navigate("/auth/login");
     window.location.reload();

@@ -1,5 +1,6 @@
 import { BankOutlined, PlusOutlined, SwapOutlined, UserOutlined } from "@ant-design/icons";
 import { Dropdown, Input, Modal, message } from "antd";
+import { TWO_FACTOR_WAYS, newCompanyNotice } from "../../utils/companyTwoFactor";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "../../configs/axios";
@@ -47,6 +48,8 @@ const VaultSwitcher = ({ companyId }: { companyId: number | null }) => {
       setName("");
       setCreateOpen(false);
       message.success("Company created");
+      const notice = newCompanyNotice(response.data?.policies);
+      if (notice) message.info({ content: notice, duration: 10 });
       navigate(`/company/${response.data.id}`);
     } catch (error: any) {
       message.error(error?.message || "Could not create the company");
@@ -133,6 +136,10 @@ const VaultSwitcher = ({ companyId }: { companyId: number | null }) => {
           onChange={(event) => setName(event.target.value)}
           onPressEnter={create}
         />
+        <p className="vault-create-note">
+          Members will need {TWO_FACTOR_WAYS} to open company vaults. You can change this in the
+          company's Policies.
+        </p>
       </Modal>
     </>
   );

@@ -1,5 +1,6 @@
 import { ClockCircleOutlined, KeyOutlined, LockOutlined, SafetyOutlined } from "@ant-design/icons";
-import { Modal, Select, Spin, Switch, message } from "antd";
+import { Alert, Modal, Select, Spin, Switch, message } from "antd";
+import { TWO_FACTOR_WAYS } from "../../utils/companyTwoFactor";
 import { useCallback, useEffect, useState } from "react";
 import { fetcherGet, fetcherPut } from "../../configs/axios";
 import { useCompanyStore, type CompanyPolicies } from "../../store/companyStore";
@@ -57,13 +58,13 @@ const CompanyPoliciesSection = ({ companyId }: { companyId: number }) => {
       return;
     }
     Modal.confirm({
-      title: "Require two-factor authentication?",
+      title: "Require two-factor sign-in?",
       content: (
         <>
           <p>
-            {data.without2fa.length === 1 ? "This member doesn't" : "These members don't"} use
-            two-factor authentication yet. They lose access to the company's items until they turn
-            it on in their Security settings:
+            {data.without2fa.length === 1 ? "This member doesn't" : "These members don't"} use{" "}
+            {TWO_FACTOR_WAYS} yet. They lose access to the company's items, and get no vault keys,
+            until they set it up in their Security settings:
           </p>
           <ul className="policy-people">
             {data.without2fa.map((person) => (
@@ -92,15 +93,26 @@ const CompanyPoliciesSection = ({ companyId }: { companyId: number }) => {
     <section className="manage-card policy-card">
       <h2>Security policies</h2>
       <p className="policy-intro">Rules for everyone in the company, including owners and admins.</p>
+      {!policies.require2fa && (
+        <Alert
+          className="policy-recommend"
+          type="info"
+          showIcon
+          closable
+          message="Recommended: require two-factor sign-in"
+          description="Members without it can't receive company vault keys, so a stolen password alone can't open your company's items."
+        />
+      )}
 
       <div className="policy-row">
         <span className="policy-icon">
           <SafetyOutlined />
         </span>
         <div className="policy-main">
-          <strong>Require two-factor authentication</strong>
+          <strong>Require two-factor sign-in</strong>
           <span>
-            Members without it can't open company items until they turn it on.
+            An authenticator app or a passkey. Members without it can't open company items, or receive
+            vault keys, until they set it up.
             {!policies.require2fa && data.without2fa.length > 0
               ? ` ${data.without2fa.length} ${data.without2fa.length === 1 ? "member doesn't" : "members don't"} use it yet.`
               : ""}
@@ -110,7 +122,7 @@ const CompanyPoliciesSection = ({ companyId }: { companyId: number }) => {
           checked={!!policies.require2fa}
           loading={saving}
           onChange={toggle2fa}
-          aria-label="Require two-factor authentication"
+          aria-label="Require two-factor sign-in"
         />
       </div>
 

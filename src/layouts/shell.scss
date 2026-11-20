@@ -1294,3 +1294,10 @@ kbd {
   line-height: 18px;
   text-transform: uppercase;
 }
+
+// "Create company": what the 2FA rule means for members (F15).
+.vault-create-note {
+  margin: 10px 0 0;
+  font-size: 13px;
+  color: var(--textMuted);
+}

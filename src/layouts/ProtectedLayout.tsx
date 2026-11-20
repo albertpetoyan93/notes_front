@@ -21,6 +21,7 @@ import { useVaultStore } from "../store/vaultStore";
 import { forgetVaultData } from "../utils/autoLock";
 import { runKeyTasks } from "../utils/vaultItems";
 import { runRecoveryTasks } from "../utils/companyRecovery";
+import { runEmergencyTasks } from "../utils/emergencyKey";
 import { MasterPasswordModal } from "../pages/settings/EncryptionSection";
 
 // How often an open vault checks for key work (grant, replace) in the background.
@@ -127,6 +128,8 @@ const ProtectedLayout: React.FC = () => {
       if (granted) message.success(granted === 1 ? "1 person can now open shared items" : `${granted} people can now open shared items`);
       // Vault recovery: custodians' key work, and recovery copies of the vault keys this person holds.
       await runRecoveryTasks().catch((error) => console.error("Could not finish recovery work:", error?.message || error));
+      // Emergency access: copies of new personal items for trusted contacts.
+      await runEmergencyTasks().catch((error) => console.error("Could not finish emergency access work:", error?.message || error));
       if (!granted) return;
       refreshVault();
       useVaultStore.getState().bumpList();
@@ -159,6 +162,8 @@ const ProtectedLayout: React.FC = () => {
         .catch(() => undefined)
         // Vault recovery copies follow vault keys that were just made or replaced.
         .then(() => runRecoveryTasks())
+        .catch(() => undefined)
+        .then(() => runEmergencyTasks())
         .catch(() => undefined);
     };
     const timer = window.setInterval(run, managesCompany ? KEY_TASKS_MANAGER_EVERY_MS : KEY_TASKS_EVERY_MS);

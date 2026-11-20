@@ -74,6 +74,13 @@ export const describeActivity = (event: ActivityEvent, withTitle = true) => {
       return "signed out a device";
     case "other_sessions_revoked":
       return "signed out all other devices";
+    case "session_token_reused":
+      // Not something the person did: someone may have copied a sign-in (F18).
+      if (d.likelyLostAnswer) {
+        const which = d.kind === "extension" ? "the browser extension's" : "a";
+        return `— ${which} sign-in ended: an old sign-in was used again from the same device (probably a lost connection)`;
+      }
+      return `— an old sign-in${d.kind === "extension" ? " to the browser extension" : ""} was used again, so it was signed out`;
     case "password_reset":
       return "reset the password";
     case "secret_link_created":
@@ -225,6 +232,7 @@ export const describeActivity = (event: ActivityEvent, withTitle = true) => {
 export const isNotableActivity = (action: string) =>
   [
     "login_failed",
+    "session_token_reused",
     "two_factor_failed",
     "two_factor_disabled",
     "unlock_failed",

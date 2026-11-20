@@ -537,7 +537,9 @@ export const useNoteStore = create<NoteStore>((set, get) => ({
   },
 
   renameCollection: async (id: number, name: string, companyId?: number | null) => {
-    const current = e2eActive() ? (await myCollections(companyId)).find((item) => item.id === id) : undefined;
+    // Locked: nothing is sent, so a sealed collection's new name can't leave this browser readable.
+    requireOpenVault();
+    const current = (await myCollections(companyId)).find((item) => item.id === id);
     if (!current?.encName) return (await axios.put(`/api/collections/${id}`, { name })).data;
     await assertNewName(name, id, companyId);
     const response = await axios.put(`/api/collections/${id}`, await sealRenamedCollection(current, name.trim()));

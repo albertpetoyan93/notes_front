@@ -37,3 +37,10 @@ describe("stage 10.6: a locked vault never sends a readable item", () => {
     expect(http.post).not.toHaveBeenCalled();
   });
 });
+
+describe("stage 10.6 follow-up", () => {
+  it("renaming a collection asks to unlock and sends nothing", async () => {
+    await expect(useNoteStore.getState().renameCollection(3, "Work 2")).rejects.toThrow(UNLOCK);
+    expect(http.put).not.toHaveBeenCalled();
+  });
+});

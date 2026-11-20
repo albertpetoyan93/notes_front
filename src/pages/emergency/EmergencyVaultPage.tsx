@@ -3,118 +3,16 @@ import { Alert, Button, Empty, Input, Select, Spin, Tag, Tooltip } from "antd";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { fetcherGet } from "../../configs/axios";
-import { openBundleWithUserKey, type KeyBundle } from "../../crypto/account";
-import { openOwnerUserKey } from "../../crypto/emergency";
-import { openCollectionKey, openCollectionName, openItemData, openItemKey } from "../../crypto/items";
 import useFieldClipboard from "../../hooks/useFieldClipboard";
 import { useKeyStore } from "../../store/keyStore";
 import dayjsExtra from "../../utils/dayjs";
 import { categoryLabel } from "../../utils/noteCategory";
+import { openEmergencyVault, waitingNotice, type Item, type VaultResponse } from "../../utils/emergencyVault";
 import { displayValue, maskValue, noteBody, noteFields, type NoteField } from "../../utils/noteFields";
 import { isSecretField } from "../../utils/secretField";
 import "../company/CompanyPage.scss";
 import "../settings/SecurityPage.scss";
 import "./EmergencyPage.scss";
-
-interface RawItem {
-  e2e?: boolean;
-  e2eId?: string;
-  itemKey?: string;
-  encData?: string;
-  title?: string;
-  content?: unknown;
-  category: string;
-  tags?: string[];
-  collectionIds?: number[];
-}
-
-interface RawCollection {
-  id: number;
-  name: string | null;
-  encName: string | null;
-  nameKey: string | null;
-  keyVersion: number | null;
-  collectionKey: string | null;
-}
-
-interface VaultResponse {
-  owner: { id: number; name: string; email: string };
-  grantedAt: string | null;
-  sealedUserKey: string;
-  publicKey: string | null;
-  protectedPrivateKey: string | null;
-  collections: RawCollection[];
-  items: RawItem[];
-}
-
-interface Item {
-  key: string;
-  title: string;
-  category: string;
-  content: { mainContent?: string; customFields?: NoteField[] } | string;
-  tags: string[];
-  collectionIds: number[];
-  failed: boolean;
-}
-
-/** Opens the owner's vault in this browser with the key they sealed to this contact. */
-const openVault = async (id: number, data: VaultResponse, mine: { privateKey: Uint8Array; publicKey: string }) => {
-  const userKey = await openOwnerUserKey(mine.privateKey, mine.publicKey, id, data.sealedUserKey);
-
-  // The owner's private key opens collection keys, for names sealed with one.
-  let ownerKeys: { privateKey: Uint8Array; publicKey: string } | null = null;
-  if (data.protectedPrivateKey && data.publicKey) {
-    ownerKeys = await openBundleWithUserKey(userKey, {
-      protectedPrivateKey: data.protectedPrivateKey,
-      publicKey: data.publicKey,
-    } as KeyBundle).catch(() => null);
-  }
-
-  const names = new Map<number, string>();
-  for (const collection of data.collections) {
-    try {
-      if (!collection.encName) {
-        names.set(collection.id, collection.name || "Collection");
-      } else if (collection.nameKey === "user") {
-        names.set(collection.id, await openCollectionName(userKey, collection.id, "user", collection.encName));
-      } else if (ownerKeys && collection.collectionKey && collection.keyVersion && collection.nameKey) {
-        const key = await openCollectionKey(
-          ownerKeys.privateKey,
-          ownerKeys.publicKey,
-          collection.id,
-          collection.keyVersion,
-          collection.collectionKey
-        );
-        names.set(collection.id, await openCollectionName(key, collection.id, collection.nameKey, collection.encName));
-      } else {
-        names.set(collection.id, "A collection");
-      }
-    } catch {
-      names.set(collection.id, "A collection");
-    }
-  }
-
-  const items: Item[] = await Promise.all(
-    data.items.map(async (raw, index) => {
-      const base = { key: String(index), category: raw.category, collectionIds: raw.collectionIds || [] };
-      try {
-        const key = await openItemKey(userKey, String(raw.e2eId), String(raw.itemKey));
-        const payload = await openItemData(key, String(raw.e2eId), String(raw.encData));
-        return {
-          ...base,
-          title: payload.title || "Untitled",
-          content: payload.content as Item["content"],
-          tags: payload.tags || [],
-          failed: false,
-        };
-      } catch {
-        return { ...base, title: "Item can't be opened", content: "", tags: [], failed: true };
-      }
-    })
-  );
-  items.sort((a, b) => a.title.localeCompare(b.title));
-  return { names, items };
-};
 
 const ItemView = ({ item }: { item: Item }) => {
   const clipboard = useFieldClipboard();
@@ -185,6 +83,7 @@ const EmergencyVaultPage = () => {
   const keys = useKeyStore((state) => state.keys);
   const [owner, setOwner] = useState<VaultResponse["owner"] | null>(null);
   const [grantedAt, setGrantedAt] = useState<string | null>(null);
+  const [waiting, setWaiting] = useState(0);
   const [vault, setVault] = useState<{ names: Map<number, string>; items: Item[] } | null>(null);
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
@@ -202,10 +101,11 @@ const EmergencyVaultPage = () => {
     (async () => {
       try {
         const data: VaultResponse = await fetcherGet(`/api/emergency/${id}/vault`);
-        const opened = await openVault(Number(id), data, keys);
+        const opened = await openEmergencyVault(Number(id), data, keys);
         if (cancelled) return;
         setOwner(data.owner);
         setGrantedAt(data.grantedAt);
+        setWaiting(data.scheme === "emergency-key" ? data.waiting : 0);
         setVault(opened);
       } catch (err: any) {
         if (!cancelled) setError(err?.message || "This vault can't be opened.");
@@ -256,6 +156,9 @@ const EmergencyVaultPage = () => {
         </div>
       ) : (
         <>
+          {owner && waitingNotice(waiting, owner.name) && (
+            <Alert className="emergency-waiting" type="info" showIcon message={waitingNotice(waiting, owner.name)} />
+          )}
           <div className="emergency-filters">
             <Input
               allowClear

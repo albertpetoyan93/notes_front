@@ -48,7 +48,8 @@ const ConfirmEmailBanner = () => {
       <MailOutlined aria-hidden="true" />
       <span className="e2e-banner-text">
         Confirm your email <strong>{me.email}</strong>: open the link we sent. Until then, invites and
-        items shared to this address can't reach you.
+        items shared to this address can't reach you. An unconfirmed account with nothing in it is
+        removed 7 days after sign-up.
       </span>
       <Button size="small" type="primary" loading={busy} onClick={resend}>
         Send a new link
