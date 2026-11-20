@@ -9,7 +9,6 @@ import {
   openEmergencyKeyAsContact,
   openItemFromEmergency,
   openNameFromEmergency,
-  openPinnedContactKey,
   pinContactKey,
   wrapEmergencyKey,
 } from "../crypto/emergency";
@@ -41,7 +40,7 @@ beforeEach(async () => {
 });
 
 describe("emergency key: the owner's background work", () => {
-  it("no key yet: makes one, then copies what the user key opens and seals the contact (pinning their key)", async () => {
+  it("no key yet: makes one, then copies what the user key opens and seals only pinned contacts", async () => {
     let stored = "";
     http.get.mockImplementation(async () =>
       !stored
@@ -53,7 +52,11 @@ describe("emergency key: the owner's background work", () => {
               { id: 20, name: "", encName: await sealCollectionName(userKey, 20, "user", "Family"), nameKey: "user" },
               { id: 21, name: "Trips", encName: null, nameKey: null },
             ],
-            contacts: [{ id: 5, publicKey: contact.publicKey, pinnedKey: null }],
+            contacts: [
+              { id: 5, publicKey: contact.publicKey, pinnedKey: await pinContactKey(userKey, 1, 5, contact.publicKey) },
+              // Not pinned (confirmed before the emergency key): never sealed automatically.
+              { id: 6, publicKey: (await generateKeyPair()).publicKey, pinnedKey: null },
+            ],
           })
     );
     http.post.mockImplementation(async (_url: string, body: any) => {
@@ -71,7 +74,8 @@ describe("emergency key: the owner's background work", () => {
     expect(await openNameFromEmergency(ek, 21, 1, second.collections[1].encName)).toBe("Trips");
     const sealed = await openEmergencyKeyAsContact(contact.privateKey, contact.publicKey, 5, 1, second.contacts[0].sealedKey);
     expect(Buffer.from(sealed).equals(Buffer.from(ek))).toBe(true);
-    expect(await openPinnedContactKey(userKey, 1, 5, second.contacts[0].pinnedKey)).toBe(contact.publicKey);
+    expect(second.contacts.map((row: any) => row.id)).toEqual([5]);
+    expect(second.contacts[0].pinnedKey).toBeUndefined();
   });
 
   it("never copies a key it can't open with the user key, nor a name kept under a vault key", async () => {

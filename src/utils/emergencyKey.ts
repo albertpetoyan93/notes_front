@@ -6,13 +6,12 @@
 // copied only if its key opens with the owner's own user-key wrap (so not a key
 // reached through a company vault or someone's share), a name only if it's under
 // the user key or plain, and the key is sealed only to the contact key the owner
-// checked (pinned).
+// checked by fingerprint (pinned at confirm). Never on first sight.
 import { fetcherGet, fetcherPost } from "../configs/axios";
 import {
   newEmergencyKey,
   openEmergencyKey,
   openPinnedContactKey,
-  pinContactKey,
   sealEmergencyKeyFor,
   sealNameForEmergency,
   wrapEmergencyKey,
@@ -93,25 +92,18 @@ const pass = async (): Promise<"again" | "done"> => {
     }
   }
 
-  const contacts: { id: number; sealedKey: string; pinnedKey?: string }[] = [];
+  const contacts: { id: number; sealedKey: string }[] = [];
   for (const contact of tasks.contacts) {
     try {
-      if (contact.pinnedKey) {
-        const checked = await openPinnedContactKey(keys.userKey, me.id, contact.id, contact.pinnedKey);
-        if (checked !== contact.publicKey) {
-          // Not the key the owner checked: never seal to it. Confirming again fixes it.
-          console.warn("Emergency access: a contact's key changed; they need to be confirmed again.");
-          continue;
-        }
-        contacts.push({ id: contact.id, sealedKey: await sealEmergencyKeyFor(contact.publicKey, contact.id, version, ek) });
-      } else {
-        // Confirmed before the emergency key: the key seen now is pinned from here on.
-        contacts.push({
-          id: contact.id,
-          sealedKey: await sealEmergencyKeyFor(contact.publicKey, contact.id, version, ek),
-          pinnedKey: await pinContactKey(keys.userKey, me.id, contact.id, contact.publicKey),
-        });
+      // Only to the key the owner checked by fingerprint. A contact without one (confirmed
+      // before the emergency key) waits for the owner to confirm them again.
+      if (!contact.pinnedKey) continue;
+      const checked = await openPinnedContactKey(keys.userKey, me.id, contact.id, contact.pinnedKey);
+      if (checked !== contact.publicKey) {
+        console.warn("Emergency access: a contact's key changed; remove them and invite them again.");
+        continue;
       }
+      contacts.push({ id: contact.id, sealedKey: await sealEmergencyKeyFor(contact.publicKey, contact.id, version, ek) });
     } catch (error) {
       skipped("a contact", error);
     }

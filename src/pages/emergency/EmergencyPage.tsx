@@ -26,6 +26,8 @@ interface Contact {
   grantsAt: string | null;
   grantedAt: string | null;
   publicKey: string | null;
+  /** Confirmed before the emergency key: confirm again (fingerprint) to move them over. */
+  needsReconfirm?: boolean;
 }
 
 interface TrustedBy {
@@ -118,8 +120,10 @@ const ConfirmModal = ({ contact, onClose, onDone }: { contact: Contact | null; o
       {contact && (
         <div className="emergency-confirm">
           <p>
-            {contact.name || contact.email} accepted. They'll get a key that opens only your personal items, never
-            company vaults or items others shared with you. Before giving it to them, check it's really
+            {contact.needsReconfirm
+              ? `Emergency access now uses a key that opens only your personal items, never company vaults or items others shared with you. ${contact.name || contact.email} still has the older kind of key until you confirm them again.`
+              : `${contact.name || contact.email} accepted. They'll get a key that opens only your personal items, never company vaults or items others shared with you.`}{" "}
+            Before giving it to them, check it's really
             their key: ask them to read the fingerprint in their <strong>Security</strong> settings (End-to-end
             encryption), by phone or in person.
           </p>
@@ -196,7 +200,7 @@ const EmergencyPage = () => {
       title: contact.status === "granted" ? "End their access?" : "Refuse the request?",
       content:
         contact.status === "granted"
-          ? "They can't open your vault any more. What they already saw can't be unseen. They stay your contact and can ask again."
+          ? "They can't open your vault any more, and nothing you add later opens with the key they had. What they already saw can't be unseen. To make them your emergency contact again, confirm them again."
           : "They won't get access. They stay your contact and can ask again.",
       okText: contact.status === "granted" ? "End access" : "Refuse",
       okButtonProps: { danger: true },
@@ -324,14 +328,15 @@ const EmergencyPage = () => {
                   <strong>
                     {contact.name || contact.email}{" "}
                     <Tag color={CONTACT_STATUS[contact.status].color}>{CONTACT_STATUS[contact.status].text}</Tag>
+                    {contact.needsReconfirm && <Tag color="gold">Confirm again</Tag>}
                   </strong>
                   {contact.name && <span>{contact.email}</span>}
                   <span>{contactLine(contact)}</span>
                 </div>
                 <div className="manage-actions">
-                  {contact.status === "accepted" && contact.publicKey && (
+                  {(contact.status === "accepted" || contact.needsReconfirm) && contact.publicKey && (
                     <Button type="primary" icon={<CheckOutlined />} onClick={() => setConfirming(contact)}>
-                      Confirm
+                      {contact.needsReconfirm ? "Confirm again" : "Confirm"}
                     </Button>
                   )}
                   {(contact.status === "confirmed" || contact.status === "invited" || contact.status === "accepted") && (
