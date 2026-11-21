@@ -1,4 +1,5 @@
 import {
+  CameraOutlined,
   DeleteOutlined,
   EyeInvisibleOutlined,
   EyeOutlined,
@@ -20,7 +21,10 @@ import {
   parseRecoveryCodes,
   recoverySummary,
 } from "../../utils/recoveryCodes";
-import { TOTP_FIELD_LABEL, isTotpLabel, readTotpQr } from "../../utils/totp";
+import { TOTP_FIELD_LABEL, isTotpLabel, canUseCamera, keyQrAccounts, readQrImage, type KeyQr } from "../../utils/totp";
+import type { MigratedAccount } from "../../utils/authenticatorMigration";
+import { accountMatchScore } from "../../utils/accountMatch";
+import QrCameraModal from "../../components/totp/QrCameraModal";
 import { CollectionItem, Note, useNoteStore } from "../../store/noteStore";
 import { OWNERSHIP_MESSAGES, ownershipChange, ownershipMessage, personalCopy } from "../../utils/ownership";
 import {
@@ -100,7 +104,9 @@ const RecoveryHint = ({ value }: { value: string }) => {
 const TotpHint = ({ value }: { value: string }) => {
   const { config, code, left, period } = useTotp(value);
   if (!value.trim()) {
-    return <span className="field-hint">Paste the key the site shows, or scan its QR code.</span>;
+    return <span className="field-hint">
+        Paste the key, or a screenshot of the site's or Google Authenticator's QR code.
+      </span>;
   }
   if (!config) {
     return (
@@ -158,6 +164,10 @@ const NoteEditor = ({
   const codesInput = useRef<HTMLInputElement>(null);
   const codesTarget = useRef<number | null>(null);
   const title = Form.useWatch("title", form) as string | undefined;
+  // A QR code with several accounts: which one goes into the key field.
+  const [picker, setPicker] = useState<{ index: number; qr: KeyQr } | null>(null);
+  // The key field the camera is scanning for.
+  const [cameraFor, setCameraFor] = useState<number | null>(null);
 
   useEffect(() => {
     if (note) {
@@ -222,12 +232,57 @@ const NoteEditor = ({
       })
     );
 
+  const putKey = (index: number, account: MigratedAccount, from?: number) => {
+    updateField(index, "value", account.uri);
+    const who = [account.issuer, account.name].filter(Boolean).join(" · ");
+    message.success(
+      from && from > 1
+        ? `Added the key for ${who || "the account"} (from ${from} accounts in the QR code)`
+        : "Authenticator key read from the QR code"
+    );
+  };
+
+  // A site's QR code, or a Google Authenticator transfer code with one or more accounts.
+  const applyQrText = (index: number, text: string) => {
+    const qr = keyQrAccounts(text);
+    const usable = qr.accounts.filter((account) => account.uri);
+    if (!usable.length) {
+      throw new Error(qr.accounts[0]?.problem || "That QR code has no key that can be used.");
+    }
+    if (usable.length === 1 && qr.accounts.length === 1) {
+      putKey(index, usable[0]);
+      return;
+    }
+    // Several accounts: take the one that clearly fits this item, or ask.
+    const item = { title: title || "", fields };
+    const ranked = usable
+      .map((account) => ({ account, score: accountMatchScore(item, account) }))
+      .sort((a, b) => b.score - a.score);
+    const [best, next] = ranked;
+    if (best.score >= 2 && best.score > (next?.score ?? -1)) {
+      putKey(index, best.account, qr.accounts.length);
+      return;
+    }
+    const unusable = qr.accounts.filter((account) => !account.uri);
+    setPicker({ index, qr: { ...qr, accounts: [...ranked.map((row) => row.account), ...unusable] } });
+  };
+
   const applyQrImage = async (index: number, file: Blob) => {
     try {
-      updateField(index, "value", await readTotpQr(file));
-      message.success("Authenticator key read from the QR code");
+      applyQrText(index, await readQrImage(file));
     } catch (error) {
       message.error(error instanceof Error ? error.message : "Could not read that image");
+    }
+  };
+
+  const applyCameraQr = (text: string) => {
+    const index = cameraFor;
+    if (index === null) return;
+    setCameraFor(null);
+    try {
+      applyQrText(index, text);
+    } catch (error) {
+      message.error(error instanceof Error ? error.message : "Could not read that QR code");
     }
   };
 
@@ -591,16 +646,27 @@ const NoteEditor = ({
                   </>
                 )}
                 {totp && (
-                  <Tooltip title="Scan a QR code from an image">
+                  <Tooltip title="Read a QR code from an image or screenshot">
                     <Button
                       type="text"
                       className="icon-btn"
-                      aria-label="Scan a QR code from an image"
+                      aria-label="Read a QR code from an image or screenshot"
                       icon={<ScanOutlined />}
                       onClick={() => {
                         qrTarget.current = index;
                         qrInput.current?.click();
                       }}
+                    />
+                  </Tooltip>
+                )}
+                {totp && canUseCamera() && (
+                  <Tooltip title="Scan a QR code with the camera">
+                    <Button
+                      type="text"
+                      className="icon-btn"
+                      aria-label="Scan a QR code with the camera"
+                      icon={<CameraOutlined />}
+                      onClick={() => setCameraFor(index)}
                     />
                   </Tooltip>
                 )}
@@ -677,6 +743,55 @@ const NoteEditor = ({
             if (file && index !== null) applyQrImage(index, file);
           }}
         />
+        <QrCameraModal
+          open={cameraFor !== null}
+          title="Scan the authenticator QR code"
+          onResult={applyCameraQr}
+          onClose={() => setCameraFor(null)}
+        />
+        <Modal
+          open={!!picker}
+          title="Which account goes in this item?"
+          footer={null}
+          width={480}
+          onCancel={() => setPicker(null)}
+          destroyOnHidden
+          className="auth-import-modal key-picker-modal"
+        >
+          {picker && (
+            <>
+              <p className="auth-import-hint">
+                This QR code holds {picker.qr.accounts.length} accounts. Choose the one for this item.
+                {picker.qr.part
+                  ? ` It's part ${picker.qr.part.index} of ${picker.qr.part.size} of the transfer; if the account isn't here, scan another part.`
+                  : ""}
+              </p>
+              <ul className="auth-import-list key-picker-list">
+                {picker.qr.accounts.map((account, at) => (
+                  <li key={`${account.uri}:${at}`} className={account.uri ? undefined : "is-disabled"}>
+                    <button
+                      type="button"
+                      disabled={!account.uri}
+                      onClick={() => {
+                        putKey(picker.index, account, picker.qr.accounts.length);
+                        setPicker(null);
+                      }}
+                    >
+                      <ItemIcon
+                        size="sm"
+                        note={{ title: account.issuer || account.name, category: "password", content: {} }}
+                      />
+                      <span className="auth-import-account">
+                        <strong>{account.issuer || "No site name"}</strong>
+                        <small>{account.problem || account.name}</small>
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+        </Modal>
         <input
           ref={codesInput}
           type="file"

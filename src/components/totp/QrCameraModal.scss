@@ -1,0 +1,58 @@
+.qr-camera-modal {
+  .qr-camera-view {
+    position: relative;
+    overflow: hidden;
+    aspect-ratio: 4 / 3;
+    border-radius: 12px;
+    background: #000;
+
+    video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+  }
+
+  .qr-camera-frame {
+    position: absolute;
+    inset: 50% auto auto 50%;
+    width: min(62%, 260px);
+    aspect-ratio: 1;
+    transform: translate(-50%, -50%);
+    border: 2px solid rgba(255, 255, 255, 0.9);
+    border-radius: 16px;
+    box-shadow: 0 0 0 100vmax rgba(0, 0, 0, 0.35);
+    pointer-events: none;
+  }
+
+  .qr-camera-starting {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    color: #fff;
+  }
+
+  .qr-camera-hint {
+    margin: 12px 0 0;
+    color: var(--textMuted);
+    font-size: 13px;
+  }
+
+  .qr-camera-status {
+    margin-top: 8px;
+  }
+
+  .qr-camera-error {
+    display: flex;
+    gap: 8px;
+    margin: 0;
+    padding: 12px;
+    border-radius: 10px;
+    color: var(--warnText);
+    background: var(--primarySoft);
+  }
+}

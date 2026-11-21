@@ -1,18 +1,16 @@
-import { CheckCircleFilled, InboxOutlined, LockOutlined, WarningFilled } from "@ant-design/icons";
+import { CameraOutlined, CheckCircleFilled, InboxOutlined, LockOutlined, WarningFilled } from "@ant-design/icons";
 import { Button, Modal, Progress, Select, Upload } from "antd";
 import { useEffect, useMemo, useState } from "react";
 import ItemIcon from "../itemIcon/ItemIcon";
 import { useNoteStore, type Note } from "../../store/noteStore";
 import { useVaultStore } from "../../store/vaultStore";
 import { canEditNote } from "../../pages/notes/NoteActions";
-import {
-  isMigrationLink,
-  parseMigrationLink,
-  type MigratedAccount,
-} from "../../utils/authenticatorMigration";
+import type { MigratedAccount } from "../../utils/authenticatorMigration";
+import { accountMatchScore, userValues } from "../../utils/accountMatch";
+import QrCameraModal from "../totp/QrCameraModal";
 import { categoryKey } from "../../utils/noteCategory";
 import { noteFields } from "../../utils/noteFields";
-import { TOTP_FIELD_LABEL, isTotpLabel, parseTotp, readQrImage } from "../../utils/totp";
+import { TOTP_FIELD_LABEL, isTotpLabel, canUseCamera, keyQrAccounts, parseTotp, readQrImage } from "../../utils/totp";
 
 type Step = "scan" | "review" | "importing" | "done";
 // What to do with one account: add it to a login (its id), create one, or skip it.
@@ -26,34 +24,11 @@ interface Row extends MigratedAccount {
 const plural = (count: number, one: string, many = `${one}s`) =>
   `${count} ${count === 1 ? one : many}`;
 
-const simplify = (value: string) => value.toLowerCase().replace(/[^a-z0-9]/g, "");
-
-const fieldValue = (note: Note, pattern: RegExp) =>
-  noteFields(note)
-    .filter((field) => pattern.test(field.label))
-    .map((field) => field.value.trim())
-    .filter(Boolean);
-
 const hasKey = (note: Note) =>
   noteFields(note).some((field) => isTotpLabel(field.label) && parseTotp(field.value));
 
-// How well a login fits an account: the issuer against the title and URL, the
-// account name against the username or email.
-const matchScore = (note: Note, account: MigratedAccount) => {
-  const issuer = simplify(account.issuer);
-  const title = simplify(note.title);
-  let score = 0;
-  if (issuer.length >= 2) {
-    if (title === issuer) score += 3;
-    else if (issuer.length >= 3 && (title.includes(issuer) || issuer.includes(title))) score += 2;
-    else if (fieldValue(note, /^(url|uri|website|link)$/i).some((url) => simplify(url).includes(issuer)))
-      score += 2;
-  }
-  const name = account.name.toLowerCase();
-  if (name && fieldValue(note, /^(username|email|login|user)$/i).some((value) => value.toLowerCase() === name))
-    score += 2;
-  return score;
-};
+const matchScore = (note: Note, account: MigratedAccount) =>
+  accountMatchScore({ title: note.title, fields: noteFields(note) }, account);
 
 // Brings authenticator keys over from Google Authenticator's "Transfer accounts" QR codes.
 const AuthenticatorImportModal = () => {
@@ -73,6 +48,7 @@ const AuthenticatorImportModal = () => {
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(0);
   const [result, setResult] = useState({ added: 0, created: 0, failed: 0 });
+  const [camera, setCamera] = useState(false);
 
   // Keys live only in this dialog; closing it forgets them.
   useEffect(() => {
@@ -83,6 +59,7 @@ const AuthenticatorImportModal = () => {
     setRows([]);
     setError("");
     setDone(0);
+    setCamera(false);
   }, [open]);
 
   const logins = useMemo(
@@ -96,33 +73,31 @@ const AuthenticatorImportModal = () => {
   const scanned = Object.keys(batches).length;
   const accounts = Object.values(batches).flat();
 
+  const addText = (text: string) => {
+    const qr = keyQrAccounts(text);
+    // Keyed by the code's text, so scanning the same code twice counts once.
+    setBatches((current) => ({ ...current, [text]: qr.accounts }));
+    setExpected((current) => Math.max(current, qr.part?.size || 1));
+  };
+
   const addImage = async (file: Blob) => {
     setError("");
     setBusy(true);
     try {
-      const text = await readQrImage(file);
-      if (isMigrationLink(text)) {
-        const batch = parseMigrationLink(text);
-        setBatches((current) => ({
-          ...current,
-          [`${batch.batchId}:${batch.batchIndex}`]: batch.accounts,
-        }));
-        setExpected((current) => Math.max(current, batch.batchSize));
-      } else if (parseTotp(text)) {
-        // A single site's QR code works too.
-        const config = parseTotp(text)!;
-        setBatches((current) => ({
-          ...current,
-          [`single:${text}`]: [{ issuer: config.issuer, name: config.account, uri: text, problem: "" }],
-        }));
-        setExpected((current) => Math.max(current, 1));
-      } else {
-        setError("That QR code is not from Google Authenticator's Transfer accounts.");
-      }
+      addText(await readQrImage(file));
     } catch (scanError) {
       setError(scanError instanceof Error ? scanError.message : "Could not read that image.");
     } finally {
       setBusy(false);
+    }
+  };
+
+  const addCameraText = (text: string) => {
+    setError("");
+    try {
+      addText(text);
+    } catch (scanError) {
+      setError(scanError instanceof Error ? scanError.message : "Could not read that QR code.");
     }
   };
 
@@ -260,7 +235,7 @@ const AuthenticatorImportModal = () => {
     ) : null;
 
   const loginOptions = logins.map((note) => {
-    const user = fieldValue(note, /^(username|email|login|user)$/i)[0];
+    const user = userValues(noteFields(note))[0];
     return {
       value: note.id,
       label: user ? `${note.title} · ${user}` : note.title,
@@ -289,8 +264,8 @@ const AuthenticatorImportModal = () => {
               <strong>Export accounts</strong>, choose the accounts, and tap Next.
             </li>
             <li>
-              Take a screenshot of each QR code it shows, and add them here. Or show the QR code
-              to your computer's camera app and paste the picture.
+              Take a screenshot of each QR code it shows and add them here, or scan them with the
+              camera.
             </li>
           </ol>
           <Upload.Dragger
@@ -308,6 +283,33 @@ const AuthenticatorImportModal = () => {
             </p>
             <p className="ant-upload-text">Drop the screenshots here, click to choose, or paste</p>
           </Upload.Dragger>
+          {canUseCamera() && (
+            <Button icon={<CameraOutlined />} disabled={busy} onClick={() => setCamera(true)}>
+              Scan with the camera
+            </Button>
+          )}
+          <QrCameraModal
+            open={camera}
+            continuous
+            className="auth-import-modal"
+            title="Scan the transfer QR codes"
+            onResult={addCameraText}
+            onClose={() => setCamera(false)}
+            status={
+              error ? (
+                <p className="import-error" role="alert">
+                  <WarningFilled /> {error}
+                </p>
+              ) : scanned > 0 ? (
+                <p className={`auth-import-status${missing ? " is-partial" : ""}`}>
+                  {missing ? <WarningFilled /> : <CheckCircleFilled />}{" "}
+                  {plural(accounts.length, "account")} found
+                  {expected > 1 ? ` · ${scanned} of ${expected} QR codes` : ""}
+                  {missing ? ". Show the next QR code." : ". You can close the camera."}
+                </p>
+              ) : null
+            }
+          />
           {scanned > 0 && (
             <p className={`auth-import-status${missing ? " is-partial" : ""}`} aria-live="polite">
               {missing ? <WarningFilled /> : <CheckCircleFilled />}{" "}

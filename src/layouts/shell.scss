@@ -1247,6 +1247,36 @@ kbd {
   }
 }
 
+// Choosing one account from a QR code that holds several, in the item editor.
+.key-picker-modal .key-picker-list li {
+  display: block;
+  padding: 0;
+
+  button {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    padding: 8px 12px;
+    border: 0;
+    background: none;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+
+    &:hover:not(:disabled),
+    &:focus-visible {
+      background: var(--primarySoft);
+    }
+
+    &:disabled {
+      cursor: not-allowed;
+    }
+  }
+}
+
 /* Plans ------------------------------------------------------------------------ */
 
 // The upgrade prompt, opened from anywhere a plan limit is reached.

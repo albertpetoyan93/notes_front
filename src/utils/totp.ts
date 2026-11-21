@@ -1,3 +1,5 @@
+import { isMigrationLink, parseMigrationLink, type MigratedAccount } from "./authenticatorMigration";
+
 // Authenticator (TOTP, RFC 6238) codes for the sites saved in the vault.
 // The key stays in the item; codes are made here, in the browser, and never stored.
 
@@ -145,9 +147,21 @@ export const groupCode = (code: string) => {
   return `${code.slice(0, half)} ${code.slice(half)}`;
 };
 
+// Live camera scanning needs a camera API (and https or localhost).
+export const canUseCamera = () =>
+  typeof navigator !== "undefined" && !!navigator.mediaDevices?.getUserMedia;
+
+// The text in a QR code, from pixels (an image or a camera frame).
+export const readQrPixels = async (pixels: ImageData, invert = true): Promise<string> => {
+  const { default: jsQR } = await import("jsqr");
+  const result = jsQR(pixels.data, pixels.width, pixels.height, {
+    inversionAttempts: invert ? "attemptBoth" : "dontInvert",
+  });
+  return result?.data?.trim() || "";
+};
+
 // The text inside a QR code in a screenshot or photo.
 export const readQrImage = async (file: Blob): Promise<string> => {
-  const { default: jsQR } = await import("jsqr");
   const bitmap = await createImageBitmap(file);
   // Large photos are scaled down; QR codes stay readable and decoding stays fast.
   const scale = Math.min(1, 1600 / Math.max(bitmap.width, bitmap.height));
@@ -160,22 +174,32 @@ export const readQrImage = async (file: Blob): Promise<string> => {
   if (!context) throw new Error("This browser cannot read images.");
   context.drawImage(bitmap, 0, 0, width, height);
   bitmap.close?.();
-  const pixels = context.getImageData(0, 0, width, height);
-  const result = jsQR(pixels.data, width, height, { inversionAttempts: "attemptBoth" });
-  if (!result?.data) throw new Error("No QR code found in that image.");
-  return result.data.trim();
+  const text = await readQrPixels(context.getImageData(0, 0, width, height));
+  if (!text) throw new Error("No QR code found in that image.");
+  return text;
 };
 
-// Reads the otpauth:// link from a screenshot or photo of the site's QR code.
-export const readTotpQr = async (file: Blob): Promise<string> => {
-  const text = await readQrImage(file);
-  if (/^otpauth-migration:/i.test(text)) {
-    throw new Error(
-      "This is a Google Authenticator transfer code. Use Import → Google Authenticator to add all its accounts."
-    );
+export interface KeyQr {
+  /** The accounts in the code; a site's own QR code has one. */
+  accounts: MigratedAccount[];
+  /** For a Google Authenticator transfer split across several codes: this one's place. */
+  part?: { index: number; size: number };
+}
+
+// The authenticator accounts in a QR code's text: a site's otpauth:// link, or a
+// Google Authenticator transfer code holding one or more accounts.
+export const keyQrAccounts = (text: string): KeyQr => {
+  if (isMigrationLink(text)) {
+    const batch = parseMigrationLink(text);
+    if (!batch.accounts.length) throw new Error("That transfer code holds no accounts.");
+    return {
+      accounts: batch.accounts,
+      part: batch.batchSize > 1 ? { index: batch.batchIndex + 1, size: batch.batchSize } : undefined,
+    };
   }
-  if (!parseTotp(text)) {
-    throw new Error("That QR code is not an authenticator code (otpauth://totp/…).");
+  const config = parseTotp(text);
+  if (!config || !/^otpauth:\/\/totp\//i.test(text)) {
+    throw new Error("That QR code is not an authenticator code.");
   }
-  return text;
+  return { accounts: [{ issuer: config.issuer, name: config.account, uri: text, problem: "" }] };
 };
