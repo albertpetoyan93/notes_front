@@ -88,11 +88,12 @@
     font-size: 12px;
     font-weight: 600;
     white-space: nowrap;
+  }
 
-    .is-active & {
-      background: rgba(255, 255, 255, 0.22);
-      color: #fff;
-    }
+  // On the filled (chosen) option: a light pill with white text, readable on purple.
+  .billing-interval-option.is-active .billing-interval-save {
+    background: rgba(255, 255, 255, 0.24);
+    color: #fff;
   }
 
   .billing-hint {

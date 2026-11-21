@@ -26,6 +26,7 @@ const BillingPage = () => {
   const [interval, setBillingInterval] = useState<Interval>("year");
   const [activating, setActivating] = useState(false);
   const started = useRef(false);
+  const poll = useRef<number | null>(null);
   // A plan picked on the website (?plan=team&interval=month): shown and scrolled to.
   const [picked, setPicked] = useState<"premium" | "family" | "team" | null>(null);
   const [showOwnPlans, setShowOwnPlans] = useState(false);
@@ -62,21 +63,31 @@ const BillingPage = () => {
     }
     setActivating(true);
     let tries = 0;
-    const poll = window.setInterval(async () => {
+    // Kept in a ref: removing ?checkout from the URL re-runs this effect, and a cleanup
+    // here would stop the polling while the spinner stays on screen.
+    poll.current = window.setInterval(async () => {
       tries += 1;
       const next = await load();
       const paid =
         next?.subscription?.paid || next?.companies.some((company) => company.subscription?.paid && company.subscription.live);
       if (paid || tries >= 15) {
-        window.clearInterval(poll);
+        if (poll.current) window.clearInterval(poll.current);
+        poll.current = null;
         setActivating(false);
         refreshVault();
         if (paid) message.success("Payment received. Thank you!");
         else message.info("Payment received. Your plan will appear here in a moment.");
       }
     }, 2000);
-    return () => window.clearInterval(poll);
   }, [params, setParams, load, refreshVault]);
+
+  // Stop polling only when leaving the page.
+  useEffect(
+    () => () => {
+      if (poll.current) window.clearInterval(poll.current);
+    },
+    [],
+  );
 
   if (!billing) {
     return (
