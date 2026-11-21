@@ -1,6 +1,8 @@
 import {
   CameraOutlined,
   DeleteOutlined,
+  DesktopOutlined,
+  PictureOutlined,
   EyeInvisibleOutlined,
   EyeOutlined,
   FileTextOutlined,
@@ -9,7 +11,7 @@ import {
   ScanOutlined,
   SyncOutlined,
 } from "@ant-design/icons";
-import { Button, Form, Input, Modal, Select, Switch, Tooltip, message } from "antd";
+import { Button, Dropdown, Form, Input, Modal, Select, Switch, Tooltip, message } from "antd";
 import { useEffect, useMemo, useRef, useState, type ClipboardEvent } from "react";
 import ItemIcon from "../../components/itemIcon/ItemIcon";
 import TotpCode from "../../components/totp/TotpCode";
@@ -21,7 +23,15 @@ import {
   parseRecoveryCodes,
   recoverySummary,
 } from "../../utils/recoveryCodes";
-import { TOTP_FIELD_LABEL, isTotpLabel, canUseCamera, keyQrAccounts, readQrImage, type KeyQr } from "../../utils/totp";
+import {
+  TOTP_FIELD_LABEL,
+  canShareScreen,
+  canUseCamera,
+  isTotpLabel,
+  keyQrAccounts,
+  readQrImage,
+  type KeyQr,
+} from "../../utils/totp";
 import type { MigratedAccount } from "../../utils/authenticatorMigration";
 import { accountMatchScore } from "../../utils/accountMatch";
 import QrCameraModal from "../../components/totp/QrCameraModal";
@@ -167,7 +177,7 @@ const NoteEditor = ({
   // A QR code with several accounts: which one goes into the key field.
   const [picker, setPicker] = useState<{ index: number; qr: KeyQr } | null>(null);
   // The key field the camera is scanning for.
-  const [cameraFor, setCameraFor] = useState<number | null>(null);
+  const [scanner, setScanner] = useState<{ index: number; source: "camera" | "screen" } | null>(null);
 
   useEffect(() => {
     if (note) {
@@ -276,9 +286,9 @@ const NoteEditor = ({
   };
 
   const applyCameraQr = (text: string) => {
-    const index = cameraFor;
-    if (index === null) return;
-    setCameraFor(null);
+    if (!scanner) return;
+    const { index } = scanner;
+    setScanner(null);
     try {
       applyQrText(index, text);
     } catch (error) {
@@ -646,29 +656,37 @@ const NoteEditor = ({
                   </>
                 )}
                 {totp && (
-                  <Tooltip title="Read a QR code from an image or screenshot">
-                    <Button
-                      type="text"
-                      className="icon-btn"
-                      aria-label="Read a QR code from an image or screenshot"
-                      icon={<ScanOutlined />}
-                      onClick={() => {
-                        qrTarget.current = index;
-                        qrInput.current?.click();
-                      }}
-                    />
-                  </Tooltip>
-                )}
-                {totp && canUseCamera() && (
-                  <Tooltip title="Scan a QR code with the camera">
-                    <Button
-                      type="text"
-                      className="icon-btn"
-                      aria-label="Scan a QR code with the camera"
-                      icon={<CameraOutlined />}
-                      onClick={() => setCameraFor(index)}
-                    />
-                  </Tooltip>
+                  <Dropdown
+                    trigger={["click"]}
+                    menu={{
+                      items: [
+                        { key: "image", icon: <PictureOutlined />, label: "From an image or screenshot" },
+                        ...(canUseCamera()
+                          ? [{ key: "camera", icon: <CameraOutlined />, label: "With the camera" }]
+                          : []),
+                        ...(canShareScreen()
+                          ? [{ key: "screen", icon: <DesktopOutlined />, label: "From the screen" }]
+                          : []),
+                      ],
+                      onClick: ({ key }) => {
+                        if (key === "image") {
+                          qrTarget.current = index;
+                          qrInput.current?.click();
+                        } else {
+                          setScanner({ index, source: key === "screen" ? "screen" : "camera" });
+                        }
+                      },
+                    }}
+                  >
+                    <Tooltip title="Scan the QR code">
+                      <Button
+                        type="text"
+                        className="icon-btn"
+                        aria-label="Scan the QR code"
+                        icon={<ScanOutlined />}
+                      />
+                    </Tooltip>
+                  </Dropdown>
                 )}
                 {isPasswordField(field.label) && (
                   <Tooltip title="Generate a strong password">
@@ -744,10 +762,11 @@ const NoteEditor = ({
           }}
         />
         <QrCameraModal
-          open={cameraFor !== null}
-          title="Scan the authenticator QR code"
+          open={!!scanner}
+          source={scanner?.source}
+          title={scanner?.source === "screen" ? "Scan the QR code on your screen" : "Scan the authenticator QR code"}
           onResult={applyCameraQr}
-          onClose={() => setCameraFor(null)}
+          onClose={() => setScanner(null)}
         />
         <Modal
           open={!!picker}

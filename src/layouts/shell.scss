@@ -1182,6 +1182,12 @@ kbd {
     color: var(--textMuted);
   }
 
+  .auth-import-scan {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
   .auth-import-list {
     display: flex;
     flex-direction: column;

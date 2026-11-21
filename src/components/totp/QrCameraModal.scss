@@ -12,6 +12,15 @@
       object-fit: cover;
       display: block;
     }
+
+    // A shared screen is shown whole, so the QR code can be anywhere on it.
+    &.is-screen {
+      aspect-ratio: 16 / 10;
+
+      video {
+        object-fit: contain;
+      }
+    }
   }
 
   .qr-camera-frame {

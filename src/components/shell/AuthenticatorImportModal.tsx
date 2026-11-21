@@ -1,4 +1,11 @@
-import { CameraOutlined, CheckCircleFilled, InboxOutlined, LockOutlined, WarningFilled } from "@ant-design/icons";
+import {
+  CameraOutlined,
+  CheckCircleFilled,
+  DesktopOutlined,
+  InboxOutlined,
+  LockOutlined,
+  WarningFilled,
+} from "@ant-design/icons";
 import { Button, Modal, Progress, Select, Upload } from "antd";
 import { useEffect, useMemo, useState } from "react";
 import ItemIcon from "../itemIcon/ItemIcon";
@@ -10,7 +17,15 @@ import { accountMatchScore, userValues } from "../../utils/accountMatch";
 import QrCameraModal from "../totp/QrCameraModal";
 import { categoryKey } from "../../utils/noteCategory";
 import { noteFields } from "../../utils/noteFields";
-import { TOTP_FIELD_LABEL, isTotpLabel, canUseCamera, keyQrAccounts, parseTotp, readQrImage } from "../../utils/totp";
+import {
+  TOTP_FIELD_LABEL,
+  canShareScreen,
+  canUseCamera,
+  isTotpLabel,
+  keyQrAccounts,
+  parseTotp,
+  readQrImage,
+} from "../../utils/totp";
 
 type Step = "scan" | "review" | "importing" | "done";
 // What to do with one account: add it to a login (its id), create one, or skip it.
@@ -48,7 +63,10 @@ const AuthenticatorImportModal = () => {
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(0);
   const [result, setResult] = useState({ added: 0, created: 0, failed: 0 });
-  const [camera, setCamera] = useState(false);
+  // Scanning live: from the camera or a shared screen.
+  const [scanner, setScanner] = useState<"camera" | "screen" | null>(null);
+  // Opened by pasting a QR code in the vault: go straight to choosing where it goes.
+  const [autoReview, setAutoReview] = useState(false);
 
   // Keys live only in this dialog; closing it forgets them.
   useEffect(() => {
@@ -59,7 +77,7 @@ const AuthenticatorImportModal = () => {
     setRows([]);
     setError("");
     setDone(0);
-    setCamera(false);
+    setScanner(null);
   }, [open]);
 
   const logins = useMemo(
@@ -116,6 +134,35 @@ const AuthenticatorImportModal = () => {
     return () => window.removeEventListener("paste", onPaste);
   }, [open, step]);
 
+  // A QR screenshot pasted anywhere in the vault (not into a field or another
+  // dialog) opens this dialog with it: a site's code or a Google Authenticator one.
+  useEffect(() => {
+    if (open) return undefined;
+    const onPaste = async (event: ClipboardEvent) => {
+      const target = event.target instanceof HTMLElement ? event.target : null;
+      if (target?.closest("input, textarea, select, [contenteditable]:not([contenteditable='false'])")) return;
+      const dialogOpen = [...document.querySelectorAll<HTMLElement>(".ant-modal-wrap")].some(
+        (wrap) => getComputedStyle(wrap).display !== "none"
+      );
+      if (dialogOpen) return;
+      const image = [...(event.clipboardData?.files || [])].find((file) => file.type.startsWith("image/"));
+      if (!image) return;
+      let text = "";
+      try {
+        text = await readQrImage(image);
+        keyQrAccounts(text);
+      } catch {
+        // Not an authenticator QR code: leave the paste alone.
+        return;
+      }
+      addText(text);
+      setAutoReview(true);
+      setOpen(true);
+    };
+    window.addEventListener("paste", onPaste);
+    return () => window.removeEventListener("paste", onPaste);
+  }, [open, setOpen]);
+
   const review = () => {
     const seen = new Set<string>();
     const next: Row[] = [];
@@ -136,6 +183,15 @@ const AuthenticatorImportModal = () => {
     setRows(next);
     setStep("review");
   };
+
+  // After a paste: all of the transfer is in, so choose where each key goes. A
+  // transfer split over several QR codes waits on the scan step for the rest.
+  useEffect(() => {
+    if (!autoReview || !open || !accounts.length) return;
+    setAutoReview(false);
+    if (expected <= scanned) review();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoReview, open, batches]);
 
   const setTarget = (key: string, target: Target) =>
     setRows((current) => current.map((row) => (row.key === key ? { ...row, target } : row)));
@@ -249,7 +305,7 @@ const AuthenticatorImportModal = () => {
       closable={step !== "importing"}
       maskClosable={step !== "importing"}
       keyboard={step !== "importing"}
-      title="Import from Google Authenticator"
+      title={step === "scan" ? "Import from Google Authenticator" : "Add authenticator keys"}
       width={620}
       footer={footer}
       destroyOnHidden
@@ -264,8 +320,8 @@ const AuthenticatorImportModal = () => {
               <strong>Export accounts</strong>, choose the accounts, and tap Next.
             </li>
             <li>
-              Take a screenshot of each QR code it shows and add them here, or scan them with the
-              camera.
+              Take a screenshot of each QR code it shows and add them here, or scan them live
+              with the buttons below.
             </li>
           </ol>
           <Upload.Dragger
@@ -283,18 +339,28 @@ const AuthenticatorImportModal = () => {
             </p>
             <p className="ant-upload-text">Drop the screenshots here, click to choose, or paste</p>
           </Upload.Dragger>
-          {canUseCamera() && (
-            <Button icon={<CameraOutlined />} disabled={busy} onClick={() => setCamera(true)}>
-              Scan with the camera
-            </Button>
+          {(canUseCamera() || canShareScreen()) && (
+            <div className="auth-import-scan">
+              {canUseCamera() && (
+                <Button icon={<CameraOutlined />} disabled={busy} onClick={() => setScanner("camera")}>
+                  Scan with the camera
+                </Button>
+              )}
+              {canShareScreen() && (
+                <Button icon={<DesktopOutlined />} disabled={busy} onClick={() => setScanner("screen")}>
+                  Scan from the screen
+                </Button>
+              )}
+            </div>
           )}
           <QrCameraModal
-            open={camera}
+            open={!!scanner}
+            source={scanner || "camera"}
             continuous
             className="auth-import-modal"
-            title="Scan the transfer QR codes"
+            title={scanner === "screen" ? "Scan the QR codes on your screen" : "Scan the transfer QR codes"}
             onResult={addCameraText}
-            onClose={() => setCamera(false)}
+            onClose={() => setScanner(null)}
             status={
               error ? (
                 <p className="import-error" role="alert">

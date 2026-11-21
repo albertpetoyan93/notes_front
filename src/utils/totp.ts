@@ -151,6 +151,12 @@ export const groupCode = (code: string) => {
 export const canUseCamera = () =>
   typeof navigator !== "undefined" && !!navigator.mediaDevices?.getUserMedia;
 
+// Reading a QR code from a shared screen, window or tab: desktop browsers only.
+export const canShareScreen = () =>
+  typeof navigator !== "undefined" &&
+  !!navigator.mediaDevices?.getDisplayMedia &&
+  !/Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
+
 // The text in a QR code, from pixels (an image or a camera frame).
 export const readQrPixels = async (pixels: ImageData, invert = true): Promise<string> => {
   const { default: jsQR } = await import("jsqr");
