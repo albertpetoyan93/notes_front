@@ -9,6 +9,7 @@ import CurrentPlan from "./billing/CurrentPlan";
 import DiscountModal from "./billing/DiscountModal";
 import FamilySection from "./billing/FamilySection";
 import { guessCurrency, joinNames, money, monthlyCents, scrollToId, teamNames } from "./billing/format";
+import PaymentHistory from "./billing/PaymentHistory";
 import PlanCards from "./billing/PlanCards";
 import SubscribeDialog from "./billing/SubscribeDialog";
 import "../company/CompanyPage.scss";
@@ -175,6 +176,8 @@ const BillingPage = () => {
           ))
         )}
       </section>
+
+      {billing.payments?.enabled && <PaymentHistory billing={billing} />}
 
       <p className="billing-footnote">
         {guessCurrency() === "eur"

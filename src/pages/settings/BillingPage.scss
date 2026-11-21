@@ -38,6 +38,67 @@
     gap: 8px 12px;
   }
 
+  /* Payment history: one line per payment, date and what on the left, amount and invoice right. */
+  .payment-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    border: 1px solid var(--borderSubtle);
+    border-radius: 12px;
+    background: var(--surfaceCard);
+    overflow: hidden;
+  }
+
+  .payment-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px 16px;
+    padding: 12px 16px;
+
+    & + & {
+      border-top: 1px solid var(--borderSubtle);
+    }
+  }
+
+  .payment-main {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+  }
+
+  .payment-date {
+    font-weight: 600;
+  }
+
+  .payment-what,
+  .payment-period {
+    font-size: 13px;
+    color: var(--textMuted);
+  }
+
+  .payment-side {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+
+    .ant-tag {
+      margin: 0;
+    }
+  }
+
+  .payment-amount {
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .payment-invoice {
+    font-size: 13px;
+    white-space: nowrap;
+  }
+
   /* Monthly | Yearly: the chosen one is filled, so it's clear which prices are shown. */
   .billing-interval {
     display: inline-flex;
