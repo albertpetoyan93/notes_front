@@ -133,12 +133,21 @@ const AuthPanel = ({ mode }: { mode: AuthMode }) => {
             <Form.Item
               name="email"
               label="Email address"
+              normalize={(value: string) => value?.trim()}
               rules={[
                 { required: true, message: "Please enter your email" },
                 { type: "email", message: "Please enter a valid email" },
               ]}
             >
-              <Input placeholder="Email address" autoComplete="username webauthn" />
+              {/* Phones would capitalise the first letter or add a space. */}
+              <Input
+                placeholder="Email address"
+                autoComplete="username webauthn"
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
+                inputMode="email"
+              />
             </Form.Item>
             <div className="auth-password-wrap">
               <NavLink
@@ -212,12 +221,20 @@ const AuthPanel = ({ mode }: { mode: AuthMode }) => {
             <Form.Item
               name="email"
               label="Email"
+              normalize={(value: string) => value?.trim()}
               rules={[
                 { required: true, message: "Please enter your email" },
                 { type: "email", message: "Please enter a valid email" },
               ]}
             >
-              <Input placeholder="Email address" />
+              <Input
+                placeholder="Email address"
+                autoComplete="email"
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
+                inputMode="email"
+              />
             </Form.Item>
             <Form.Item name="fullName" label="Full Name">
               <Input placeholder="Full Name (optional)" />

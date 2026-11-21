@@ -41,7 +41,8 @@
 
 .auth-panel {
   width: 100%;
-  max-width: 420px;
+  // The card's own width with its padding and border (it used to grow past this).
+  max-width: 466px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -53,6 +54,8 @@
 
 .auth-card {
   width: 100%;
+  // Padding and border inside the width: on phones it ran 34px past the screen.
+  box-sizing: border-box;
   padding: 22px 22px 18px;
   border-radius: 18px;
   background: #fff;
