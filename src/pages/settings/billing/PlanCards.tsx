@@ -1,5 +1,5 @@
 import { CheckOutlined } from "@ant-design/icons";
-import { Button, Segmented, Tag } from "antd";
+import { Button, Tag } from "antd";
 import { useBillingStore, type Billing, type Interval } from "../../../store/billingStore";
 import { useVaultStore } from "../../../store/vaultStore";
 import { date, guessCurrency, money, monthlyCents, perPeriod, taxNote, useBusy } from "./format";
@@ -121,14 +121,21 @@ const PlanCards = ({
           {covered ? "A plan of your own" : "Plans"}
         </h2>
         {payments && (
-          <Segmented
-            value={interval}
-            onChange={(value) => onInterval(value as Interval)}
-            options={[
-              { label: "Yearly · save up to 28%", value: "year" },
-              { label: "Monthly", value: "month" },
-            ]}
-          />
+          <div className="billing-interval" role="radiogroup" aria-label="Billing period">
+            {(["month", "year"] as Interval[]).map((value) => (
+              <button
+                key={value}
+                type="button"
+                role="radio"
+                aria-checked={interval === value}
+                className={`billing-interval-option${interval === value ? " is-active" : ""}`}
+                onClick={() => onInterval(value)}
+              >
+                {value === "year" ? "Yearly" : "Monthly"}
+                {value === "year" && <span className="billing-interval-save">Save up to 28%</span>}
+              </button>
+            ))}
+          </div>
         )}
       </div>
       {covered && (

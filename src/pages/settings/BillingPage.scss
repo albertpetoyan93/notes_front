@@ -38,6 +38,63 @@
     gap: 8px 12px;
   }
 
+  /* Monthly | Yearly: the chosen one is filled, so it's clear which prices are shown. */
+  .billing-interval {
+    display: inline-flex;
+    padding: 4px;
+    gap: 4px;
+    border: 1px solid var(--borderSubtle);
+    border-radius: 999px;
+    background: var(--surfaceMuted);
+  }
+
+  .billing-interval-option {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 36px;
+    padding: 6px 16px;
+    border: 0;
+    border-radius: 999px;
+    background: transparent;
+    color: var(--textMuted);
+    font: inherit;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color 0.15s ease, color 0.15s ease;
+
+    &:hover:not(.is-active) {
+      color: var(--colorText);
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--primary);
+      outline-offset: 2px;
+    }
+
+    &.is-active {
+      background: var(--primary);
+      color: #fff;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+    }
+  }
+
+  .billing-interval-save {
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: var(--primarySoft);
+    color: var(--primaryText);
+    font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
+
+    .is-active & {
+      background: rgba(255, 255, 255, 0.22);
+      color: #fff;
+    }
+  }
+
   .billing-hint {
     margin: 0;
     font-size: 13px;
