@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { fetcherDelete, fetcherGet, fetcherPost } from "../configs/axios";
+import { guessCurrency } from "../pages/settings/billing/format";
 
 export type PlanId = "free" | "premium" | "family" | "team";
 
@@ -22,6 +23,8 @@ export interface BillingSubscription {
   currentPeriodEnd: string | null;
   cancelAtPeriodEnd: boolean;
   graceEndsAt: string | null;
+  /** "usd" or "eur" once paid through Stripe; null for a trial. */
+  currency?: string | null;
   live: boolean;
   /** Paid through Stripe (not a free trial). */
   paid: boolean;
@@ -184,10 +187,12 @@ export const useBillingStore = create<BillingStore>((set, get) => ({
   },
 
   checkout: async (plan, interval, companyId) => {
+    // The currency the prices were shown in; the server keeps an earlier one if there is one.
     const { url } = await fetcherPost("/api/billing/checkout", {
       plan,
       interval,
       companyId,
+      currency: guessCurrency(),
     });
     window.location.assign(url);
   },

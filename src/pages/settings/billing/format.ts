@@ -12,18 +12,42 @@ const FALLBACK_PRICES: Record<PaidPlan, { month: number; year: number }> = {
   team: { month: 500, year: 400 },
 };
 
-/** Price in US cents per month, for that billing period. */
+/** Price in cents per month, for that billing period (the same number in USD and EUR). */
 export const monthlyCents = (billing: Billing, plan: PaidPlan, interval: Interval) =>
   (billing.prices || FALLBACK_PRICES)[plan][interval];
 
-export const money = (cents: number) => {
-  const value = Math.round(cents) / 100;
-  return value % 1 === 0 ? `$${value}` : `$${value.toFixed(2)}`;
+/** USD: tax added on top where it applies. EUR: VAT included. */
+export type Currency = "usd" | "eur";
+
+/**
+ * The currency to show before anything is paid: EUR in Europe, USD elsewhere. Stripe
+ * checkout is opened in the same one. Once paid, the subscription's own currency wins.
+ */
+export const guessCurrency = (): Currency => {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone?.startsWith("Europe/") ? "eur" : "usd";
+  } catch {
+    return "usd";
+  }
 };
 
-/** "$30 a year" or "$3.49 a month". */
-export const perPeriod = (monthly: number, interval: Interval) =>
-  interval === "year" ? `${money(monthly * 12)} a year` : `${money(monthly)} a month`;
+/** A paid subscription's currency, else the guess. */
+export const currencyOf = (subscription?: { currency?: string | null } | null): Currency =>
+  subscription?.currency === "eur" || subscription?.currency === "usd" ? subscription.currency : guessCurrency();
+
+export const money = (cents: number, currency: Currency = guessCurrency()) => {
+  const value = Math.round(cents) / 100;
+  const symbol = currency === "eur" ? "€" : "$";
+  return value % 1 === 0 ? `${symbol}${value}` : `${symbol}${value.toFixed(2)}`;
+};
+
+/** "$30 a year" or "€3.49 a month". */
+export const perPeriod = (monthly: number, interval: Interval, currency: Currency = guessCurrency()) =>
+  interval === "year" ? `${money(monthly * 12, currency)} a year` : `${money(monthly, currency)} a month`;
+
+/** What the price includes, in that currency. */
+export const taxNote = (currency: Currency = guessCurrency()) =>
+  currency === "eur" ? "Prices include VAT." : "Tax is added at checkout where it applies.";
 
 export const date = (value: string | null) => (value ? dayjsExtra(value).format("D MMM YYYY") : "");
 export const shortDate = (value: string | null) => (value ? dayjsExtra(value).format("D MMM") : "");

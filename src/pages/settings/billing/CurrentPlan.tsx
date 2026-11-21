@@ -1,9 +1,9 @@
 import { CheckOutlined, DownOutlined, MinusOutlined } from "@ant-design/icons";
 import { Button, Dropdown, Modal, Tag } from "antd";
-import { useBillingStore, type Billing } from "../../../store/billingStore";
+import { useBillingStore, type Billing, type Interval } from "../../../store/billingStore";
 import { useVaultStore } from "../../../store/vaultStore";
 import { fileSize } from "../../../utils/fileSize";
-import { date, days, daysLeft, joinNames, monthlyCents, perPeriod, scrollToId, teamNames, useBusy, type PaidPlan } from "./format";
+import { currencyOf, date, days, daysLeft, joinNames, monthlyCents, perPeriod as formatPerPeriod, scrollToId, teamNames, useBusy, type PaidPlan } from "./format";
 
 /** The plan this person has now: what it costs, when it renews, and what it unlocks. */
 const CurrentPlan = ({ billing }: { billing: Billing }) => {
@@ -12,6 +12,8 @@ const CurrentPlan = ({ billing }: { billing: Billing }) => {
   const { busy, run } = useBusy();
   const payments = billing.payments?.enabled;
   const own = billing.source === "own" ? billing.subscription : null;
+  // A paid plan is billed in its own currency; otherwise prices show in the viewer's.
+  const perPeriod = (monthly: number, interval: Interval) => formatPerPeriod(monthly, interval, currencyOf(own));
   const live = own?.live ? own : null;
   const paidPlan = billing.plan === "free" || billing.plan === "team" ? null : (billing.plan as PaidPlan);
   const interval = live?.interval || "year";

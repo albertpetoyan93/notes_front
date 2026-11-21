@@ -8,7 +8,7 @@ import CompanyCard from "./billing/CompanyCard";
 import CurrentPlan from "./billing/CurrentPlan";
 import DiscountModal from "./billing/DiscountModal";
 import FamilySection from "./billing/FamilySection";
-import { joinNames, money, monthlyCents, scrollToId, teamNames } from "./billing/format";
+import { guessCurrency, joinNames, money, monthlyCents, scrollToId, teamNames } from "./billing/format";
 import PlanCards from "./billing/PlanCards";
 import SubscribeDialog from "./billing/SubscribeDialog";
 import "../company/CompanyPage.scss";
@@ -166,7 +166,10 @@ const BillingPage = () => {
       </section>
 
       <p className="billing-footnote">
-        Prices in USD{billing.payments?.tax ? "; tax is added at checkout where it applies" : ""}. Encryption, two-factor
+        {guessCurrency() === "eur"
+          ? "Prices in EUR, VAT included"
+          : `Prices in USD${billing.payments?.tax ? "; tax is added at checkout where it applies" : ""}`}
+        . Encryption, two-factor
         sign-in and passkeys are on every plan.
       </p>
 

@@ -1,7 +1,7 @@
 import { Modal, message } from "antd";
 import { useEffect, useState } from "react";
 import { useBillingStore, type Billing, type BillingCompany, type Interval } from "../../../store/billingStore";
-import { date, daysLeft, money, monthlyCents, plural, teamMonthly } from "./format";
+import { currencyOf, date, daysLeft, money as formatMoney, monthlyCents, plural, taxNote, teamMonthly } from "./format";
 
 /** Subscribe a company to Team: monthly or yearly, with the exact total for its seats. */
 const SubscribeDialog = ({
@@ -27,6 +27,9 @@ const SubscribeDialog = ({
   const suspended = company.status === "suspended";
   const trial = company.subscription?.live && company.subscription.status === "trialing" ? company.subscription : null;
   const discount = company.discount?.status === "approved" ? company.discount.percent : 0;
+  // A company that paid before stays in that currency.
+  const currency = currencyOf(company.subscription);
+  const money = (cents: number) => formatMoney(cents, currency);
 
   const options = (["year", "month"] as Interval[]).map((value) => {
     const monthly = teamMonthly(billing, company, value);
@@ -86,7 +89,7 @@ const SubscribeDialog = ({
             : trial?.trialEndsAt && daysLeft(trial.trialEndsAt) > 2
               ? `Nothing is charged until the trial ends on ${date(trial.trialEndsAt)}. Members added later are charged for the rest of the period.`
               : "Members added later are charged for the rest of the period."}
-          {billing.payments?.tax ? " Tax is added at checkout where it applies." : ""}
+          {currency === "eur" || billing.payments?.tax ? ` ${taxNote(currency)}` : ""}
         </p>
       </div>
     </Modal>

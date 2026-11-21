@@ -2,7 +2,7 @@ import { CheckOutlined } from "@ant-design/icons";
 import { Button, Segmented, Tag } from "antd";
 import { useBillingStore, type Billing, type Interval } from "../../../store/billingStore";
 import { useVaultStore } from "../../../store/vaultStore";
-import { date, money, monthlyCents, perPeriod, useBusy } from "./format";
+import { date, guessCurrency, money, monthlyCents, perPeriod, taxNote, useBusy } from "./format";
 
 type Card = {
   id: "free" | "premium" | "family";
@@ -88,7 +88,7 @@ const PlanCards = ({
       tag: plan === "premium" ? "Most popular" : undefined,
       primary: payments ? { ...pay, label: `Subscribe ${interval === "year" ? "yearly" : "monthly"}` } : undefined,
       disabled: payments ? undefined : "Trial used · payments open soon",
-      note: billing.payments?.tax ? "Tax is added at checkout where it applies." : "Cancel any time.",
+      note: guessCurrency() === "eur" || billing.payments?.tax ? taxNote() : "Cancel any time.",
     };
   };
 
@@ -153,7 +153,7 @@ const PlanCards = ({
               {card.tag && <Tag color={card.tag === "Current" ? undefined : "purple"}>{card.tag}</Tag>}
             </div>
             <div className="plan-price">
-              <b>{card.id === "free" ? "$0" : money(monthlyCents(billing, card.id, interval))}</b>
+              <b>{card.id === "free" ? money(0) : money(monthlyCents(billing, card.id, interval))}</b>
               <span>{unit(card.id)}</span>
             </div>
             <ul>

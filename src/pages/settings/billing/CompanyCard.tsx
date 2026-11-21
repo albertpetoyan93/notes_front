@@ -2,7 +2,7 @@ import { BankOutlined, MoreOutlined } from "@ant-design/icons";
 import { Button, Dropdown, Modal, Tag } from "antd";
 import { useBillingStore, type Billing, type BillingCompany } from "../../../store/billingStore";
 import { exportCompanyItems } from "./companyActions";
-import { date, days, daysLeft, money, plural, teamMonthly, useBusy } from "./format";
+import { currencyOf, date, days, daysLeft, money as formatMoney, plural, teamMonthly, useBusy } from "./format";
 
 type Fact = { label: string; value: string; detail?: string };
 
@@ -24,6 +24,8 @@ const CompanyCard = ({
   const owner = company.role === "owner";
   const suspended = company.status === "suspended";
   const team = company.subscription?.live ? company.subscription : null;
+  // A paid Team is billed in its own currency; otherwise prices show in the viewer's.
+  const money = (cents: number) => formatMoney(cents, currencyOf(company.subscription));
   const paid = !!team?.paid;
   const interval = team?.interval || "year";
   const cancelling = !!team && (team.cancelAtPeriodEnd || team.status === "canceled");
