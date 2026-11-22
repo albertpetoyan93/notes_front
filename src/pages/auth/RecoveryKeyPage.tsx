@@ -27,6 +27,7 @@ const RecoveryKeyPage = () => {
         className="auth-submit"
         type="primary"
         block
+        style={{ marginTop: 20 }}
         disabled={!confirmed}
         onClick={() => {
           takeNewAccountRecovery();

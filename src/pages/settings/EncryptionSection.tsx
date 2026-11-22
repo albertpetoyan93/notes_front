@@ -1,4 +1,11 @@
-import { CopyOutlined, DownloadOutlined, LockOutlined, SafetyOutlined } from "@ant-design/icons";
+import {
+  CheckCircleFilled,
+  CheckOutlined,
+  CopyOutlined,
+  DownloadOutlined,
+  LockOutlined,
+  SafetyOutlined,
+} from "@ant-design/icons";
 import { Alert, Button, Checkbox, Input, Modal, Tag, message } from "antd";
 import { useEffect, useState } from "react";
 import { fetcherPost } from "../../configs/axios";
@@ -9,6 +16,7 @@ import { useKeyStore } from "../../store/keyStore";
 import dayjsExtra from "../../utils/dayjs";
 import { masterPasswordProblems } from "../../utils/masterPassword";
 import { masterKeysFor } from "../../utils/vaultKeys";
+import "./RecoveryKeyStep.scss";
 
 const downloadText = (name: string, text: string) => {
   const url = URL.createObjectURL(new Blob([text], { type: "text/plain" }));
@@ -31,54 +39,86 @@ export const RecoveryKeyStep = ({
 }) => {
   const [saved, setSaved] = useState(false);
   const [typed, setTyped] = useState("");
+  const [copied, setCopied] = useState(false);
   const lastGroup = recoveryKey.slice(-4);
   const matches = typed.trim().toUpperCase() === lastGroup;
+  const wrong = typed.trim().length === 4 && !matches;
+  const groups = recoveryKey.split("-");
 
   useEffect(() => onConfirmed(saved && matches), [saved, matches, onConfirmed]);
+  useEffect(() => {
+    if (!copied) return;
+    const timer = setTimeout(() => setCopied(false), 2000);
+    return () => clearTimeout(timer);
+  }, [copied]);
 
   return (
     <div className="e2e-recovery">
-      <p>
-        This is the <strong>only way back</strong> if you forget your master password. 2keevo
-        can't reset it for you. Keep it <strong>outside 2keevo</strong>: on paper, or in another
-        safe place.
-      </p>
-      <div className="e2e-recovery-key mono" aria-label="Recovery key">
-        {recoveryKey}
+      <div className="e2e-recovery-warning">
+        <SafetyOutlined />
+        <p>
+          This is the <strong>only way back</strong> if you forget your master password. 2keevo can't
+          reset it for you. Keep it <strong>outside 2keevo</strong>: on paper, or in another safe place.
+        </p>
       </div>
-      <div className="e2e-recovery-actions">
-        <Button
-          icon={<CopyOutlined />}
-          onClick={() => navigator.clipboard.writeText(recoveryKey).then(() => message.success("Recovery key copied"))}
-        >
-          Copy
-        </Button>
-        <Button
-          icon={<DownloadOutlined />}
-          onClick={() =>
-            downloadText(
-              "2keevo-recovery-key.txt",
-              `2keevo recovery key for ${email}\n\n${recoveryKey}\n\nUse it at app.2keevo.com/auth/recover if you forget your master password.\n`
-            )
-          }
-        >
-          Download .txt
-        </Button>
+
+      <div className="e2e-recovery-box">
+        <div className="e2e-recovery-key mono" aria-label="Recovery key">
+          {groups.map((group, index) => (
+            <span className="e2e-recovery-group" key={index}>
+              {group}
+              {index < groups.length - 1 && <span className="e2e-recovery-sep">-</span>}
+            </span>
+          ))}
+        </div>
+        <div className="e2e-recovery-actions">
+          <Button
+            type="text"
+            icon={copied ? <CheckOutlined /> : <CopyOutlined />}
+            onClick={() =>
+              navigator.clipboard
+                .writeText(recoveryKey)
+                .then(() => setCopied(true))
+                .catch(() => message.error("Couldn't copy. Select the key and copy it by hand."))
+            }
+          >
+            {copied ? "Copied" : "Copy"}
+          </Button>
+          <Button
+            type="text"
+            icon={<DownloadOutlined />}
+            onClick={() =>
+              downloadText(
+                "2keevo-recovery-key.txt",
+                `2keevo recovery key for ${email}\n\n${recoveryKey}\n\nUse it at app.2keevo.com/auth/recover if you forget your master password.\n`
+              )
+            }
+          >
+            Download .txt
+          </Button>
+        </div>
       </div>
-      <Checkbox checked={saved} onChange={(event) => setSaved(event.target.checked)}>
-        I saved my recovery key somewhere safe, outside 2keevo
-      </Checkbox>
-      <label className="e2e-field">
-        <span>Type its last 4 characters to confirm</span>
-        <Input
-          value={typed}
-          maxLength={4}
-          onChange={(event) => setTyped(event.target.value)}
-          status={typed.length === 4 && !matches ? "error" : undefined}
-          style={{ width: 120 }}
-          className="mono"
-        />
-      </label>
+
+      <div className="e2e-recovery-confirm">
+        <Checkbox checked={saved} onChange={(event) => setSaved(event.target.checked)}>
+          I saved my recovery key somewhere safe, outside 2keevo
+        </Checkbox>
+        <label className="e2e-field">
+          <span>Type the last 4 characters of the key to confirm</span>
+          <Input
+            value={typed}
+            maxLength={4}
+            placeholder={"••••"}
+            autoComplete="off"
+            spellCheck={false}
+            onChange={(event) => setTyped(event.target.value)}
+            status={wrong ? "error" : undefined}
+            suffix={matches ? <CheckCircleFilled style={{ color: "var(--colorSuccess)" }} /> : <span />}
+            className="mono e2e-recovery-code"
+          />
+          {wrong && <div className="e2e-recovery-hint is-error">That doesn't match the end of your key.</div>}
+        </label>
+      </div>
     </div>
   );
 };

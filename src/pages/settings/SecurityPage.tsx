@@ -1,5 +1,7 @@
 import {
+  CheckOutlined,
   ChromeOutlined,
+  CopyOutlined,
   DesktopOutlined,
   LogoutOutlined,
   MobileOutlined,
@@ -98,10 +100,12 @@ const EnableModal = ({ open, onClose }: { open: boolean; onClose: (changed: bool
   const [codes, setCodes] = useState<string[] | null>(null);
   const [saved, setSaved] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [secretCopied, setSecretCopied] = useState(false);
 
   useEffect(() => {
     if (!open) return;
     setSetup(null);
+    setSecretCopied(false);
     setCode("");
     setCodes(null);
     setSaved(false);
@@ -165,30 +169,59 @@ const EnableModal = ({ open, onClose }: { open: boolean; onClose: (changed: bool
         </div>
       ) : (
         <div className="enable-2fa">
-          <p>
-            1. Scan this QR code with an authenticator app, such as Google Authenticator,
-            1Password, Authy or Microsoft Authenticator.
-          </p>
-          <div className="enable-2fa-qr">
-            <QRCode value={setup.otpauthUrl} size={176} bordered={false} />
-          </div>
-          <p className="enable-2fa-secret">
-            Can't scan it? Enter this key instead:{" "}
-            <Typography.Text code copyable>
-              {setup.secret}
-            </Typography.Text>
-          </p>
-          <p>2. Enter the 6-digit code the app shows.</p>
-          <Input.OTP
-            length={6}
-            value={code}
-            inputMode="numeric"
-            formatter={(value) => value.replace(/\D/g, "")}
-            onChange={(value) => {
-              setCode(value);
-              if (/^\d{6}$/.test(value)) enable(value);
-            }}
-          />
+          <section className="enable-2fa-step">
+            <span className="enable-2fa-num">1</span>
+            <div className="enable-2fa-body">
+              <p>
+                Scan this QR code with an authenticator app, such as Google Authenticator, 1Password,
+                Authy or Microsoft Authenticator.
+              </p>
+              <div className="enable-2fa-qr">
+                <QRCode value={setup.otpauthUrl} size={168} bordered={false} />
+              </div>
+              <div className="enable-2fa-secret">
+                <span className="enable-2fa-secret-label">Can't scan it? Enter this key instead:</span>
+                <div className="enable-2fa-secret-row">
+                  <code className="mono">{setup.secret.match(/.{1,4}/g)?.join(" ")}</code>
+                  <Button
+                    type="text"
+                    size="small"
+                    aria-label="Copy key"
+                    icon={secretCopied ? <CheckOutlined /> : <CopyOutlined />}
+                    onClick={() =>
+                      navigator.clipboard
+                        .writeText(setup.secret)
+                        .then(() => {
+                          setSecretCopied(true);
+                          setTimeout(() => setSecretCopied(false), 2000);
+                        })
+                        .catch(() => message.error("Couldn't copy. Select the key and copy it by hand."))
+                    }
+                  >
+                    {secretCopied ? "Copied" : "Copy"}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </section>
+          <section className="enable-2fa-step">
+            <span className="enable-2fa-num">2</span>
+            <div className="enable-2fa-body">
+              <p>Enter the 6-digit code the app shows.</p>
+              <Input.OTP
+                className="enable-2fa-otp"
+                length={6}
+                value={code}
+                inputMode="numeric"
+                autoFocus
+                formatter={(value) => value.replace(/\D/g, "")}
+                onChange={(value) => {
+                  setCode(value);
+                  if (/^\d{6}$/.test(value)) enable(value);
+                }}
+              />
+            </div>
+          </section>
         </div>
       )}
     </Modal>

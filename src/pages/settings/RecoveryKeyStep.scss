@@ -1,0 +1,120 @@
+// The recovery key, shown once, and proof the person saved it. Loaded by the component so it
+// looks the same on sign-up, account reset and the Security page.
+.e2e-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+
+  > span {
+    font-size: 13px;
+    font-weight: 550;
+  }
+}
+
+.e2e-recovery {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  text-align: left;
+
+  p {
+    margin: 0;
+  }
+}
+
+.e2e-recovery-warning {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--warnSoft);
+  color: var(--colorText);
+  font-size: 13.5px;
+  line-height: 1.5;
+
+  > .anticon {
+    flex: none;
+    margin-top: 3px;
+    color: var(--warnText);
+    font-size: 16px;
+  }
+}
+
+.e2e-recovery-box {
+  display: flex;
+  flex-direction: column;
+  border: 1px dashed var(--borderStrong);
+  border-radius: 12px;
+  background: var(--surfaceHover);
+  overflow: hidden;
+}
+
+.e2e-recovery-key {
+  // Groups wrap as whole blocks, never in the middle of one.
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  padding: 16px 14px;
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  line-height: 1.6;
+  user-select: all;
+
+  .e2e-recovery-group {
+    white-space: nowrap;
+  }
+
+  .e2e-recovery-sep {
+    opacity: 0.4;
+  }
+}
+
+.e2e-recovery-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  border-top: 1px dashed var(--borderStrong);
+
+  .ant-btn {
+    height: 40px;
+    border-radius: 0;
+
+    & + .ant-btn {
+      border-left: 1px dashed var(--borderStrong);
+    }
+  }
+}
+
+.e2e-recovery-confirm {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding-top: 16px;
+  border-top: 1px solid var(--borderSubtle);
+
+  .ant-checkbox-wrapper {
+    align-items: flex-start;
+    line-height: 1.45;
+  }
+
+  .e2e-recovery-code {
+    width: 132px;
+    font-size: 16px;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+  }
+}
+
+.e2e-recovery-hint {
+  font-size: 12.5px;
+  color: var(--textFaint);
+
+  &.is-error {
+    color: var(--colorError);
+  }
+
+  &.is-ok {
+    color: var(--colorSuccess);
+  }
+}

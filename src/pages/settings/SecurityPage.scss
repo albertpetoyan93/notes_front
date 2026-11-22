@@ -52,27 +52,113 @@
 }
 
 .enable-2fa {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding-top: 4px;
+
   p {
-    margin: 0 0 12px;
+    margin: 0;
+    line-height: 1.5;
   }
+}
+
+.enable-2fa-step {
+  display: flex;
+  gap: 12px;
+
+  & + & {
+    padding-top: 20px;
+    border-top: 1px solid var(--borderSubtle);
+  }
+}
+
+.enable-2fa-num {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--primarySoft);
+  color: var(--primaryText);
+  font-size: 12.5px;
+  font-weight: 700;
+}
+
+.enable-2fa-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding-top: 1px;
 }
 
 .enable-2fa-qr {
   display: flex;
   justify-content: center;
-  margin-bottom: 12px;
 
   .ant-qrcode {
-    padding: 8px;
-    border-radius: 10px;
+    padding: 10px;
+    border: 1px solid var(--borderSubtle);
+    border-radius: 12px;
     background: #ffffff;
   }
 }
 
 .enable-2fa-secret {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.enable-2fa-secret-label {
   font-size: 13px;
   color: var(--textMuted);
-  word-break: break-all;
+}
+
+.enable-2fa-secret-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 6px 6px 12px;
+  border: 1px dashed var(--borderStrong);
+  border-radius: 10px;
+  background: var(--surfaceHover);
+
+  code {
+    flex: 1;
+    min-width: 0;
+    font-size: 13.5px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    word-spacing: 0.15em;
+    line-height: 1.5;
+    // Breaks only between the groups of 4.
+    overflow-wrap: normal;
+    user-select: all;
+  }
+
+  .ant-btn {
+    flex: none;
+  }
+}
+
+.enable-2fa-otp.ant-otp {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+  max-width: 330px;
+
+  .ant-otp-input {
+    flex: 1;
+    min-width: 0;
+    height: 46px;
+    font-size: 20px;
+    font-weight: 600;
+    border-color: var(--borderStrong);
+  }
 }
 
 .recovery-codes {
@@ -125,9 +211,8 @@
   }
 }
 
-// End-to-end encryption: switch-on steps and the recovery key.
-.e2e-step,
-.e2e-recovery {
+// End-to-end encryption: switch-on steps. The recovery key styles live in RecoveryKeyStep.scss.
+.e2e-step {
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -135,36 +220,6 @@
   p {
     margin: 0;
   }
-}
-
-.e2e-field {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-
-  > span {
-    font-size: 13px;
-    font-weight: 550;
-  }
-}
-
-.e2e-recovery-key {
-  padding: 14px;
-  border: 1px dashed var(--borderStrong);
-  border-radius: 10px;
-  background: var(--surfaceHover);
-  font-size: 17px;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  text-align: center;
-  overflow-wrap: anywhere;
-  user-select: all;
-}
-
-.e2e-recovery-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
 }
 
 .e2e-working {
