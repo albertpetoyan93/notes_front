@@ -722,6 +722,17 @@
   .field-value-input {
     position: relative;
     min-width: 0;
+
+    // The monospace (13px) secret inputs came out 34px and plain ones 35.6px;
+    // hold them all at the 36px of the icon buttons beside them.
+    .ant-input,
+    .ant-input-affix-wrapper {
+      min-height: 36px;
+    }
+
+    .ant-input-affix-wrapper > .ant-input {
+      min-height: 0;
+    }
   }
 
   // Room under the input for the hint, so the input stays level with the
@@ -829,6 +840,20 @@
     font-size: 24px;
   }
 
+  // Seven icons and Edit don't fit a phone's width with gaps between them:
+  // drop the gaps (the 36px buttons still keep them apart), wrap if an item
+  // has even more actions, and keep Edit at the end of the row.
+  .detail-actions {
+    flex: 1 1 100%;
+    flex-wrap: wrap;
+    gap: 0;
+    min-width: 0;
+
+    > .ant-btn:not(.icon-btn) {
+      margin-left: auto;
+    }
+  }
+
   .field-row {
     grid-template-columns: minmax(0, 1fr) auto;
     row-gap: 0;
@@ -866,9 +891,12 @@
         padding: 0 0 6px 10px;
       }
 
+      // Level with the input (both 36px tall), not centred between the
+      // field name and the input; a textarea keeps them on its first line.
       .field-actions {
         grid-column: 2;
-        grid-row: 1 / span 2;
+        grid-row: 2;
+        align-self: start;
       }
     }
   }

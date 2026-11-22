@@ -76,6 +76,9 @@
   background: none;
   color: var(--textMuted);
   font-size: 17px;
+  // Inside an inline wrapper (a Badge), sit on the line's top so the button
+  // isn't pushed up by the text baseline.
+  vertical-align: top;
   cursor: pointer;
 
   &:hover {
@@ -86,6 +89,44 @@
   &.ant-btn {
     width: 36px;
     min-width: 36px;
+  }
+
+  // antd puts the icon in a text line, on its baseline, so a glyph sized up
+  // or down drifts off-centre. Centre it on the box instead.
+  &.ant-btn .ant-btn-icon {
+    display: grid;
+    place-items: center;
+  }
+
+  // antd glyphs fill different parts of their 1em box (Rollback ~79% of it,
+  // MinusCircle and FileText all of it), so a row of them looks uneven. Bring
+  // each to the size of Delete, Team and Search (~800 of 896 units).
+  // On antd buttons the selector must outrank antd's own
+  // `.ant-btn.ant-btn-icon-only .anticon { font-size: inherit }`.
+  &.ant-btn .ant-btn-icon,
+  &:not(.ant-btn) {
+    .anticon-rollback {
+      font-size: 1.15em;
+    }
+
+    .anticon-minus-circle,
+    .anticon-file-text {
+      font-size: 0.9em;
+    }
+
+    .anticon-history,
+    .anticon-logout,
+    .anticon-sync,
+    .anticon-eye,
+    .anticon-eye-invisible {
+      font-size: 0.94em;
+    }
+
+    // The star is also drawn a little above the middle of its box.
+    .anticon-star {
+      font-size: 0.95em;
+      transform: translateY(0.04em);
+    }
   }
 }
 
@@ -171,8 +212,8 @@ kbd {
 }
 
 .avatar-btn {
-  width: 34px;
-  height: 34px;
+  width: 36px;
+  height: 36px;
   margin-left: 4px;
   border: 0;
   border-radius: 50%;
