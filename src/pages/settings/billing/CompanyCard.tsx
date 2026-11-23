@@ -119,7 +119,7 @@ const CompanyCard = ({
     : [];
   const onMenu = ({ key }: { key: string }) => {
     if (key === "interval")
-      askIntervalSwitch(other, run, company.id);
+      askIntervalSwitch(other, run, company.id, `${company.name} Team`);
     if (key === "resume") run("resume", () => setCancelled(false, company.id), "Team continues");
     if (key === "portal") run("portal", () => portal(company.id));
     if (key === "export") run("export", () => exportCompanyItems(company));
@@ -131,7 +131,7 @@ const CompanyCard = ({
   let primary: { key: string; label: string; onClick: () => void } | null = null;
   if (owner) {
     if (suspended && payments) primary = { key: "reopen", label: "Subscribe and reopen", onClick: () => onSubscribe(company) };
-    else if (paid && team?.status === "past_due") primary = { key: "retry", label: "Try again", onClick: () => askRetryPayment(run, company.id) };
+    else if (paid && team?.status === "past_due") primary = { key: "retry", label: "Try again", onClick: () => askRetryPayment(run, company.id, `${company.name} Team`) };
     else if (paid && cancelling) primary = { key: "resume", label: "Resume Team", onClick: () => run("resume", () => setCancelled(false, company.id), "Team continues") };
     else if (!paid && payments && !suspended) primary = { key: "subscribe", label: "Subscribe", onClick: () => onSubscribe(company) };
   }

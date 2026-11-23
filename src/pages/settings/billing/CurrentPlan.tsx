@@ -118,7 +118,7 @@ const CurrentPlan = ({ billing }: { billing: Billing }) => {
   ];
   const onMenu = ({ key }: { key: string }) => {
     if (key === "portal") run("portal", () => portal());
-    if (key === "interval") askIntervalSwitch(other, run);
+    if (key === "interval") askIntervalSwitch(other, run, undefined, billing.planName);
     if (key === "resume") run("resume", () => setCancelled(false), "Your plan continues");
     if (key === "cancel") cancel();
   };
@@ -163,7 +163,7 @@ const CurrentPlan = ({ billing }: { billing: Billing }) => {
           <div className="billing-plan-actions">
             {live?.status === "past_due" && paid && (
               <>
-                <Button type="primary" loading={busy === "retry"} onClick={() => askRetryPayment(run)}>
+                <Button type="primary" loading={busy === "retry"} onClick={() => askRetryPayment(run, undefined, billing.planName)}>
                   Try again
                 </Button>
                 <Button loading={busy === "portal"} onClick={() => run("portal", () => portal())}>

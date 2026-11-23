@@ -1,6 +1,5 @@
-import { Modal } from "antd";
-import { useBillingStore, type Interval, type IntervalPreview } from "../../../store/billingStore";
-import { date, money, type Currency } from "./format";
+import { create } from "zustand";
+import { useBillingStore, type Interval, type IntervalPreview, type RetryPreview } from "../../../store/billingStore";
 
 const BRANDS: Record<string, string> = {
   visa: "Visa",
@@ -22,59 +21,37 @@ export const cardLabel = (card: IntervalPreview["card"]) => {
   return `${brand} •••• ${card.last4}${wallet ? ` (${wallet})` : ""}`;
 };
 
-/** What the confirmation says about today's charge, from Stripe's preview. */
-export const intervalChargeText = (to: Interval, preview: IntervalPreview) => {
-  const card = cardLabel(preview.card);
-  if (preview.trialEndsAt) {
-    return `Nothing is charged today. Your first payment on ${date(preview.trialEndsAt)} is the ${to === "year" ? "yearly" : "monthly"} price, charged to ${card}.`;
-  }
-  if (preview.amountCents > 0) {
-    const amount = money(preview.amountCents, preview.currency as Currency);
-    return to === "year"
-      ? `${amount} is charged to ${card} today: the yearly price, less the unused part of your current month and any discount. Your plan then renews once a year. To use another card, choose Card and invoices first.`
-      : `${amount} is charged to ${card} today, less the unused part of your current period.`;
-  }
-  return to === "month"
-    ? "Nothing is charged today. The unused part of your year is kept as credit and used for your next monthly payments."
-    : "Nothing is charged today: your credit covers it.";
-};
+/** What the charge dialog shows and does: a plan switch or a failed payment paid again. */
+export type ChargeRequest =
+  | { kind: "interval"; to: Interval; planName: string; companyId?: number; preview: IntervalPreview }
+  | { kind: "retry"; planName: string; companyId?: number; preview: RetryPreview };
+
+/** The one charge dialog on the Billing page (ChargeDialog.tsx renders it). */
+export const useChargeDialog = create<{
+  request: ChargeRequest | null;
+  open: (request: ChargeRequest) => void;
+  close: () => void;
+}>((set) => ({
+  request: null,
+  open: (request) => set({ request }),
+  close: () => set({ request: null }),
+}));
 
 type Run = (key: string, action: () => Promise<unknown>, done?: string) => Promise<void>;
 
-/** A failed payment, charged again only after the person has seen the amount and the card. */
-export const askRetryPayment = (run: Run, companyId?: number) =>
-  run("retry", async () => {
-    const { previewRetry, retryPayment } = useBillingStore.getState();
-    const preview = await previewRetry(companyId);
-    const amount = money(preview.amountCents, preview.currency as Currency);
-    Modal.confirm({
-      title: "Try the payment again?",
-      content: `${amount} is charged to ${cardLabel(preview.card)} now. If this card no longer works, choose Update card instead and add another one; it's then charged there.`,
-      okText: `Pay ${amount}`,
-      cancelText: "Not now",
-      onOk: () => run("retry", () => retryPayment(companyId), "Paid. Thank you!"),
-    });
+/**
+ * Monthly ↔ yearly, only after the person has seen what it charges today and on which
+ * card. `run` shows the button busy while Stripe prices it.
+ */
+export const askIntervalSwitch = (to: Interval, run: Run, companyId?: number, planName = "Premium") =>
+  run("interval", async () => {
+    const preview = await useBillingStore.getState().previewInterval(to, companyId);
+    useChargeDialog.getState().open({ kind: "interval", to, planName, companyId, preview });
   });
 
-/**
- * Monthly ↔ yearly, only after the person has seen what it charges today. `run` is the
- * page's busy/message helper; the price comes from Stripe, so it matches the real charge.
- */
-export const askIntervalSwitch = (to: Interval, run: Run, companyId?: number) =>
-  run("interval", async () => {
-    const { previewInterval, changeInterval } = useBillingStore.getState();
-    const preview = await previewInterval(to, companyId);
-    const charge = preview.amountCents > 0 && !preview.trialEndsAt;
-    Modal.confirm({
-      title: to === "year" ? "Switch to yearly billing?" : "Switch to monthly billing?",
-      content: intervalChargeText(to, preview),
-      okText: charge ? `Pay ${money(preview.amountCents, preview.currency as Currency)} and switch` : "Switch",
-      cancelText: "Keep current",
-      onOk: () =>
-        run(
-          "interval",
-          () => changeInterval(to, companyId, preview.prorationDate),
-          to === "year" ? "Switched to yearly" : "Switched to monthly"
-        ),
-    });
+/** A failed payment, charged again only after the person has seen the amount and the card. */
+export const askRetryPayment = (run: Run, companyId?: number, planName = "Premium") =>
+  run("retry", async () => {
+    const preview = await useBillingStore.getState().previewRetry(companyId);
+    useChargeDialog.getState().open({ kind: "retry", planName, companyId, preview });
   });

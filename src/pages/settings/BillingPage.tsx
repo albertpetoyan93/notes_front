@@ -6,10 +6,19 @@ import { useBillingStore, type BillingCompany, type Interval } from "../../store
 import { useVaultStore } from "../../store/vaultStore";
 import AttentionList from "./billing/AttentionList";
 import CompanyCard from "./billing/CompanyCard";
+import ChargeDialog from "./billing/ChargeDialog";
 import CurrentPlan from "./billing/CurrentPlan";
 import DiscountModal from "./billing/DiscountModal";
 import FamilySection from "./billing/FamilySection";
-import { companyNeedsAttention, guessCurrency, joinNames, money, monthlyCents, scrollToId, teamNames } from "./billing/format";
+import {
+  companyNeedsAttention,
+  guessCurrency,
+  joinNames,
+  money,
+  monthlyCents,
+  scrollToId,
+  teamNames,
+} from "./billing/format";
 import PaymentHistory from "./billing/PaymentHistory";
 import PlanCards from "./billing/PlanCards";
 import SubscribeDialog from "./billing/SubscribeDialog";
@@ -91,7 +100,8 @@ const BillingPage = () => {
       tries += 1;
       const next = await load();
       const paid =
-        next?.subscription?.paid || next?.companies.some((company) => company.subscription?.paid && company.subscription.live);
+        next?.subscription?.paid ||
+        next?.companies.some((company) => company.subscription?.paid && company.subscription.live);
       if (paid || tries >= 15) {
         if (poll.current) window.clearInterval(poll.current);
         poll.current = null;
@@ -128,7 +138,7 @@ const BillingPage = () => {
   const known = (id: number | null | undefined) => (id != null && companies.some((c) => c.id === id) ? id : null);
   const scope: number | null =
     forParam === "team"
-      ? known(vaultCompanyId) ?? companies.find((c) => c.role === "owner")?.id ?? companies[0]?.id ?? null
+      ? (known(vaultCompanyId) ?? companies.find((c) => c.role === "owner")?.id ?? companies[0]?.id ?? null)
       : forParam === "me"
         ? null
         : forParam
@@ -146,7 +156,8 @@ const BillingPage = () => {
     );
 
   // Paying for their own plan, or in a family: nothing more to buy for the personal vault.
-  const ownPaid = (billing.source === "own" && billing.plan !== "free" && billing.subscription?.paid) || billing.source === "family";
+  const ownPaid =
+    (billing.source === "own" && billing.plan !== "free" && billing.subscription?.paid) || billing.source === "family";
   const covered = billing.source === "team";
   const showPlans = !ownPaid && (!covered || showOwnPlans);
   const teamPrice = `${money(monthlyCents(billing, "team", "year"))}–${money(monthlyCents(billing, "team", "month"))}`;
@@ -158,36 +169,33 @@ const BillingPage = () => {
           <h1>Billing</h1>
           <p>{company ? `${company.name}'s Team plan and payments.` : "Your plan, your family and your payments."}</p>
         </div>
-      </div>
 
-      {companies.length > 0 && (
-        <div className="billing-whose">
-          <span className="billing-whose-label" id="billing-whose-label">
-            Billing for
-          </span>
-          <Segmented
-            className="billing-whose-switch"
-            aria-labelledby="billing-whose-label"
-            value={scope === null ? "me" : String(scope)}
-            onChange={(value) => choose(String(value))}
-            options={[
-              { label: "Personal", value: "me", icon: <UserOutlined /> },
-              ...companies.map((c) => ({
-                value: String(c.id),
-                icon: <BankOutlined />,
-                label: (
-                  <span className="billing-whose-option">
-                    {c.name}
-                    {companyNeedsAttention(c) && (
-                      <span className="billing-whose-dot" role="img" aria-label="needs attention" />
-                    )}
-                  </span>
-                ),
-              })),
-            ]}
-          />
-        </div>
-      )}
+        {companies.length > 0 && (
+          <div className="billing-whose">
+            <Segmented
+              className="billing-whose-switch"
+              aria-label="Billing for"
+              value={scope === null ? "me" : String(scope)}
+              onChange={(value) => choose(String(value))}
+              options={[
+                { label: "Personal", value: "me", icon: <UserOutlined /> },
+                ...companies.map((c) => ({
+                  value: String(c.id),
+                  icon: <BankOutlined />,
+                  label: (
+                    <span className="billing-whose-option">
+                      {c.name}
+                      {companyNeedsAttention(c) && (
+                        <span className="billing-whose-dot" role="img" aria-label="needs attention" />
+                      )}
+                    </span>
+                  ),
+                })),
+              ]}
+            />
+          </div>
+        )}
+      </div>
 
       {activating && (
         <div className="billing-activating" role="status">
@@ -209,7 +217,12 @@ const BillingPage = () => {
             </h2>
             <span className="billing-hint">{teamPrice} per accepted member a month</span>
           </div>
-          <CompanyCard billing={billing} company={company} onSubscribe={setSubscribeFor} onAskDiscount={setDiscountFor} />
+          <CompanyCard
+            billing={billing}
+            company={company}
+            onSubscribe={setSubscribeFor}
+            onAskDiscount={setDiscountFor}
+          />
         </section>
       ) : (
         <>
@@ -228,7 +241,8 @@ const BillingPage = () => {
           {!ownPaid && covered && !showOwnPlans && (
             <div className="billing-card billing-covered">
               <span>
-                You already have Premium features through {joinNames(teamNames(billing))}'s Team. You don't need a plan of your own.
+                You already have Premium features through {joinNames(teamNames(billing))}'s Team. You don't need a plan
+                of your own.
               </span>
               <Button type="link" onClick={() => setShowOwnPlans(true)}>
                 Buy your own plan
@@ -248,11 +262,13 @@ const BillingPage = () => {
                 <h2 id="billing-companies-title" className="billing-label">
                   Companies
                 </h2>
-                <span className="billing-hint">Each company has its own Team bill · {teamPrice} per accepted member a month</span>
+                <span className="billing-hint">
+                  Each company has its own Team bill · {teamPrice} per accepted member a month
+                </span>
               </div>
               <div className="billing-card billing-empty">
-                You don't manage a company yet. Create one from the vault menu (top left): it gets 14 days of Team free, no card
-                needed, and its plan shows up here.
+                You don't manage a company yet. Create one from the vault menu (top left): it gets 14 days of Team free,
+                no card needed, and its plan shows up here.
               </div>
             </section>
           )}
@@ -268,11 +284,11 @@ const BillingPage = () => {
         {guessCurrency() === "eur"
           ? "Prices in EUR, VAT included"
           : `Prices in USD${billing.payments?.tax ? "; tax is added at checkout where it applies" : ""}`}
-        . Encryption, two-factor
-        sign-in and passkeys are on every plan.
+        . Encryption, two-factor sign-in and passkeys are on every plan.
       </p>
 
       <SubscribeDialog billing={billing} company={subscribeFor} onClose={() => setSubscribeFor(null)} />
+      <ChargeDialog />
       <DiscountModal company={discountFor} onClose={() => setDiscountFor(null)} />
     </div>
   );

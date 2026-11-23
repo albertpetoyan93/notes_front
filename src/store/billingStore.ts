@@ -119,7 +119,18 @@ export interface IntervalPreview {
   prorationDate: number;
   /** Still in the free days: nothing today; the first charge stays on this date. */
   trialEndsAt: string | null;
+  /** Receipt lines, in cents: the new plan's price, credit for unused time, discount, tax. */
+  priceCents: number;
+  creditCents: number;
+  discountCents: number;
+  taxCents: number;
+  /** The period the new price covers. */
+  periodStart: string | null;
+  periodEnd: string | null;
 }
+
+/** A failed payment to pay again: what it charges, on which card, for which period. */
+export type RetryPreview = Omit<IntervalPreview, "prorationDate" | "trialEndsAt"> & { interval: Interval };
 
 /** What the server says when a plan limit is hit (HTTP 402). */
 export interface PlanLimitInfo {
@@ -164,7 +175,7 @@ interface BillingStore {
   portal: (companyId?: number) => Promise<void>;
   setCancelled: (cancel: boolean, companyId?: number) => Promise<void>;
   /** A failed payment: what trying again charges, and on which card. */
-  previewRetry: (companyId?: number) => Promise<Pick<IntervalPreview, "amountCents" | "currency" | "card">>;
+  previewRetry: (companyId?: number) => Promise<RetryPreview>;
   /** Charge a failed payment again now. */
   retryPayment: (companyId?: number) => Promise<void>;
   /** What switching monthly/yearly charges today, priced by Stripe before anything changes. */
