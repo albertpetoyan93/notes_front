@@ -907,3 +907,119 @@
   justify-content: space-between;
   flex-wrap: wrap;
 }
+
+/* Breach alerts (BreachAlerts.tsx, docs/features/breach-alerts.md) */
+.breach-banner {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 10px;
+  margin: 0 16px 10px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--dangerSoft);
+  color: var(--dangerText);
+  font-size: 12.5px;
+}
+
+.breach-banner-icon {
+  font-size: 15px;
+}
+
+.breach-banner-text {
+  flex: 1;
+  min-width: 180px;
+}
+
+.breach-banner-actions,
+.breached-site-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.breach-link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.breached-sites {
+  margin: 0 16px 12px;
+  padding: 12px;
+  border-radius: 12px;
+  background: var(--colorBgLayout);
+  font-size: 12.5px;
+}
+
+.breached-sites-head {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: 8px;
+  color: var(--textMuted);
+
+  strong {
+    color: var(--primaryText);
+    font-size: 13px;
+  }
+}
+
+.breached-site {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 10px 0;
+  border-top: 1px solid var(--borderSubtle);
+}
+
+.breached-site-main {
+  flex: 1;
+  min-width: 200px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.breached-site-title {
+  font-weight: 600;
+  color: var(--primaryText);
+}
+
+.breached-site-tag {
+  margin-left: 6px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--warnSoft);
+  color: var(--warnText);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.breached-site-sub {
+  color: var(--textMuted);
+}
+
+.breached-site-items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  color: var(--primaryText);
+}
+
+.breached-sites-source {
+  margin: 8px 0 0;
+  color: var(--textMuted);
+  font-size: 11.5px;
+}
+
+.badge.is-site-breached {
+  color: #ffffff;
+  background: var(--colorError);
+}

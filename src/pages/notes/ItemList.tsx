@@ -9,6 +9,7 @@ import {
 import { Button, Checkbox, Input, Skeleton } from "antd";
 import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import ItemIcon from "../../components/itemIcon/ItemIcon";
+import { useBreachAlertStore } from "../../store/breachAlertStore";
 import type { BreachCheckState } from "../../hooks/useBreachCheck";
 import type { Note } from "../../store/noteStore";
 import dayjsExtra from "../../utils/dayjs";
@@ -155,6 +156,7 @@ interface ItemListProps {
 
 const ItemRowContent = ({ note }: { note: Note }) => {
   const issues = healthIssues(note);
+  const siteBreached = useBreachAlertStore((state) => state.itemIds.has(note.id));
   const subtitle = noteSubtitle(note) || categoryLabel(note.category);
   return (
     <>
@@ -164,7 +166,11 @@ const ItemRowContent = ({ note }: { note: Note }) => {
         <span className="item-sub">{subtitle}</span>
       </span>
       <span className="item-meta">
-        {issues[0] && <span className={`badge is-${issues[0]}`}>{HEALTH_LABEL[issues[0]]}</span>}
+        {siteBreached ? (
+          <span className="badge is-site-breached">Site breached</span>
+        ) : (
+          issues[0] && <span className={`badge is-${issues[0]}`}>{HEALTH_LABEL[issues[0]]}</span>
+        )}
         {note.isShared && !note.collection?.companyId && (
           <TeamOutlined aria-label={`Shared by ${note.sharedByName || "someone"}`} />
         )}

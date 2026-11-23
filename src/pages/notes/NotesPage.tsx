@@ -8,7 +8,7 @@ import {
   ShareAltOutlined,
 } from "@ant-design/icons";
 import { Button, Modal, Select, Tooltip, message } from "antd";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { fetcherPost } from "../../configs/axios";
 import useVaultNav from "../../hooks/useVaultNav";
@@ -27,6 +27,8 @@ import {
 import { defaultNewItemCollection } from "../../utils/companyCollections";
 import CollectionDialogs from "./CollectionDialogs";
 import useBreachCheck from "../../hooks/useBreachCheck";
+import useBreachAlerts from "../../hooks/useBreachAlerts";
+import { BreachBanner, BreachedSites } from "./BreachAlerts";
 import ItemDetail from "./ItemDetail";
 import ItemList, { HealthSummary, ListFilter } from "./ItemList";
 import { isNoteOwner } from "./NoteActions";
@@ -128,6 +130,15 @@ const NotesPage = ({ companyId }: { companyId?: number }) => {
   const isHealth = nav.view === "health";
   // Checks for leaked passwords while Security health is open.
   const breach = useBreachCheck(summary, isHealth && healthIncluded, refreshVault);
+  // Breached-site alerts: every plan (a security feature), personal vault only.
+  const breachAlerts = useBreachAlerts(summary, !companyId);
+  // Opening another item resets the editor (effect below), so the request waits until it's selected.
+  const pendingNewPassword = useRef<number | null>(null);
+  const openForNewPassword = (noteId: number) => {
+    pendingNewPassword.current = noteId;
+    nav.update({ item: String(noteId), new: null });
+    setEditing({ id: noteId, freshPassword: true });
+  };
   const isTrash = nav.view === "trash";
   const activeCollection =
     collections.find(
@@ -234,6 +245,11 @@ const NotesPage = ({ companyId }: { companyId?: number }) => {
     : explicit || (phone ? null : list[0] || null);
 
   useEffect(() => {
+    if (selected?.id && pendingNewPassword.current === selected.id) {
+      pendingNewPassword.current = null;
+      setEditing({ id: selected.id, freshPassword: true });
+      return;
+    }
     setEditing(null);
   }, [selected?.id, nav.newCategory]);
 
@@ -503,7 +519,16 @@ const NotesPage = ({ companyId }: { companyId?: number }) => {
       </>
     ) : null;
 
-  const banner = isHealth && !healthIncluded ? (
+  const breachedSites = isHealth && !companyId ? (
+    <BreachedSites
+      alerts={breachAlerts.alerts}
+      onChangePassword={openForNewPassword}
+      onDismiss={breachAlerts.dismiss}
+      onOpen={(noteId) => nav.update({ item: String(noteId) })}
+    />
+  ) : null;
+
+  const healthBanner = isHealth && !healthIncluded ? (
     <div className="list-note health-locked">
       <span>The password health report (weak, reused and old passwords) is part of Premium.</span>
       <Button size="small" type="primary" onClick={() => navigate("/settings/billing")}>
@@ -527,6 +552,24 @@ const NotesPage = ({ companyId }: { companyId?: number }) => {
       <InboxOutlined /> Items in Trash are deleted for good after 30 days.
     </div>
   ) : null;
+
+  const banner = isHealth ? (
+    <>
+      {breachedSites}
+      {healthBanner}
+    </>
+  ) : !isTrash && breachAlerts.alerts.length ? (
+    <BreachBanner
+      alerts={breachAlerts.alerts}
+      onChangePassword={openForNewPassword}
+      onDismiss={breachAlerts.dismiss}
+      onSeeAll={() =>
+        nav.update({ health: "1", favorites: null, shared: null, collection: null, tag: null, item: null })
+      }
+    />
+  ) : (
+    healthBanner
+  );
 
   const footer =
     selecting && checkedIds.length > 0 ? (
