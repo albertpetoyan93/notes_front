@@ -7,9 +7,25 @@ export const CARD_BRANDS = [
   "American Express",
 ] as const;
 
+export const CARD_CURRENCIES = [
+  "USD",
+  "EUR",
+  "GBP",
+  "AMD",
+  "RUB",
+  "CHF",
+  "CAD",
+  "AUD",
+  "JPY",
+  "CNY",
+  "GEL",
+  "AED",
+] as const;
+
 export function cardFieldKind(label?: string) {
   const name = String(label || "").trim().toLowerCase();
   if (name === "number") return "number" as const;
+  if (name === "currency") return "currency" as const;
   if (name === "expires") return "expires" as const;
   if (name === "cvv") return "cvv" as const;
   if (name === "brand") return "brand" as const;

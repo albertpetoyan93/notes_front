@@ -1,4 +1,4 @@
-import { Segmented, Spin, Tag } from "antd";
+import { Spin, Tag } from "antd";
 import { useEffect, useState } from "react";
 import { fetcherGet } from "../../../configs/axios";
 import type { Billing } from "../../../store/billingStore";
@@ -39,27 +39,29 @@ const what = (p: PaymentItem) =>
     .join(" · ");
 
 /**
- * Payment history: the person's own payments, or those of a company they own. Each row
- * links to Stripe's invoice PDF.
+ * Payment history: the person's own payments (`companyId` null), or those of a company they own.
+ * Each row links to Stripe's invoice PDF. Billing's switcher at the top picks whose.
  */
-const PaymentHistory = ({ billing }: { billing: Billing }) => {
-  const owned = billing.companies.filter((company) => company.role === "owner");
-  const [whose, setWhose] = useState<string>("me");
+const PaymentHistory = ({ billing, companyId }: { billing: Billing; companyId: number | null }) => {
   const [rows, setRows] = useState<PaymentItem[] | null>(null);
   const [failed, setFailed] = useState(false);
+  // Loads again when the plan changes (a payment taken now, a renewal), not on every refresh.
+  const sub =
+    companyId === null ? billing.subscription : billing.companies.find((company) => company.id === companyId)?.subscription;
+  const stamp = sub ? `${sub.status}|${sub.trialEndsAt}|${sub.currentPeriodEnd}` : "";
 
   useEffect(() => {
     let cancelled = false;
     setRows(null);
     setFailed(false);
-    const query = whose === "me" ? "" : `?companyId=${whose}`;
+    const query = companyId === null ? "" : `?companyId=${companyId}`;
     fetcherGet(`/api/billing/payments${query}`)
       .then((data: PaymentItem[]) => !cancelled && setRows(data))
       .catch(() => !cancelled && setFailed(true));
     return () => {
       cancelled = true;
     };
-  }, [whose]);
+  }, [companyId, stamp]);
 
   return (
     <section id="billing-payments" className="billing-section" aria-labelledby="billing-payments-title">
@@ -67,13 +69,6 @@ const PaymentHistory = ({ billing }: { billing: Billing }) => {
         <h2 id="billing-payments-title" className="billing-label">
           Payment history
         </h2>
-        {owned.length > 0 && (
-          <Segmented
-            value={whose}
-            onChange={(value) => setWhose(String(value))}
-            options={[{ label: "Personal", value: "me" }, ...owned.map((c) => ({ label: c.name, value: String(c.id) }))]}
-          />
-        )}
       </div>
 
       {failed ? (

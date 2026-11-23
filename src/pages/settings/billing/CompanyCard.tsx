@@ -2,6 +2,7 @@ import { BankOutlined, MoreOutlined } from "@ant-design/icons";
 import { Button, Dropdown, Modal, Tag } from "antd";
 import { useBillingStore, type Billing, type BillingCompany } from "../../../store/billingStore";
 import { exportCompanyItems } from "./companyActions";
+import { askIntervalSwitch, askRetryPayment } from "./intervalSwitch";
 import { currencyOf, date, days, daysLeft, money as formatMoney, plural, teamMonthly, useBusy } from "./format";
 
 type Fact = { label: string; value: string; detail?: string };
@@ -18,7 +19,7 @@ const CompanyCard = ({
   onSubscribe: (company: BillingCompany) => void;
   onAskDiscount: (company: BillingCompany) => void;
 }) => {
-  const { portal, setCancelled, changeInterval, startTrial } = useBillingStore();
+  const { portal, setCancelled, startTrial } = useBillingStore();
   const { busy, run } = useBusy();
   const payments = billing.payments?.enabled;
   const owner = company.role === "owner";
@@ -110,7 +111,7 @@ const CompanyCard = ({
           ? [{ key: "interval", label: `Switch to ${other === "year" ? "yearly" : "monthly"} (${money(teamMonthly(billing, company, other))} / month)` }]
           : []),
         ...(paid && cancelling ? [{ key: "resume", label: "Resume Team" }] : []),
-        ...(paid && team?.status !== "past_due" ? [{ key: "portal", label: "Card and invoices" }] : []),
+        ...(paid ? [{ key: "portal", label: team?.status === "past_due" ? "Update card" : "Card and invoices" }] : []),
         { key: "export", label: "Export company items" },
         ...(!company.discount && !suspended ? [{ key: "discount", label: "Ask for the nonprofit or school discount" }] : []),
         ...(paid && !cancelling ? [{ key: "cancel", label: "Cancel Team", danger: true }] : []),
@@ -118,7 +119,7 @@ const CompanyCard = ({
     : [];
   const onMenu = ({ key }: { key: string }) => {
     if (key === "interval")
-      run("interval", () => changeInterval(other, company.id), other === "year" ? "Switched to yearly" : "Switched to monthly");
+      askIntervalSwitch(other, run, company.id);
     if (key === "resume") run("resume", () => setCancelled(false, company.id), "Team continues");
     if (key === "portal") run("portal", () => portal(company.id));
     if (key === "export") run("export", () => exportCompanyItems(company));
@@ -130,7 +131,7 @@ const CompanyCard = ({
   let primary: { key: string; label: string; onClick: () => void } | null = null;
   if (owner) {
     if (suspended && payments) primary = { key: "reopen", label: "Subscribe and reopen", onClick: () => onSubscribe(company) };
-    else if (paid && team?.status === "past_due") primary = { key: "portal", label: "Update card", onClick: () => run("portal", () => portal(company.id)) };
+    else if (paid && team?.status === "past_due") primary = { key: "retry", label: "Try again", onClick: () => askRetryPayment(run, company.id) };
     else if (paid && cancelling) primary = { key: "resume", label: "Resume Team", onClick: () => run("resume", () => setCancelled(false, company.id), "Team continues") };
     else if (!paid && payments && !suspended) primary = { key: "subscribe", label: "Subscribe", onClick: () => onSubscribe(company) };
   }

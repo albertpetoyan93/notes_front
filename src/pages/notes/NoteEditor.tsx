@@ -39,6 +39,7 @@ import { CollectionItem, Note, useNoteStore } from "../../store/noteStore";
 import { OWNERSHIP_MESSAGES, ownershipChange, ownershipMessage, personalCopy } from "../../utils/ownership";
 import {
   CARD_BRANDS,
+  CARD_CURRENCIES,
   cardBrandFromFields,
   cardFieldKind,
   cardNumberPlaceholder,
@@ -76,7 +77,7 @@ const TEMPLATES: Record<string, (string | [string, string])[]> = {
   ssh: ["Host", ["Port", "22"], "Username", "Password", "SSH Key Path", "Connection String"],
   db: [["DB_HOST", "localhost"], ["DB_PORT", "5432"], "DB_USER", "DB_NAME", "DB_PASSWORD"],
   address: ["Full name", "Organization", "Email", "Phone", "Address", "Address 2", "City", "State", "Postal code", "Country"],
-  card: ["Cardholder", "Brand", "Number", "Expires", "CVV", "PIN"],
+  card: ["Cardholder", "Brand", "Currency", "Number", "Expires", "CVV", "PIN"],
 };
 
 const templateFields = (category: string): NoteField[] =>
@@ -553,6 +554,21 @@ const NoteEditor = ({
                       : [...CARD_BRANDS]
                     ).map((item) => ({ value: item, label: item }))}
                     onChange={setBrand}
+                  />
+                ) : kind === "currency" ? (
+                  <Select
+                    showSearch
+                    allowClear
+                    placeholder="Currency"
+                    aria-label={field.label || "Currency"}
+                    value={field.value || undefined}
+                    style={{ width: "100%" }}
+                    options={(field.value &&
+                    !CARD_CURRENCIES.includes(field.value as (typeof CARD_CURRENCIES)[number])
+                      ? [field.value, ...CARD_CURRENCIES]
+                      : [...CARD_CURRENCIES]
+                    ).map((item) => ({ value: item, label: item }))}
+                    onChange={(next) => updateField(index, "value", next || "")}
                   />
                 ) : recovery && field.value && !shown.has(index) ? (
                   <Input

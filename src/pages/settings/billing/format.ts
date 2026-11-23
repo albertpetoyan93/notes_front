@@ -97,3 +97,17 @@ export const useBusy = () => {
 
 export const scrollToId = (id: string) =>
   document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "center" });
+
+/** A trial ending within this many days is flagged. */
+export const SOON_DAYS = 3;
+
+/** True when a company the person owns has something to fix: suspended, a failed payment or a trial ending soon. */
+export const companyNeedsAttention = (company: BillingCompany) => {
+  if (company.role !== "owner") return false;
+  const team = company.subscription?.live ? company.subscription : null;
+  return (
+    company.status === "suspended" ||
+    team?.status === "past_due" ||
+    (team?.status === "trialing" && !team.paid && daysLeft(team.trialEndsAt) <= SOON_DAYS)
+  );
+};

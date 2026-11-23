@@ -1,13 +1,14 @@
-import { CheckOutlined, DownOutlined, MinusOutlined } from "@ant-design/icons";
+import { CheckOutlined, DownOutlined, MinusOutlined, RocketOutlined } from "@ant-design/icons";
 import { Button, Dropdown, Modal, Tag } from "antd";
 import { useBillingStore, type Billing, type Interval } from "../../../store/billingStore";
 import { useVaultStore } from "../../../store/vaultStore";
 import { fileSize } from "../../../utils/fileSize";
-import { currencyOf, date, days, daysLeft, joinNames, monthlyCents, perPeriod as formatPerPeriod, scrollToId, teamNames, useBusy, type PaidPlan } from "./format";
+import { askIntervalSwitch, askRetryPayment } from "./intervalSwitch";
+import { currencyOf,date, days, daysLeft, joinNames, monthlyCents, perPeriod as formatPerPeriod, scrollToId, teamNames, useBusy, type PaidPlan } from "./format";
 
 /** The plan this person has now: what it costs, when it renews, and what it unlocks. */
 const CurrentPlan = ({ billing }: { billing: Billing }) => {
-  const { portal, setCancelled, changeInterval, familyLeave } = useBillingStore();
+  const { portal, setCancelled, payNow, familyLeave } = useBillingStore();
   const refreshVault = useVaultStore((state) => state.refresh);
   const { busy, run } = useBusy();
   const payments = billing.payments?.enabled;
@@ -59,15 +60,28 @@ const CurrentPlan = ({ billing }: { billing: Billing }) => {
     } else {
       badge = interval === "year" ? "Yearly" : "Monthly";
       badgeColor = "green";
-      line = live.trialEndsAt && new Date(live.trialEndsAt).getTime() > Date.now()
-        ? `${cost} · first payment ${date(live.trialEndsAt)}`
-        : `${cost} · renews ${date(live.currentPeriodEnd)}`;
-      sub = "Paid through Stripe. Your card and invoices are under Manage.";
+      const firstLater = !!live.trialEndsAt && new Date(live.trialEndsAt).getTime() > Date.now();
+      line = firstLater ? `${cost} · first payment ${date(live.trialEndsAt)}` : `${cost} · renews ${date(live.currentPeriodEnd)}`;
+      sub = firstLater
+        ? "Nothing is charged until then, or choose Pay now to start today. Card and invoices are under Manage."
+        : "Paid through Stripe. Your card and invoices are under Manage.";
     }
   }
 
   const paid = !!live?.paid;
   const cancelling = !!live && (live.cancelAtPeriodEnd || live.status === "canceled");
+  // Subscribed during the free days: the first charge waits for them to end, unless the
+  // person chooses to pay today.
+  const deferred =
+    paid && !cancelling && live?.status === "trialing" && !!live.trialEndsAt && new Date(live.trialEndsAt).getTime() > Date.now();
+  const startNow = () =>
+    Modal.confirm({
+      title: "Start your paid plan today?",
+      content: `Your free days end now and your card is charged ${cost} today instead of on ${date(live?.trialEndsAt || null)}. A promotion code you used still applies.`,
+      okText: "Pay now",
+      cancelText: "Not now",
+      onOk: () => run("charge", () => payNow(), "Paid. Your plan has started."),
+    });
   const other = interval === "year" ? "month" : "year";
   const cancel = () =>
     Modal.confirm({
@@ -104,7 +118,7 @@ const CurrentPlan = ({ billing }: { billing: Billing }) => {
   ];
   const onMenu = ({ key }: { key: string }) => {
     if (key === "portal") run("portal", () => portal());
-    if (key === "interval") run("interval", () => changeInterval(other), other === "year" ? "Switched to yearly" : "Switched to monthly");
+    if (key === "interval") askIntervalSwitch(other, run);
     if (key === "resume") run("resume", () => setCancelled(false), "Your plan continues");
     if (key === "cancel") cancel();
   };
@@ -148,13 +162,28 @@ const CurrentPlan = ({ billing }: { billing: Billing }) => {
           </div>
           <div className="billing-plan-actions">
             {live?.status === "past_due" && paid && (
-              <Button type="primary" loading={busy === "portal"} onClick={() => run("portal", () => portal())}>
-                Update card
-              </Button>
+              <>
+                <Button type="primary" loading={busy === "retry"} onClick={() => askRetryPayment(run)}>
+                  Try again
+                </Button>
+                <Button loading={busy === "portal"} onClick={() => run("portal", () => portal())}>
+                  Update card
+                </Button>
+              </>
             )}
             {live?.status === "trialing" && !paid && payments && (
               <Button type="primary" onClick={() => scrollToId("billing-plans")}>
                 Subscribe
+              </Button>
+            )}
+            {billing.plan === "free" && !live && (
+              <Button type="primary" icon={<RocketOutlined />} onClick={() => scrollToId("billing-plans")}>
+                Upgrade
+              </Button>
+            )}
+            {deferred && (
+              <Button loading={busy === "charge"} onClick={startNow}>
+                Pay now
               </Button>
             )}
             {paid && (

@@ -111,6 +111,16 @@ export interface Billing {
 
 export type Interval = "month" | "year";
 
+export interface IntervalPreview {
+  amountCents: number;
+  currency: string;
+  /** The card that is charged; null when Stripe has none on file (then it asks at payment). */
+  card: { brand: string; last4: string; wallet: string | null } | null;
+  prorationDate: number;
+  /** Still in the free days: nothing today; the first charge stays on this date. */
+  trialEndsAt: string | null;
+}
+
 /** What the server says when a plan limit is hit (HTTP 402). */
 export interface PlanLimitInfo {
   message: string;
@@ -153,7 +163,16 @@ interface BillingStore {
   /** Go to Stripe's customer portal (card, invoices). */
   portal: (companyId?: number) => Promise<void>;
   setCancelled: (cancel: boolean, companyId?: number) => Promise<void>;
-  changeInterval: (interval: Interval, companyId?: number) => Promise<void>;
+  /** A failed payment: what trying again charges, and on which card. */
+  previewRetry: (companyId?: number) => Promise<Pick<IntervalPreview, "amountCents" | "currency" | "card">>;
+  /** Charge a failed payment again now. */
+  retryPayment: (companyId?: number) => Promise<void>;
+  /** What switching monthly/yearly charges today, priced by Stripe before anything changes. */
+  previewInterval: (interval: Interval, companyId?: number) => Promise<IntervalPreview>;
+  /** prorationDate: the moment the confirmed preview was priced at. */
+  changeInterval: (interval: Interval, companyId?: number, prorationDate?: number) => Promise<void>;
+  /** Subscribed during a trial: end the free days and charge the card today. */
+  payNow: (companyId?: number) => Promise<void>;
   openUpgrade: (info: PlanLimitInfo) => void;
   closeUpgrade: () => void;
 }
@@ -214,8 +233,22 @@ export const useBillingStore = create<BillingStore>((set, get) => ({
     await get().load();
   },
 
-  changeInterval: async (interval, companyId) => {
-    await fetcherPost("/api/billing/interval", { interval, companyId });
+  previewRetry: (companyId) => fetcherPost("/api/billing/retry/preview", { companyId }),
+
+  retryPayment: async (companyId) => {
+    await fetcherPost("/api/billing/retry", { companyId });
+    await get().load();
+  },
+
+  previewInterval: (interval, companyId) => fetcherPost("/api/billing/interval/preview", { interval, companyId }),
+
+  changeInterval: async (interval, companyId, prorationDate) => {
+    await fetcherPost("/api/billing/interval", { interval, companyId, prorationDate });
+    await get().load();
+  },
+
+  payNow: async (companyId) => {
+    await fetcherPost("/api/billing/pay-now", { companyId });
     await get().load();
   },
 

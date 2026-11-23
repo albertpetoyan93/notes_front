@@ -4,19 +4,23 @@ import type { ReactNode } from "react";
 import { useBillingStore, type Billing, type BillingCompany } from "../../../store/billingStore";
 import { useVaultStore } from "../../../store/vaultStore";
 import { exportCompanyItems, shareFamilyCollection, waitingForCollection } from "./companyActions";
-import { date, days, daysLeft, scrollToId, useBusy } from "./format";
+import { date, days, daysLeft, scrollToId, SOON_DAYS, useBusy } from "./format";
 
 type Action = { key: string; label: string; run: () => Promise<unknown>; done?: string; primary?: boolean };
 type Item = { key: string; tone: "warn" | "info"; title: string; text: ReactNode; actions: Action[] };
 
-const SOON_DAYS = 3;
 
-/** Everything that needs doing, on top: failed payments, suspended companies, ending trials, invites. */
+/**
+ * Everything that needs doing, on top: failed payments, suspended companies, ending trials, invites.
+ * `companyId` null shows the person's own items; a company id shows only that company's.
+ */
 const AttentionList = ({
   billing,
+  companyId,
   onSubscribeCompany,
 }: {
   billing: Billing;
+  companyId: number | null;
   onSubscribeCompany: (company: BillingCompany) => void;
 }) => {
   const { portal, familyAccept, familyDecline, familyCollection } = useBillingStore();
@@ -24,7 +28,8 @@ const AttentionList = ({
   const { busy, run } = useBusy();
   const payments = billing.payments?.enabled;
   const items: Item[] = [];
-  const own = billing.source === "own" ? billing.subscription : null;
+  const personal = companyId === null;
+  const own = personal && billing.source === "own" ? billing.subscription : null;
 
   if (own?.live && own.status === "past_due") {
     items.push({
@@ -50,7 +55,7 @@ const AttentionList = ({
     });
   }
 
-  for (const invite of billing.family.invites) {
+  for (const invite of personal ? billing.family.invites : []) {
     items.push({
       key: `invite-${invite.id}`,
       tone: "info",
@@ -74,7 +79,7 @@ const AttentionList = ({
     });
   }
 
-  const organizer = billing.family.organizer;
+  const organizer = personal ? billing.family.organizer : null;
   if (organizer && !organizer.live) {
     items.push({
       key: "family-ended",
@@ -112,7 +117,7 @@ const AttentionList = ({
   }
 
   for (const company of billing.companies) {
-    if (company.role !== "owner") continue;
+    if (company.id !== companyId || company.role !== "owner") continue;
     const team = company.subscription?.live ? company.subscription : null;
     if (company.status === "suspended") {
       items.push({

@@ -38,6 +38,66 @@
     gap: 8px 12px;
   }
 
+  /* Top of the page: whose billing is shown. The chosen one is filled so it reads at a glance. */
+  .billing-whose {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 10px;
+  }
+
+  .billing-whose-label {
+    font-size: 13px;
+    color: var(--textMuted);
+  }
+
+  .billing-whose-option {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  /* A company with a failed payment, a suspension or a trial ending soon. */
+  .billing-whose-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: #e5484d;
+    box-shadow: 0 0 0 2px var(--surfaceCard);
+  }
+
+  .billing-whose-switch.ant-segmented {
+    max-width: 100%;
+    overflow-x: auto;
+    padding: 3px;
+    border: 1px solid var(--borderSubtle);
+    border-radius: 10px;
+    background: var(--surfaceCard);
+
+    .ant-segmented-item {
+      border-radius: 7px;
+      color: var(--textMuted);
+      font-weight: 500;
+      transition: color 0.15s ease, background-color 0.15s ease;
+
+      &:hover:not(.ant-segmented-item-selected) {
+        color: var(--primaryText);
+        background: var(--primarySoft);
+      }
+    }
+
+    .ant-segmented-item-label {
+      padding: 0 12px;
+    }
+
+    .ant-segmented-item-selected,
+    .ant-segmented-thumb {
+      background: var(--primary);
+      color: #fff;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+    }
+  }
+
   /* Payment history: one line per payment, date and what on the left, amount and invoice right. */
   .payment-list {
     margin: 0;

@@ -1,4 +1,5 @@
-import { Button, Spin, message } from "antd";
+import { BankOutlined, UserOutlined } from "@ant-design/icons";
+import { Button, Segmented, Spin, message } from "antd";
 import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useBillingStore, type BillingCompany, type Interval } from "../../store/billingStore";
@@ -8,7 +9,7 @@ import CompanyCard from "./billing/CompanyCard";
 import CurrentPlan from "./billing/CurrentPlan";
 import DiscountModal from "./billing/DiscountModal";
 import FamilySection from "./billing/FamilySection";
-import { guessCurrency, joinNames, money, monthlyCents, scrollToId, teamNames } from "./billing/format";
+import { companyNeedsAttention, guessCurrency, joinNames, money, monthlyCents, scrollToId, teamNames } from "./billing/format";
 import PaymentHistory from "./billing/PaymentHistory";
 import PlanCards from "./billing/PlanCards";
 import SubscribeDialog from "./billing/SubscribeDialog";
@@ -16,13 +17,15 @@ import "../company/CompanyPage.scss";
 import "./BillingPage.scss";
 
 /**
- * Billing: what needs doing first, then the plan this person has, the plans they could
- * start, the family they run, and each company they manage (each with its own Team bill).
+ * Billing for one account at a time, picked at the top: Personal (own plan, plans to start,
+ * family, own payments) or a company they manage (its Team bill and payments). The choice
+ * lives in ?for=<companyId>; without it the page opens on the vault open in the sidebar.
  */
 const BillingPage = () => {
   const billing = useBillingStore((state) => state.billing);
   const load = useBillingStore((state) => state.load);
   const refreshVault = useVaultStore((state) => state.refresh);
+  const vaultCompanyId = useVaultStore((state) => state.companyId);
   const [params, setParams] = useSearchParams();
   const [interval, setBillingInterval] = useState<Interval>("year");
   const [activating, setActivating] = useState(false);
@@ -45,7 +48,18 @@ const BillingPage = () => {
     if (next === "month" || next === "year") setBillingInterval(next);
     setPicked(plan);
     if (plan !== "team") setShowOwnPlans(true);
-    setParams({}, { replace: true });
+    setParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.delete("plan");
+        next.delete("interval");
+        // Premium and Family are personal plans; Team opens on a company (see `scope` below).
+        if (plan !== "team") next.delete("for");
+        else if (!next.get("for")) next.set("for", "team");
+        return next;
+      },
+      { replace: true },
+    );
   }, [params, setParams]);
 
   useEffect(() => {
@@ -57,7 +71,14 @@ const BillingPage = () => {
     const result = params.get("checkout");
     if (!result || started.current) return;
     started.current = true;
-    setParams({}, { replace: true });
+    setParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.delete("checkout");
+        return next;
+      },
+      { replace: true },
+    );
     if (result === "cancel") {
       message.info("Checkout cancelled. Nothing was charged.");
       return;
@@ -100,6 +121,30 @@ const BillingPage = () => {
     );
   }
 
+  // Whose billing is shown: ?for=<companyId>, ?for=team (the website's Team link: the open
+  // company vault, else the first one owned), else the vault open in the sidebar, else Personal.
+  const companies = billing.companies;
+  const forParam = params.get("for");
+  const known = (id: number | null | undefined) => (id != null && companies.some((c) => c.id === id) ? id : null);
+  const scope: number | null =
+    forParam === "team"
+      ? known(vaultCompanyId) ?? companies.find((c) => c.role === "owner")?.id ?? companies[0]?.id ?? null
+      : forParam === "me"
+        ? null
+        : forParam
+          ? known(Number(forParam))
+          : known(vaultCompanyId);
+  const company = scope === null ? null : companies.find((c) => c.id === scope) || null;
+  const choose = (value: string) =>
+    setParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.set("for", value);
+        return next;
+      },
+      { replace: true },
+    );
+
   // Paying for their own plan, or in a family: nothing more to buy for the personal vault.
   const ownPaid = (billing.source === "own" && billing.plan !== "free" && billing.subscription?.paid) || billing.source === "family";
   const covered = billing.source === "team";
@@ -111,9 +156,38 @@ const BillingPage = () => {
       <div className="manage-head">
         <div>
           <h1>Billing</h1>
-          <p>Your plan, your family and the companies you manage.</p>
+          <p>{company ? `${company.name}'s Team plan and payments.` : "Your plan, your family and your payments."}</p>
         </div>
       </div>
+
+      {companies.length > 0 && (
+        <div className="billing-whose">
+          <span className="billing-whose-label" id="billing-whose-label">
+            Billing for
+          </span>
+          <Segmented
+            className="billing-whose-switch"
+            aria-labelledby="billing-whose-label"
+            value={scope === null ? "me" : String(scope)}
+            onChange={(value) => choose(String(value))}
+            options={[
+              { label: "Personal", value: "me", icon: <UserOutlined /> },
+              ...companies.map((c) => ({
+                value: String(c.id),
+                icon: <BankOutlined />,
+                label: (
+                  <span className="billing-whose-option">
+                    {c.name}
+                    {companyNeedsAttention(c) && (
+                      <span className="billing-whose-dot" role="img" aria-label="needs attention" />
+                    )}
+                  </span>
+                ),
+              })),
+            ]}
+          />
+        </div>
+      )}
 
       {activating && (
         <div className="billing-activating" role="status">
@@ -121,63 +195,74 @@ const BillingPage = () => {
         </div>
       )}
 
-      <AttentionList billing={billing} onSubscribeCompany={setSubscribeFor} />
+      <AttentionList billing={billing} companyId={scope} onSubscribeCompany={setSubscribeFor} />
 
-      <CurrentPlan billing={billing} />
-
-      {showPlans && (
-        <PlanCards
-          billing={billing}
-          interval={interval}
-          onInterval={setBillingInterval}
-          picked={picked}
-          covered={covered}
-          onHide={covered ? () => setShowOwnPlans(false) : undefined}
-        />
-      )}
-      {!ownPaid && covered && !showOwnPlans && (
-        <div className="billing-card billing-covered">
-          <span>
-            You already have Premium features through {joinNames(teamNames(billing))}'s Team. You don't need a plan of your own.
-          </span>
-          <Button type="link" onClick={() => setShowOwnPlans(true)}>
-            Buy your own plan
-          </Button>
-        </div>
-      )}
-
-      <FamilySection family={billing.family} />
-
-      <section
-        id="billing-companies"
-        className={`billing-section${picked === "team" ? " is-picked" : ""}`}
-        aria-labelledby="billing-companies-title"
-      >
-        <div className="billing-section-head">
-          <h2 id="billing-companies-title" className="billing-label">
-            Companies
-          </h2>
-          <span className="billing-hint">Each company has its own Team bill · {teamPrice} per accepted member a month</span>
-        </div>
-        {billing.companies.length === 0 ? (
-          <div className="billing-card billing-empty">
-            You don't manage a company yet. Create one from the vault menu (top left): it gets 14 days of Team free, no card
-            needed, and its plan shows up here.
+      {company ? (
+        <section
+          id="billing-companies"
+          className={`billing-section${picked === "team" ? " is-picked" : ""}`}
+          aria-labelledby="billing-companies-title"
+        >
+          <div className="billing-section-head">
+            <h2 id="billing-companies-title" className="billing-label">
+              Team plan
+            </h2>
+            <span className="billing-hint">{teamPrice} per accepted member a month</span>
           </div>
-        ) : (
-          billing.companies.map((company) => (
-            <CompanyCard
-              key={company.id}
-              billing={billing}
-              company={company}
-              onSubscribe={setSubscribeFor}
-              onAskDiscount={setDiscountFor}
-            />
-          ))
-        )}
-      </section>
+          <CompanyCard billing={billing} company={company} onSubscribe={setSubscribeFor} onAskDiscount={setDiscountFor} />
+        </section>
+      ) : (
+        <>
+          <CurrentPlan billing={billing} />
 
-      {billing.payments?.enabled && <PaymentHistory billing={billing} />}
+          {showPlans && (
+            <PlanCards
+              billing={billing}
+              interval={interval}
+              onInterval={setBillingInterval}
+              picked={picked}
+              covered={covered}
+              onHide={covered ? () => setShowOwnPlans(false) : undefined}
+            />
+          )}
+          {!ownPaid && covered && !showOwnPlans && (
+            <div className="billing-card billing-covered">
+              <span>
+                You already have Premium features through {joinNames(teamNames(billing))}'s Team. You don't need a plan of your own.
+              </span>
+              <Button type="link" onClick={() => setShowOwnPlans(true)}>
+                Buy your own plan
+              </Button>
+            </div>
+          )}
+
+          <FamilySection family={billing.family} />
+
+          {companies.length === 0 && (
+            <section
+              id="billing-companies"
+              className={`billing-section${picked === "team" ? " is-picked" : ""}`}
+              aria-labelledby="billing-companies-title"
+            >
+              <div className="billing-section-head">
+                <h2 id="billing-companies-title" className="billing-label">
+                  Companies
+                </h2>
+                <span className="billing-hint">Each company has its own Team bill · {teamPrice} per accepted member a month</span>
+              </div>
+              <div className="billing-card billing-empty">
+                You don't manage a company yet. Create one from the vault menu (top left): it gets 14 days of Team free, no card
+                needed, and its plan shows up here.
+              </div>
+            </section>
+          )}
+        </>
+      )}
+
+      {/* Only the owner pays, so an admin sees the company's plan but not its payments. */}
+      {billing.payments?.enabled && (!company || company.role === "owner") && (
+        <PaymentHistory billing={billing} companyId={scope} />
+      )}
 
       <p className="billing-footnote">
         {guessCurrency() === "eur"

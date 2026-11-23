@@ -109,6 +109,7 @@ export const CATEGORY_FIELD_TEMPLATES: Record<NoteCategory, CustomField[]> = {
   card: [
     { label: "Cardholder", value: "" },
     { label: "Brand", value: "" },
+    { label: "Currency", value: "" },
     { label: "Number", value: "" },
     { label: "Expires", value: "" },
     { label: "CVV", value: "" },

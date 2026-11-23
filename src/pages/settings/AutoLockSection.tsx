@@ -11,7 +11,7 @@ import {
   lockVault,
 } from "../../utils/autoLock";
 
-const DEFAULT_EXTENSION_AUTO_LOCK_MINUTES = 60;
+const DEFAULT_EXTENSION_AUTO_LOCK_MINUTES = 360;
 
 // How long the vault app and the browser extension may sit idle before they
 // lock. Saved on the account; a company can require a shorter time for both.
