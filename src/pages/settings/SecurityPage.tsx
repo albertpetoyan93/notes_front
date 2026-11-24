@@ -29,6 +29,7 @@ import "../company/CompanyPage.scss";
 import AutoLockSection from "./AutoLockSection";
 import EncryptionSection from "./EncryptionSection";
 import ClipboardSection from "./ClipboardSection";
+import BreachEmailSection from "./BreachEmailSection";
 import PasskeysSection from "./PasskeysSection";
 import "./SecurityPage.scss";
 
@@ -448,6 +449,8 @@ const SecurityPage = () => {
       <AutoLockSection />
 
       <ClipboardSection />
+
+      <BreachEmailSection />
 
       <section className="security-section">
         <div className="security-section-head">
