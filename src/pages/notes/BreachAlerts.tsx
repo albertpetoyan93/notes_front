@@ -111,3 +111,39 @@ export const BreachedSites = ({
     </p>
   </section>
 );
+
+const NEWS_KEY = "2keevo.news.breach-alerts";
+
+/** Whether the one-time "New: breach alerts" note was closed in this browser. */
+export const breachNewsSeen = () => {
+  try {
+    return localStorage.getItem(NEWS_KEY) === "1";
+  } catch {
+    return false;
+  }
+};
+
+/** A one-time note announcing breach alerts (Nov 2026); closing it hides it for good. */
+export const BreachNews = ({ onOpen, onClose }: { onOpen: () => void; onClose: () => void }) => {
+  const close = () => {
+    try {
+      localStorage.setItem(NEWS_KEY, "1");
+    } catch {
+      /* Private mode: it just shows again next time. */
+    }
+    onClose();
+  };
+  return (
+    <div className="breach-news" role="status">
+      <AlertOutlined className="breach-banner-icon" />
+      <span className="breach-banner-text">
+        <strong>New: free breach alerts.</strong> 2keevo now warns you when a site you have a login on reports a
+        breach, checked on this device.{" "}
+        <button type="button" className="breach-link" onClick={onOpen}>
+          See your sites
+        </button>
+      </span>
+      <Button size="small" type="text" icon={<CloseOutlined />} aria-label="Close" onClick={close} />
+    </div>
+  );
+};

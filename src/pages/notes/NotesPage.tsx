@@ -28,7 +28,7 @@ import { defaultNewItemCollection } from "../../utils/companyCollections";
 import CollectionDialogs from "./CollectionDialogs";
 import useBreachCheck from "../../hooks/useBreachCheck";
 import useBreachAlerts from "../../hooks/useBreachAlerts";
-import { BreachBanner, BreachedSites } from "./BreachAlerts";
+import { BreachBanner, BreachedSites, BreachNews, breachNewsSeen } from "./BreachAlerts";
 import ItemDetail from "./ItemDetail";
 import ItemList, { HealthSummary, ListFilter } from "./ItemList";
 import { isNoteOwner } from "./NoteActions";
@@ -132,6 +132,7 @@ const NotesPage = ({ companyId }: { companyId?: number }) => {
   const breach = useBreachCheck(summary, isHealth && healthIncluded, refreshVault);
   // Breached-site alerts: every plan (a security feature), personal vault only.
   const breachAlerts = useBreachAlerts(summary, !companyId);
+  const [newsSeen, setNewsSeen] = useState(breachNewsSeen);
   // Opening another item resets the editor (effect below), so the request waits until it's selected.
   const pendingNewPassword = useRef<number | null>(null);
   const openForNewPassword = (noteId: number) => {
@@ -568,7 +569,13 @@ const NotesPage = ({ companyId }: { companyId?: number }) => {
       }
     />
   ) : (
-    healthBanner
+    healthBanner ??
+    (!companyId && !isTrash && !newsSeen ? (
+      <BreachNews
+        onOpen={() => nav.update({ health: "1", favorites: null, shared: null, collection: null, tag: null, item: null })}
+        onClose={() => setNewsSeen(true)}
+      />
+    ) : null)
   );
 
   const footer =
