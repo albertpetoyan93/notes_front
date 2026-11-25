@@ -9,9 +9,9 @@ import { useNoteStore } from "../store/noteStore";
 import { useVaultStore } from "../store/vaultStore";
 import { LOCK_EVENT_KEY, SIGNED_OUT_PREFIX } from "./signOut";
 
-export const AUTO_LOCK_CHOICES = [5, 15, 30, 60, 0] as const;
-/** The browser extension may also stay open for 3 or 6 hours. */
-export const EXTENSION_AUTO_LOCK_CHOICES = [5, 15, 30, 60, 180, 360, 0] as const;
+export const AUTO_LOCK_CHOICES = [5, 15, 30, 60, 120, 240, 360, 480, 600, 720, 1440, 0] as const;
+/** The browser extension has its own list, from 5 minutes up to 12 hours. */
+export const EXTENSION_AUTO_LOCK_CHOICES = [5, 15, 30, 60, 180, 360, 480, 600, 720, 0] as const;
 export const DEFAULT_AUTO_LOCK_MINUTES = 15;
 
 const ACTIVITY_KEY = "keevo.lastActivity";
