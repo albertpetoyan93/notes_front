@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 import { useBillingStore, type Billing, type BillingCompany } from "../../../store/billingStore";
 import { useVaultStore } from "../../../store/vaultStore";
 import { exportCompanyItems, shareFamilyCollection, waitingForCollection } from "./companyActions";
-import { date, days, daysLeft, scrollToId, SOON_DAYS, useBusy } from "./format";
+import { date, days, daysLeft, FREE_SOON_DAYS, isComplimentary, scrollToId, SOON_DAYS, useBusy } from "./format";
 
 type Action = { key: string; label: string; run: () => Promise<unknown>; done?: string; primary?: boolean };
 type Item = { key: string; tone: "warn" | "info"; title: string; text: ReactNode; actions: Action[] };
@@ -51,6 +51,21 @@ const AttentionList = ({
         : "When it ends you move to Free. Nothing is locked or deleted.",
       actions: payments
         ? [{ key: "own-sub", label: "Choose a plan", run: async () => scrollToId("billing-plans"), primary: true }]
+        : [],
+    });
+  }
+
+  if (isComplimentary(own) && daysLeft(own!.currentPeriodEnd) <= FREE_SOON_DAYS) {
+    const left = daysLeft(own!.currentPeriodEnd);
+    items.push({
+      key: "own-free",
+      tone: "info",
+      title: left ? `Your free ${billing.planName} ends in ${days(left)}` : `Your free ${billing.planName} ends today`,
+      text: payments
+        ? `Subscribe now to keep it; the first payment waits until ${date(own!.currentPeriodEnd)}. If you don't, you move to Free and nothing is locked.`
+        : "When it ends you move to Free. Nothing is locked or deleted.",
+      actions: payments
+        ? [{ key: "own-free-sub", label: "Choose a plan", run: async () => scrollToId("billing-plans"), primary: true }]
         : [],
     });
   }
@@ -150,6 +165,16 @@ const AttentionList = ({
         text: "Subscribe to keep the company open. Unpaid, it's suspended: items hidden but kept.",
         actions: payments
           ? [{ key: `sub-${company.id}`, label: "Subscribe", primary: true, run: async () => onSubscribeCompany(company) }]
+          : [],
+      });
+    } else if (isComplimentary(team) && daysLeft(team!.currentPeriodEnd) <= FREE_SOON_DAYS) {
+      items.push({
+        key: `free-${company.id}`,
+        tone: "info",
+        title: `${company.name}'s free Team ends in ${days(daysLeft(team!.currentPeriodEnd))}`,
+        text: `Subscribe to keep the company open; the first payment waits until ${date(team!.currentPeriodEnd)}. Unpaid, it's suspended: items hidden but kept.`,
+        actions: payments
+          ? [{ key: `free-sub-${company.id}`, label: "Subscribe", primary: true, run: async () => onSubscribeCompany(company) }]
           : [],
       });
     }

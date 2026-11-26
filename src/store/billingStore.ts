@@ -16,7 +16,8 @@ export interface PlanLimits {
 export interface BillingSubscription {
   id: number;
   plan: PlanId;
-  status: "trialing" | "active" | "past_due" | "canceled" | "expired";
+  /** "complimentary": free access given by the 2keevo team, until currentPeriodEnd. */
+  status: "trialing" | "active" | "past_due" | "canceled" | "expired" | "complimentary";
   interval: "month" | "year" | null;
   seats: number | null;
   trialEndsAt: string | null;

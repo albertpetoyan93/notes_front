@@ -38,6 +38,8 @@ const PlanCards = ({
   const payments = billing.payments?.enabled;
   const own = billing.source === "own" ? billing.subscription : null;
   const trialing = own?.live && own.status === "trialing" && !own.paid ? own.plan : null;
+  // Free access from the 2keevo team: subscribing now starts paying when it ends.
+  const free = own?.live && own.status === "complimentary" ? own.plan : null;
 
   const paid = (plan: "premium" | "family"): Card => {
     const monthly = monthlyCents(billing, plan, interval);
@@ -55,6 +57,15 @@ const PlanCards = ({
       },
     }[plan];
 
+    if (free === plan) {
+      return {
+        id: plan,
+        ...base,
+        tag: "Free now",
+        primary: payments ? { ...pay, label: `Subscribe, pay on ${date(own?.currentPeriodEnd || null)}` } : undefined,
+        note: payments ? "Your free access keeps running until then." : "Paid plans open soon.",
+      };
+    }
     if (trialing === plan) {
       return {
         id: plan,

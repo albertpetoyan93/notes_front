@@ -100,6 +100,12 @@ export const scrollToId = (id: string) =>
 
 /** A trial ending within this many days is flagged. */
 export const SOON_DAYS = 3;
+/** Free access from the 2keevo team ending within this many days is flagged (the email goes out then too). */
+export const FREE_SOON_DAYS = 7;
+
+/** Free access from the 2keevo team that is still on. */
+export const isComplimentary = (subscription: { status: string; live: boolean } | null | undefined) =>
+  !!subscription?.live && subscription.status === "complimentary";
 
 /** True when a company the person owns has something to fix: suspended, a failed payment or a trial ending soon. */
 export const companyNeedsAttention = (company: BillingCompany) => {
@@ -108,6 +114,7 @@ export const companyNeedsAttention = (company: BillingCompany) => {
   return (
     company.status === "suspended" ||
     team?.status === "past_due" ||
-    (team?.status === "trialing" && !team.paid && daysLeft(team.trialEndsAt) <= SOON_DAYS)
+    (team?.status === "trialing" && !team.paid && daysLeft(team.trialEndsAt) <= SOON_DAYS) ||
+    (isComplimentary(team) && daysLeft(team!.currentPeriodEnd) <= FREE_SOON_DAYS)
   );
 };

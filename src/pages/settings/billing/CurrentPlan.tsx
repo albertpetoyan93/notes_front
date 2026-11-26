@@ -53,6 +53,13 @@ const CurrentPlan = ({ billing }: { billing: Billing }) => {
       sub = paidPlan
         ? `Then ${perPeriod(monthlyCents(billing, paidPlan, "year"), "year")} or ${perPeriod(monthlyCents(billing, paidPlan, "month"), "month")}, if you subscribe. Nothing is charged.`
         : "Nothing is charged.";
+    } else if (live.status === "complimentary") {
+      badge = `Free from 2keevo · ${days(daysLeft(live.currentPeriodEnd))} left`;
+      badgeColor = "purple";
+      line = `Free until ${date(live.currentPeriodEnd)}, a gift from the 2keevo team`;
+      sub = paidPlan
+        ? `Nothing is charged. To keep it after that, subscribe any time: ${perPeriod(monthlyCents(billing, paidPlan, "year"), "year")} or ${perPeriod(monthlyCents(billing, paidPlan, "month"), "month")}, first payment on ${date(live.currentPeriodEnd)}.`
+        : "Nothing is charged.";
     } else if (live.cancelAtPeriodEnd || live.status === "canceled") {
       badge = "Cancelled";
       line = `Paid features stay until ${date(live.currentPeriodEnd)}`;
@@ -171,7 +178,7 @@ const CurrentPlan = ({ billing }: { billing: Billing }) => {
                 </Button>
               </>
             )}
-            {live?.status === "trialing" && !paid && payments && (
+            {(live?.status === "trialing" || live?.status === "complimentary") && !paid && payments && (
               <Button type="primary" onClick={() => scrollToId("billing-plans")}>
                 Subscribe
               </Button>

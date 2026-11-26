@@ -65,6 +65,17 @@ const CompanyCard = ({
         detail: `Billed yearly, or ${money(teamMonthly(billing, company, "month"))} monthly${afterDiscount}`,
       },
     ];
+  } else if (team && !paid && team.status === "complimentary") {
+    tag = { label: "Team · free from 2keevo", color: "purple" };
+    facts = [
+      { label: "Free until", value: date(team.currentPeriodEnd), detail: `${days(daysLeft(team.currentPeriodEnd))} left · a gift from the 2keevo team` },
+      seatsFact,
+      {
+        label: "After that",
+        value: yearlyLine(teamMonthly(billing, company, "year")),
+        detail: `If you subscribe. Billed yearly, or ${money(teamMonthly(billing, company, "month"))} monthly${afterDiscount}`,
+      },
+    ];
   } else if (team && paid) {
     const monthly = teamMonthly(billing, company, interval);
     const firstPayment = team.trialEndsAt && new Date(team.trialEndsAt).getTime() > Date.now();
